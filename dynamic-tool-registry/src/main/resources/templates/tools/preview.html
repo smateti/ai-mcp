@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Preview Tool</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="container">
+        <h1>Preview Tool</h1>
+
+        <form th:action="@{/tools/register}" method="post">
+            <input type="hidden" name="toolId" th:value="${request.toolId}">
+            <input type="hidden" name="openApiEndpoint" th:value="${request.openApiEndpoint}">
+            <input type="hidden" name="path" th:value="${request.path}">
+            <input type="hidden" name="httpMethod" th:value="${request.httpMethod}">
+
+            <div class="preview-section">
+                <h2>Tool Information</h2>
+                <table class="info-table">
+                    <tr>
+                        <th>Tool ID:</th>
+                        <td th:text="${request.toolId}"></td>
+                    </tr>
+                    <tr>
+                        <th>Name:</th>
+                        <td th:text="${preview.name}"></td>
+                    </tr>
+                    <tr>
+                        <th>Description (from OpenAPI):</th>
+                        <td th:text="${preview.description}"></td>
+                    </tr>
+                    <tr>
+                        <th>HTTP Method:</th>
+                        <td th:text="${preview.httpMethod}"></td>
+                    </tr>
+                    <tr>
+                        <th>Path:</th>
+                        <td th:text="${preview.path}"></td>
+                    </tr>
+                    <tr th:if="${preview.baseUrl != null}">
+                        <th>Base URL (from OpenAPI):</th>
+                        <td th:text="${preview.baseUrl}"></td>
+                    </tr>
+                </table>
+
+                <div class="form-group">
+                    <label for="baseUrl">Base URL (editable):</label>
+                    <input type="text" id="baseUrl" name="baseUrl" th:value="${preview.baseUrl}"
+                           placeholder="https://api.example.com">
+                    <small>You can override the base URL from OpenAPI spec if needed</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="humanReadableDescription">Human-Readable Explanation for AI Models:</label>
+                    <textarea id="humanReadableDescription" name="humanReadableDescription" rows="4"
+                             placeholder="Add a clear explanation of what this tool does, when to use it, and any important context that an AI model should know..."
+                             th:text="${preview.description}"></textarea>
+                    <small>This helps AI models understand the purpose and usage of this tool. (Pre-populated with OpenAPI description - you can edit it)</small>
+                </div>
+            </div>
+
+            <div class="section" th:unless="${#lists.isEmpty(preview.parameters)}">
+                <h2>Parameters</h2>
+                <p><small>Add human-readable explanations and examples for each parameter to help AI models understand how to use them correctly.</small></p>
+
+                <th:block th:each="parameter, iterStat : ${preview.parameters}">
+                    <div class="form-group" th:style="'margin-left: ' + (${parameter.nestingLevel} * 20) + 'px;'">
+                        <label>
+                            <span th:if="${parameter.nestingLevel > 0}">└─ </span>
+                            <strong th:text="${parameter.name}"></strong>
+                            (<span th:text="${parameter.type}"></span>,
+                            <span th:text="${parameter.required ? 'required' : 'optional'}"></span>)
+                        </label>
+
+                        <div style="background-color: #f5f5f5; padding: 5px; margin-bottom: 5px; border-radius: 3px;">
+                            <small><strong>OpenAPI Description:</strong> <span th:text="${parameter.description != null ? parameter.description : '(no description)'}"></span></small>
+                            <br/>
+                            <small><strong>OpenAPI Example:</strong> <span th:text="${parameter.example != null ? parameter.example : '(no example)'}"></span></small>
+                            <br th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}"/>
+                            <small th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}">
+                                <strong>Allowed Values:</strong> <span th:text="${#strings.listJoin(parameter.enumValues, ', ')}"></span>
+                            </small>
+                        </div>
+
+                        <input type="hidden" name="paramNames" th:value="${parameter.name}">
+                        <input type="hidden" name="paramTypes" th:value="${parameter.type}">
+                        <input type="hidden" name="paramRequired" th:value="${parameter.required}">
+                        <input type="hidden" name="paramIn" th:value="${parameter.in}">
+                        <input type="hidden" name="paramDescriptions" th:value="${parameter.description}">
+                        <input type="hidden" name="paramNestingLevels" th:value="${parameter.nestingLevel}">
+
+                        <label style="font-weight: normal; font-size: 0.9em;">
+                            Human-Readable Description:
+                        </label>
+                        <textarea name="paramHumanDescriptions"
+                                 rows="2"
+                                 placeholder="Add a human-readable explanation for AI models..."
+                                 th:text="${parameter.description}"></textarea>
+
+                        <label style="font-weight: normal; font-size: 0.9em; margin-top: 5px;">
+                            Custom Example (optional):
+                        </label>
+                        <input name="paramExamples"
+                               type="text"
+                               th:value="${parameter.example}"
+                               placeholder="Add or override example value..."/>
+                    </div>
+
+                    <!-- Recursively display nested parameters -->
+                    <th:block th:if="${!parameter.nestedParameters.isEmpty()}" th:insert="~{:: nested-parameter-preview-edit(${parameter.nestedParameters})}"></th:block>
+                </th:block>
+            </div>
+
+            <!-- Nested parameters recursive edit template -->
+            <th:block th:fragment="nested-parameter-preview-edit(params)">
+                <th:block th:each="parameter : ${params}">
+                    <div class="form-group" th:style="'margin-left: ' + (${parameter.nestingLevel} * 20) + 'px;'">
+                        <label>
+                            <span th:if="${parameter.nestingLevel > 0}">└─ </span>
+                            <strong th:text="${parameter.name}"></strong>
+                            (<span th:text="${parameter.type}"></span>,
+                            <span th:text="${parameter.required ? 'required' : 'optional'}"></span>)
+                        </label>
+
+                        <div style="background-color: #f5f5f5; padding: 5px; margin-bottom: 5px; border-radius: 3px;">
+                            <small><strong>OpenAPI Description:</strong> <span th:text="${parameter.description != null ? parameter.description : '(no description)'}"></span></small>
+                            <br/>
+                            <small><strong>OpenAPI Example:</strong> <span th:text="${parameter.example != null ? parameter.example : '(no example)'}"></span></small>
+                            <br th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}"/>
+                            <small th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}">
+                                <strong>Allowed Values:</strong> <span th:text="${#strings.listJoin(parameter.enumValues, ', ')}"></span>
+                            </small>
+                        </div>
+
+                        <input type="hidden" name="paramNames" th:value="${parameter.name}">
+                        <input type="hidden" name="paramTypes" th:value="${parameter.type}">
+                        <input type="hidden" name="paramRequired" th:value="${parameter.required}">
+                        <input type="hidden" name="paramIn" th:value="${parameter.in}">
+                        <input type="hidden" name="paramDescriptions" th:value="${parameter.description}">
+                        <input type="hidden" name="paramNestingLevels" th:value="${parameter.nestingLevel}">
+
+                        <label style="font-weight: normal; font-size: 0.9em;">
+                            Human-Readable Description:
+                        </label>
+                        <textarea name="paramHumanDescriptions"
+                                 rows="2"
+                                 placeholder="Add a human-readable explanation for AI models..."
+                                 th:text="${parameter.description}"></textarea>
+
+                        <label style="font-weight: normal; font-size: 0.9em; margin-top: 5px;">
+                            Custom Example (optional):
+                        </label>
+                        <input name="paramExamples"
+                               type="text"
+                               th:value="${parameter.example}"
+                               placeholder="Add or override example value..."/>
+                    </div>
+                    <th:block th:if="${!parameter.nestedParameters.isEmpty()}" th:insert="~{:: nested-parameter-preview-edit(${parameter.nestedParameters})}"></th:block>
+                </th:block>
+            </th:block>
+
+            <div class="section" th:unless="${#lists.isEmpty(preview.responses)}">
+                <h2>Response Descriptions</h2>
+                <p><small>Add human-readable explanations for each response to help AI models understand the output.</small></p>
+
+                <th:block th:each="response : ${preview.responses}">
+                    <div class="form-group">
+                        <label>
+                            <strong>Status Code: <span th:text="${response.statusCode}"></span></strong>
+                            (<span th:text="${response.type != null ? response.type : 'no content type'}"></span>)
+                        </label>
+
+                        <div style="background-color: #f5f5f5; padding: 5px; margin-bottom: 5px; border-radius: 3px;">
+                            <small><strong>OpenAPI Description:</strong> <span th:text="${response.description != null ? response.description : '(no description)'}"></span></small>
+                        </div>
+
+                        <input type="hidden" name="responseStatusCodes" th:value="${response.statusCode}">
+                        <input type="hidden" name="responseDescriptions" th:value="${response.description}">
+                        <input type="hidden" name="responseTypes" th:value="${response.type}">
+
+                        <label style="font-weight: normal; font-size: 0.9em;">
+                            Human-Readable Description:
+                        </label>
+                        <textarea name="responseHumanDescriptions"
+                                 rows="2"
+                                 placeholder="Explain what this response means and when it occurs..."
+                                 th:text="${response.description}"></textarea>
+                    </div>
+
+                    <!-- Editable nested response parameters -->
+                    <div th:unless="${#lists.isEmpty(response.parameters)}" style="margin-left: 20px; margin-top: 10px;">
+                        <h4>Response Properties (editable):</h4>
+                        <p><small>Add human-readable explanations for response properties to help AI models understand the output structure.</small></p>
+                        <th:block th:each="parameter : ${response.parameters}">
+                            <div class="form-group" th:style="'margin-left: ' + (${parameter.nestingLevel} * 20) + 'px; background-color: #f9f9f9; padding: 10px; margin-bottom: 10px; border-left: 3px solid #3498db;'">
+                                <label>
+                                    <span th:if="${parameter.nestingLevel > 0}">└─ </span>
+                                    <strong th:text="${parameter.name}"></strong>
+                                    (<span th:text="${parameter.type}"></span>)
+                                </label>
+
+                                <div style="background-color: #ffffff; padding: 5px; margin-bottom: 5px; border-radius: 3px;">
+                                    <small><strong>OpenAPI Description:</strong> <span th:text="${parameter.description != null ? parameter.description : '(no description)'}"></span></small>
+                                    <br th:if="${parameter.example != null}"/>
+                                    <small th:if="${parameter.example != null}"><strong>OpenAPI Example:</strong> <span th:text="${parameter.example}"></span></small>
+                                    <br th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}"/>
+                                    <small th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}">
+                                        <strong>Allowed Values:</strong> <span th:text="${#strings.listJoin(parameter.enumValues, ', ')}"></span>
+                                    </small>
+                                </div>
+
+                                <input type="hidden" name="responseParamNames" th:value="${parameter.name}">
+                                <input type="hidden" name="responseParamTypes" th:value="${parameter.type}">
+                                <input type="hidden" name="responseParamDescriptions" th:value="${parameter.description}">
+                                <input type="hidden" name="responseParamNestingLevels" th:value="${parameter.nestingLevel}">
+                                <input type="hidden" name="responseParamStatusCodes" th:value="${response.statusCode}">
+
+                                <label style="font-weight: normal; font-size: 0.9em;">
+                                    Human-Readable Description:
+                                </label>
+                                <textarea name="responseParamHumanDescriptions"
+                                         rows="2"
+                                         placeholder="Add a human-readable explanation for AI models..."
+                                         th:text="${parameter.description}"></textarea>
+
+                                <label style="font-weight: normal; font-size: 0.9em; margin-top: 5px;">
+                                    Custom Example (optional):
+                                </label>
+                                <input name="responseParamExamples"
+                                       type="text"
+                                       th:value="${parameter.example}"
+                                       placeholder="Add or override example value..."/>
+                            </div>
+                            <!-- Recursively display nested response parameters -->
+                            <th:block th:if="${!parameter.nestedParameters.isEmpty()}" th:insert="~{:: nested-response-parameter-preview-edit(${parameter.nestedParameters}, ${response.statusCode})}"></th:block>
+                        </th:block>
+                    </div>
+                </th:block>
+            </div>
+
+            <!-- Nested response parameters recursive template -->
+            <th:block th:fragment="nested-response-parameter-preview-edit(params, statusCode)">
+                <th:block th:each="parameter : ${params}">
+                    <div class="form-group" th:style="'margin-left: ' + (${parameter.nestingLevel} * 20) + 'px; background-color: #f9f9f9; padding: 10px; margin-bottom: 10px; border-left: 3px solid #3498db;'">
+                        <label>
+                            <span th:if="${parameter.nestingLevel > 0}">└─ </span>
+                            <strong th:text="${parameter.name}"></strong>
+                            (<span th:text="${parameter.type}"></span>)
+                        </label>
+
+                        <div style="background-color: #ffffff; padding: 5px; margin-bottom: 5px; border-radius: 3px;">
+                            <small><strong>OpenAPI Description:</strong> <span th:text="${parameter.description != null ? parameter.description : '(no description)'}"></span></small>
+                            <br th:if="${parameter.example != null}"/>
+                            <small th:if="${parameter.example != null}"><strong>OpenAPI Example:</strong> <span th:text="${parameter.example}"></span></small>
+                            <br th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}"/>
+                            <small th:if="${parameter.enumValues != null and !parameter.enumValues.isEmpty()}">
+                                <strong>Allowed Values:</strong> <span th:text="${#strings.listJoin(parameter.enumValues, ', ')}"></span>
+                            </small>
+                        </div>
+
+                        <input type="hidden" name="responseParamNames" th:value="${parameter.name}">
+                        <input type="hidden" name="responseParamTypes" th:value="${parameter.type}">
+                        <input type="hidden" name="responseParamDescriptions" th:value="${parameter.description}">
+                        <input type="hidden" name="responseParamNestingLevels" th:value="${parameter.nestingLevel}">
+                        <input type="hidden" name="responseParamStatusCodes" th:value="${statusCode}">
+
+                        <label style="font-weight: normal; font-size: 0.9em;">
+                            Human-Readable Description:
+                        </label>
+                        <textarea name="responseParamHumanDescriptions"
+                                 rows="2"
+                                 placeholder="Add a human-readable explanation for AI models..."
+                                 th:text="${parameter.description}"></textarea>
+
+                        <label style="font-weight: normal; font-size: 0.9em; margin-top: 5px;">
+                            Custom Example (optional):
+                        </label>
+                        <input name="responseParamExamples"
+                               type="text"
+                               th:value="${parameter.example}"
+                               placeholder="Add or override example value..."/>
+                    </div>
+                    <th:block th:if="${!parameter.nestedParameters.isEmpty()}" th:insert="~{:: nested-response-parameter-preview-edit(${parameter.nestedParameters}, ${statusCode})}"></th:block>
+                </th:block>
+            </th:block>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Confirm Registration</button>
+                <a th:href="@{/tools/new}" class="btn btn-secondary">Back to Form</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Server Test Console</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding: 25px;
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            transition: border-color 0.3s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .code-block pre {
+            margin: 0;
+        }
+
+        .tools-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .tool-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tool-card:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .tool-card h3 {
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .tool-card p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-ready {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .response-success {
+            border-left: 4px solid #28a745;
+        }
+
+        .response-error {
+            border-left: 4px solid #dc3545;
+        }
+
+        .json-key {
+            color: #9cdcfe;
+        }
+
+        .json-string {
+            color: #ce9178;
+        }
+
+        .json-number {
+            color: #b5cea8;
+        }
+
+        .json-boolean {
+            color: #569cd6;
+        }
+
+        .json-null {
+            color: #569cd6;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .copy-btn {
+            float: right;
+            background: #444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .copy-btn:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MCP Server Test Console</h1>
+            <p>Test your Model Context Protocol tools with a beautiful interface</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Left Panel - Request Builder -->
+            <div class="panel">
+                <h2>📝 Request Builder</h2>
+
+                <div class="form-group">
+                    <label for="method">MCP Method:</label>
+                    <select id="method" onchange="updateMethodFields()">
+                        <option value="initialize">initialize - Initialize MCP connection</option>
+                        <option value="tools/list">tools/list - List all available tools</option>
+                        <option value="tools/call">tools/call - Execute a tool</option>
+                    </select>
+                </div>
+
+                <div id="initializeFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="clientName">Client Name:</label>
+                        <input type="text" id="clientName" value="MCP Test Client" />
+                    </div>
+                    <div class="form-group">
+                        <label for="clientVersion">Client Version:</label>
+                        <input type="text" id="clientVersion" value="1.0.0" />
+                    </div>
+                </div>
+
+                <div id="toolsCallFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="toolName">Tool Name:</label>
+                        <select id="toolName" onchange="loadToolSchema()">
+                            <option value="">-- Select a tool --</option>
+                            <option th:each="tool : ${tools}"
+                                    th:value="${tool.name}"
+                                    th:text="${tool.name}"></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolArguments">Tool Arguments (JSON):</label>
+                        <textarea id="toolArguments" placeholder='{"key": "value"}'>{}</textarea>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="buildAndDisplayRequest()">
+                        🔨 Build Request
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearAll()">
+                        🗑️ Clear
+                    </button>
+                </div>
+
+                <h2 style="margin-top: 30px;">📤 JSON-RPC Request</h2>
+                <button class="copy-btn" onclick="copyRequest()">📋 Copy</button>
+                <div class="code-block" id="requestDisplay">
+                    <pre>// Click "Build Request" to generate JSON-RPC request</pre>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="executeRequest()">
+                        ▶️ Execute Request
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel - Available Tools -->
+            <div class="panel">
+                <h2>🛠️ Available Tools <span class="status-indicator status-ready" th:text="${#lists.size(tools)} + ' tools'"></span></h2>
+
+                <div class="tools-list">
+                    <div class="tool-card" th:each="tool : ${tools}" th:data-tool-name="${tool.name}" onclick="selectToolFromCard(this)">
+                        <h3 th:text="${tool.name}">Tool Name</h3>
+                        <p th:text="${tool.description}">Tool Description</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Panel - Response -->
+            <div class="panel full-width">
+                <h2>📥 JSON-RPC Response <span id="responseStatus"></span></h2>
+                <button class="copy-btn" onclick="copyResponse()">📋 Copy</button>
+                <div class="code-block" id="responseDisplay">
+                    <pre>// Response will appear here after execution</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        let currentRequest = null;
+        let requestId = 1;
+
+        const tools = /*[[${tools}]]*/ [];
+        const toolSchemas = new Map();
+
+        function updateMethodFields() {
+            const method = document.getElementById('method').value;
+            document.getElementById('initializeFields').style.display =
+                method === 'initialize' ? 'block' : 'none';
+            document.getElementById('toolsCallFields').style.display =
+                method === 'tools/call' ? 'block' : 'none';
+
+            buildAndDisplayRequest();
+        }
+
+        function buildAndDisplayRequest() {
+            const method = document.getElementById('method').value;
+            const request = {
+                jsonrpc: "2.0",
+                id: requestId,
+                method: method
+            };
+
+            if (method === 'initialize') {
+                request.params = {
+                    protocolVersion: "2024-11-05",
+                    capabilities: {},
+                    clientInfo: {
+                        name: document.getElementById('clientName').value,
+                        version: document.getElementById('clientVersion').value
+                    }
+                };
+            } else if (method === 'tools/call') {
+                const toolName = document.getElementById('toolName').value;
+                const argsText = document.getElementById('toolArguments').value;
+
+                try {
+                    const args = argsText.trim() ? JSON.parse(argsText) : {};
+                    request.params = {
+                        name: toolName,
+                        arguments: args
+                    };
+                } catch (e) {
+                    alert('Invalid JSON in tool arguments: ' + e.message);
+                    return;
+                }
+            } else {
+                request.params = {};
+            }
+
+            currentRequest = request;
+            displayRequest(request);
+        }
+
+        function displayRequest(request) {
+            const formatted = JSON.stringify(request, null, 2);
+            const highlighted = syntaxHighlight(formatted);
+            document.getElementById('requestDisplay').innerHTML = '<pre>' + highlighted + '</pre>';
+        }
+
+        function displayResponse(response, isError = false) {
+            const formatted = JSON.stringify(response, null, 2);
+            const highlighted = syntaxHighlight(formatted);
+            const displayDiv = document.getElementById('responseDisplay');
+            displayDiv.innerHTML = '<pre>' + highlighted + '</pre>';
+
+            if (isError) {
+                displayDiv.parentElement.classList.add('response-error');
+                displayDiv.parentElement.classList.remove('response-success');
+            } else {
+                displayDiv.parentElement.classList.add('response-success');
+                displayDiv.parentElement.classList.remove('response-error');
+            }
+
+            const statusSpan = document.getElementById('responseStatus');
+            if (isError) {
+                statusSpan.innerHTML = '<span class="status-indicator status-error">Error</span>';
+            } else {
+                statusSpan.innerHTML = '<span class="status-indicator status-ready">Success</span>';
+            }
+        }
+
+        async function executeRequest() {
+            if (!currentRequest) {
+                alert('Please build a request first');
+                return;
+            }
+
+            const statusSpan = document.getElementById('responseStatus');
+            statusSpan.innerHTML = '<span class="status-indicator status-loading">Executing...</span>';
+
+            try {
+                const response = await fetch('/mcp/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(currentRequest)
+                });
+
+                const result = await response.json();
+                displayResponse(result, result.error !== undefined);
+                requestId++;
+
+            } catch (error) {
+                displayResponse({
+                    jsonrpc: "2.0",
+                    id: currentRequest.id,
+                    error: {
+                        code: -32603,
+                        message: "Network error: " + error.message
+                    }
+                }, true);
+            }
+        }
+
+        async function loadToolSchema() {
+            const toolName = document.getElementById('toolName').value;
+            if (!toolName) return;
+
+            try {
+                const response = await fetch('/mcp/tool/' + encodeURIComponent(toolName) + '/schema');
+                const schema = await response.json();
+                toolSchemas.set(toolName, schema);
+
+                // Generate sample arguments based on schema
+                if (schema.inputSchema && schema.inputSchema.properties) {
+                    const sampleArgs = {};
+                    for (const [key, prop] of Object.entries(schema.inputSchema.properties)) {
+                        if (prop.type === 'string') {
+                            sampleArgs[key] = prop.description || 'string value';
+                        } else if (prop.type === 'number' || prop.type === 'integer') {
+                            sampleArgs[key] = 0;
+                        } else if (prop.type === 'boolean') {
+                            sampleArgs[key] = false;
+                        } else if (prop.type === 'array') {
+                            sampleArgs[key] = [];
+                        } else if (prop.type === 'object') {
+                            sampleArgs[key] = {};
+                        }
+                    }
+                    document.getElementById('toolArguments').value = JSON.stringify(sampleArgs, null, 2);
+                }
+
+                buildAndDisplayRequest();
+            } catch (error) {
+                console.error('Failed to load tool schema:', error);
+            }
+        }
+
+        function selectToolFromCard(element) {
+            const toolName = element.getAttribute('data-tool-name');
+            selectTool(toolName);
+        }
+
+        function selectTool(toolName) {
+            document.getElementById('method').value = 'tools/call';
+            updateMethodFields();
+            document.getElementById('toolName').value = toolName;
+            loadToolSchema();
+        }
+
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return '<span class="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        function copyRequest() {
+            const text = JSON.stringify(currentRequest, null, 2);
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Request copied to clipboard!');
+            });
+        }
+
+        function copyResponse() {
+            const text = document.getElementById('responseDisplay').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Response copied to clipboard!');
+            });
+        }
+
+        function clearAll() {
+            document.getElementById('method').value = 'initialize';
+            document.getElementById('clientName').value = 'MCP Test Client';
+            document.getElementById('clientVersion').value = '1.0.0';
+            document.getElementById('toolName').value = '';
+            document.getElementById('toolArguments').value = '{}';
+            document.getElementById('requestDisplay').innerHTML = '<pre>// Click "Build Request" to generate JSON-RPC request</pre>';
+            document.getElementById('responseDisplay').innerHTML = '<pre>// Response will appear here after execution</pre>';
+            document.getElementById('responseStatus').innerHTML = '';
+            currentRequest = null;
+            updateMethodFields();
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            updateMethodFields();
+        };
+    </script>
+</body>
+</html>

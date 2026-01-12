@@ -1,0 +1,138 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------------< com.example:mcp-chat-app >----------------------
+[INFO] Building MCP Chat Application 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.2.1:run (default-cli) > test-compile @ mcp-chat-app >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ mcp-chat-app ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ mcp-chat-app ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ mcp-chat-app ---
+[INFO] skip non existing resourceDirectory D:\apps\ws\ws8\mcp-chat-app\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ mcp-chat-app ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] <<< spring-boot:3.2.1:run (default-cli) < test-compile @ mcp-chat-app <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.2.1:run (default-cli) @ mcp-chat-app ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-11T17:51:15.887-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Starting McpChatApplication using Java 21.0.8 with PID 13040 (D:\apps\ws\ws8\mcp-chat-app\target\classes started by smate in D:\apps\ws\ws8\mcp-chat-app)
+2026-01-11T17:51:15.889-05:00 DEBUG 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-11T17:51:15.889-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-01-11T17:51:15.945-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-01-11T17:51:15.945-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-01-11T17:51:17.179-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-01-11T17:51:17.191-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-11T17:51:17.191-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-11T17:51:17.238-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-11T17:51:17.239-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1292 ms
+2026-01-11T17:51:17.505-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+2026-01-11T17:51:17.689-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2026-01-11T17:51:17.718-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path ''
+2026-01-11T17:51:17.727-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Started McpChatApplication in 2.406 seconds (process running for 2.943)
+2026-01-11T17:51:54.147-05:00  INFO 13040 --- [mcp-chat-app] [nio-8083-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-01-11T17:51:54.147-05:00  INFO 13040 --- [mcp-chat-app] [nio-8083-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-01-11T17:51:54.148-05:00  INFO 13040 --- [mcp-chat-app] [nio-8083-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-01-11T17:52:08.673-05:00  INFO 13040 --- [mcp-chat-app] [nio-8083-exec-5] c.e.chat.controller.ChatController       : Received message from session b0947987-0da1-4aed-b365-110c24cb2608: /help
+2026-01-11T17:52:08.674-05:00  INFO 13040 --- [mcp-chat-app] [nio-8083-exec-5] com.example.chat.service.ChatService     : Executing tool command: help with args: 
+2026-01-11T17:52:08.771-05:00  WARN 13040 --- [mcp-chat-app] [nio-8083-exec-7] .w.s.m.s.DefaultHandlerExceptionResolver : Resolved [org.springframework.http.converter.HttpMessageNotReadableException: JSON parse error: Unrecognized character escape '!' (code 33)]
+2026-01-11T17:52:38.820-05:00  INFO 13040 --- [mcp-chat-app] [   File Watcher] rtingClassPathChangeChangedEventListener : Restarting due to 11 class path changes (0 additions, 11 deletions, 0 modifications)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-11T17:52:38.971-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Starting McpChatApplication using Java 21.0.8 with PID 13040 (D:\apps\ws\ws8\mcp-chat-app\target\classes started by smate in D:\apps\ws\ws8\mcp-chat-app)
+2026-01-11T17:52:38.971-05:00 DEBUG 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-11T17:52:38.972-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-01-11T17:52:39.176-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-01-11T17:52:39.179-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-11T17:52:39.179-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-11T17:52:39.203-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-11T17:52:39.203-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 193 ms
+2026-01-11T17:52:39.253-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+2026-01-11T17:52:39.300-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2026-01-11T17:52:39.306-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path ''
+2026-01-11T17:52:39.307-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Started McpChatApplication in 0.4 seconds (process running for 84.524)
+2026-01-11T17:52:39.308-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+2026-01-11T17:52:47.878-05:00  INFO 13040 --- [mcp-chat-app] [   File Watcher] rtingClassPathChangeChangedEventListener : Restarting due to 1 class path change (1 addition, 0 deletions, 0 modifications)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-11T17:52:47.965-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Starting McpChatApplication using Java 21.0.8 with PID 13040 (D:\apps\ws\ws8\mcp-chat-app\target\classes started by smate in D:\apps\ws\ws8\mcp-chat-app)
+2026-01-11T17:52:47.965-05:00 DEBUG 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-11T17:52:47.965-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-01-11T17:52:48.059-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-01-11T17:52:48.060-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-11T17:52:48.064-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-11T17:52:48.083-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-11T17:52:48.083-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 116 ms
+2026-01-11T17:52:48.105-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+2026-01-11T17:52:48.123-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2026-01-11T17:52:48.144-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path ''
+2026-01-11T17:52:48.145-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Started McpChatApplication in 0.203 seconds (process running for 93.361)
+2026-01-11T17:52:48.145-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+2026-01-11T17:52:49.553-05:00  INFO 13040 --- [mcp-chat-app] [   File Watcher] rtingClassPathChangeChangedEventListener : Restarting due to 10 class path changes (10 additions, 0 deletions, 0 modifications)
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-11T17:52:49.620-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Starting McpChatApplication using Java 21.0.8 with PID 13040 (D:\apps\ws\ws8\mcp-chat-app\target\classes started by smate in D:\apps\ws\ws8\mcp-chat-app)
+2026-01-11T17:52:49.620-05:00 DEBUG 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-11T17:52:49.621-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-01-11T17:52:49.713-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-01-11T17:52:49.715-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-11T17:52:49.716-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-11T17:52:49.732-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-11T17:52:49.732-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 111 ms
+2026-01-11T17:52:49.766-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+2026-01-11T17:52:49.779-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2026-01-11T17:52:49.796-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path ''
+2026-01-11T17:52:49.797-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] com.example.chat.McpChatApplication      : Started McpChatApplication in 0.189 seconds (process running for 95.013)
+2026-01-11T17:52:49.797-05:00  INFO 13040 --- [mcp-chat-app] [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:58 min
+[INFO] Finished at: 2026-01-11T17:53:06-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.2.1:run (default-cli) on project mcp-chat-app: Process terminated with exit code: 1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

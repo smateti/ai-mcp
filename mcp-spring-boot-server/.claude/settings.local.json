@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean package:*)",
+      "Bash(curl:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(timeout 2 java:*)",
+      "Bash(cat:*)",
+      "Bash(findstr:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(netstat:*)"
+    ]
+  }
+}

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP SSE Streaming Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding: 25px;
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group select,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            margin-top: 10px;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .stream-display {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 500px;
+            min-height: 300px;
+        }
+
+        .event-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 3px solid #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 4px;
+        }
+
+        .event-status {
+            border-left-color: #28a745;
+        }
+
+        .event-error {
+            border-left-color: #dc3545;
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        .event-result {
+            border-left-color: #17a2b8;
+            background: rgba(23, 162, 184, 0.1);
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .event-type {
+            font-weight: bold;
+            color: #9cdcfe;
+        }
+
+        .event-time {
+            color: #858585;
+            font-size: 11px;
+        }
+
+        .event-data {
+            color: #ce9178;
+            white-space: pre-wrap;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-idle {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-streaming {
+            background: #fff3cd;
+            color: #856404;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MCP SSE Streaming Demo</h1>
+            <p>Real-time Server-Sent Events for Tool Execution</p>
+        </div>
+
+        <div class="main-grid">
+            <!-- Left Panel - Controls -->
+            <div class="panel">
+                <h2>📝 Stream Configuration</h2>
+
+                <div class="form-group">
+                    <label for="toolSelect">Select Tool:</label>
+                    <select id="toolSelect" onchange="updateParameterInputs()">
+                        <option value="echo">echo - Echo message</option>
+                        <option value="add">add - Add two numbers</option>
+                        <option value="get_current_time">get_current_time - Get server time</option>
+                        <option value="jsonplaceholder-user">jsonplaceholder-user - Fetch user data</option>
+                        <option value="rag_query">rag_query - Query RAG knowledge base</option>
+                    </select>
+                </div>
+
+                <div id="parameterInputs">
+                    <!-- Dynamic parameter inputs will be inserted here -->
+                </div>
+
+                <button class="btn btn-primary" id="startBtn" onclick="startStreaming()">
+                    ▶️ Start Streaming
+                </button>
+
+                <button class="btn btn-danger" id="stopBtn" onclick="stopStreaming()" disabled>
+                    ⏹️ Stop Streaming
+                </button>
+
+                <div class="stats" style="margin-top: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="eventCount">0</div>
+                        <div class="stat-label">Events Received</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="duration">0s</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statusBadge">
+                            <span class="status-indicator status-idle">Idle</span>
+                        </div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Info -->
+            <div class="panel">
+                <h2>ℹ️ About SSE</h2>
+                <div style="line-height: 1.8;">
+                    <p><strong>Server-Sent Events (SSE)</strong> enable real-time streaming from server to client.</p>
+                    <br>
+                    <p><strong>Advantages:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>✅ Real-time progress updates</li>
+                        <li>✅ Automatic reconnection</li>
+                        <li>✅ Simple HTTP-based protocol</li>
+                        <li>✅ Works through firewalls</li>
+                        <li>✅ Lower overhead than polling</li>
+                        <li>✅ Native browser support</li>
+                    </ul>
+                    <br>
+                    <p><strong>Use Cases:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>📝 Stream LLM responses token-by-token</li>
+                        <li>📊 Show RAG ingestion progress</li>
+                        <li>⏱️ Monitor long-running operations</li>
+                        <li>🔔 Push real-time notifications</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Bottom Panel - Stream Output -->
+            <div class="panel full-width">
+                <h2>📥 Live Stream Output</h2>
+                <div class="stream-display" id="streamOutput">
+                    <div style="color: #858585; text-align: center; padding: 50px;">
+                        No stream active. Click "Start Streaming" to begin.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let eventCount = 0;
+        let startTime = null;
+        let durationInterval = null;
+
+        const toolParameters = {
+            echo: [{ name: 'message', type: 'text', placeholder: 'Enter message to echo' }],
+            add: [
+                { name: 'a', type: 'number', placeholder: 'First number' },
+                { name: 'b', type: 'number', placeholder: 'Second number' }
+            ],
+            get_current_time: [],
+            'jsonplaceholder-user': [{ name: 'userId', type: 'number', placeholder: 'User ID (1-10)' }],
+            rag_query: [{ name: 'question', type: 'text', placeholder: 'Your question' }]
+        };
+
+        function updateParameterInputs() {
+            const tool = document.getElementById('toolSelect').value;
+            const params = toolParameters[tool];
+            const container = document.getElementById('parameterInputs');
+
+            container.innerHTML = '';
+
+            params.forEach(param => {
+                const div = document.createElement('div');
+                div.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.textContent = param.name + ':';
+                label.setAttribute('for', param.name);
+
+                const input = document.createElement('input');
+                input.type = param.type;
+                input.id = param.name;
+                input.name = param.name;
+                input.placeholder = param.placeholder;
+
+                div.appendChild(label);
+                div.appendChild(input);
+                container.appendChild(div);
+            });
+        }
+
+        function startStreaming() {
+            const tool = document.getElementById('toolSelect').value;
+            const params = toolParameters[tool];
+
+            // Build query string
+            let queryParams = new URLSearchParams();
+            params.forEach(param => {
+                const value = document.getElementById(param.name).value;
+                if (value) {
+                    queryParams.append(param.name, value);
+                }
+            });
+
+            // Reset counters
+            eventCount = 0;
+            startTime = Date.now();
+            document.getElementById('eventCount').textContent = '0';
+            document.getElementById('duration').textContent = '0s';
+            document.getElementById('streamOutput').innerHTML = '';
+
+            // Start duration counter
+            durationInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('duration').textContent = elapsed + 's';
+            }, 1000);
+
+            // Update UI
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            updateStatus('streaming', 'Streaming');
+
+            // Create SSE connection
+            const url = `/mcp/stream/execute/${tool}?${queryParams.toString()}`;
+            eventSource = new EventSource(url);
+
+            eventSource.addEventListener('status', (e) => {
+                handleEvent('status', JSON.parse(e.data), e.lastEventId);
+            });
+
+            eventSource.addEventListener('result', (e) => {
+                handleEvent('result', JSON.parse(e.data), e.lastEventId);
+            });
+
+            eventSource.addEventListener('error', (e) => {
+                if (e.data) {
+                    handleEvent('error', JSON.parse(e.data), e.lastEventId);
+                } else {
+                    console.error('SSE error', e);
+                    stopStreaming();
+                }
+            });
+
+            eventSource.onerror = (e) => {
+                console.error('SSE connection error', e);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    stopStreaming();
+                    updateStatus('error', 'Error');
+                }
+            };
+        }
+
+        function stopStreaming() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            if (durationInterval) {
+                clearInterval(durationInterval);
+                durationInterval = null;
+            }
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+
+            if (eventCount === 0) {
+                updateStatus('idle', 'Idle');
+            } else {
+                updateStatus('complete', 'Complete');
+            }
+        }
+
+        function handleEvent(type, data, id) {
+            eventCount++;
+            document.getElementById('eventCount').textContent = eventCount;
+
+            const output = document.getElementById('streamOutput');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = `event-item event-${type}`;
+
+            const header = document.createElement('div');
+            header.className = 'event-header';
+
+            const typeSpan = document.createElement('span');
+            typeSpan.className = 'event-type';
+            typeSpan.textContent = type.toUpperCase();
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'event-time';
+            timeSpan.textContent = new Date().toLocaleTimeString();
+
+            header.appendChild(typeSpan);
+            header.appendChild(timeSpan);
+
+            const dataDiv = document.createElement('div');
+            dataDiv.className = 'event-data';
+            dataDiv.textContent = JSON.stringify(data, null, 2);
+
+            eventDiv.appendChild(header);
+            eventDiv.appendChild(dataDiv);
+            output.appendChild(eventDiv);
+
+            // Auto-scroll to bottom
+            output.scrollTop = output.scrollHeight;
+
+            // Check if stream is complete
+            if (data.stage === 'complete') {
+                setTimeout(stopStreaming, 1000);
+            }
+        }
+
+        function updateStatus(status, text) {
+            const badge = document.getElementById('statusBadge');
+            badge.innerHTML = `<span class="status-indicator status-${status}">${text}</span>`;
+        }
+
+        // Initialize
+        window.onload = function() {
+            updateParameterInputs();
+        };
+    </script>
+</body>
+</html>

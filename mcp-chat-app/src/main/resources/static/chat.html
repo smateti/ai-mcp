@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Chat - Claude Style</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      background: #f7f7f8;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background: #ffffff;
+      border-right: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .new-chat-btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: #2d2d2d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .new-chat-btn:hover {
+      background: #1a1a1a;
+    }
+
+    .conversations-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .conversation-item {
+      padding: 12px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 14px;
+      color: #374151;
+      border: 1px solid transparent;
+    }
+
+    .conversation-item:hover {
+      background: #f3f4f6;
+    }
+
+    .conversation-item.active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #1e40af;
+    }
+
+    .conversation-title {
+      font-weight: 500;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .conversation-date {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    /* Main Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .rag-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .rag-toggle input[type="checkbox"] {
+      width: 40px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      background: #f7f7f8;
+    }
+
+    .message {
+      max-width: 800px;
+      margin: 0 auto 24px;
+    }
+
+    .message-role {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      color: #6b7280;
+    }
+
+    .message-content {
+      padding: 16px;
+      border-radius: 8px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .message.user .message-content {
+      background: #eff6ff;
+      color: #1e40af;
+    }
+
+    .message.assistant .message-content {
+      background: #ffffff;
+      color: #1f2937;
+      border: 1px solid #e5e7eb;
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 16px 24px;
+      border-top: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+
+    .input-container {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .message-input {
+      width: 100%;
+      min-height: 60px;
+      max-height: 200px;
+      padding: 16px 60px 16px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      resize: none;
+      font-size: 14px;
+      font-family: inherit;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .message-input:focus {
+      border-color: #3b82f6;
+    }
+
+    .send-btn {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      width: 36px;
+      height: 36px;
+      background: #2d2d2d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      background: #1a1a1a;
+    }
+
+    .send-btn:disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #9ca3af;
+    }
+
+    .empty-state h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #6b7280;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+    }
+
+    .loading {
+      text-align: center;
+      color: #6b7280;
+      padding: 12px;
+      font-style: italic;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <button class="new-chat-btn" onclick="createNewConversation()">+ New Chat</button>
+      </div>
+      <div class="conversations-list" id="conversationsList">
+        <!-- Conversations will be loaded here -->
+      </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="chat-area">
+      <div class="chat-header">
+        <div class="chat-title" id="chatTitle">Select or create a conversation</div>
+      </div>
+      <div class="messages-container" id="messagesContainer">
+        <div class="empty-state">
+          <h2>Welcome to MCP Chat</h2>
+          <p>Create a new conversation or select an existing one to get started</p>
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="input-container">
+          <textarea
+            class="message-input"
+            id="messageInput"
+            placeholder="Type your message here..."
+            rows="1"
+            disabled
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentConversationId = null;
+    let conversations = [];
+
+    // Load conversations on page load
+    window.addEventListener('DOMContentLoaded', loadConversations);
+
+    async function loadConversations() {
+      try {
+        const response = await fetch('/api/conversations');
+        conversations = await response.json();
+        renderConversations();
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+      }
+    }
+
+    function renderConversations() {
+      const list = document.getElementById('conversationsList');
+      if (conversations.length === 0) {
+        list.innerHTML = '<div style="padding: 12px; text-align: center; color: #9ca3af; font-size: 14px;">No conversations yet</div>';
+        return;
+      }
+
+      list.innerHTML = conversations.map(conv => `
+        <div class="conversation-item ${conv.id === currentConversationId ? 'active' : ''}"
+             onclick="selectConversation(${conv.id})">
+          <div class="conversation-title">${escapeHtml(conv.title)}</div>
+          <div class="conversation-date">${formatDate(conv.updatedAt)} • ${conv.messageCount} messages</div>
+        </div>
+      `).join('');
+    }
+
+    async function createNewConversation() {
+      try {
+        const response = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'New Chat' })
+        });
+        const newConv = await response.json();
+        conversations.unshift(newConv);
+        renderConversations();
+        selectConversation(newConv.id);
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+        alert('Failed to create new conversation');
+      }
+    }
+
+    async function selectConversation(id) {
+      currentConversationId = id;
+      const conv = conversations.find(c => c.id === id);
+
+      document.getElementById('chatTitle').textContent = conv ? conv.title : 'Chat';
+      document.getElementById('messageInput').disabled = false;
+      document.getElementById('sendBtn').disabled = false;
+
+      renderConversations();
+      await loadMessages(id);
+    }
+
+    async function loadMessages(conversationId) {
+      const container = document.getElementById('messagesContainer');
+      container.innerHTML = '<div class="loading">Loading messages...</div>';
+
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}/messages`);
+        const messages = await response.json();
+
+        if (messages.length === 0) {
+          container.innerHTML = '<div class="empty-state"><h2>Start a conversation</h2><p>Send a message to get started</p></div>';
+        } else {
+          container.innerHTML = messages.map(msg => `
+            <div class="message ${msg.role}">
+              <div class="message-role">${msg.role}</div>
+              <div class="message-content">${escapeHtml(msg.content)}</div>
+            </div>
+          `).join('');
+          container.scrollTop = container.scrollHeight;
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        container.innerHTML = '<div class="empty-state"><p style="color: #ef4444;">Failed to load messages</p></div>';
+      }
+    }
+
+    async function sendMessage() {
+      if (!currentConversationId) return;
+
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (!message) return;
+
+      const sendBtn = document.getElementById('sendBtn');
+
+      // Disable input while sending
+      input.disabled = true;
+      sendBtn.disabled = true;
+
+      // Add user message to UI immediately
+      const container = document.getElementById('messagesContainer');
+      if (container.querySelector('.empty-state')) {
+        container.innerHTML = '';
+      }
+
+      container.innerHTML += `
+        <div class="message user">
+          <div class="message-role">user</div>
+          <div class="message-content">${escapeHtml(message)}</div>
+        </div>
+        <div class="loading">Thinking...</div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      input.value = '';
+
+      try {
+        const response = await fetch(`/api/conversations/${currentConversationId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        const result = await response.json();
+
+        // Remove loading and add assistant message
+        container.querySelector('.loading').remove();
+        container.innerHTML += `
+          <div class="message assistant">
+            <div class="message-role">assistant</div>
+            <div class="message-content">${escapeHtml(result.assistantMessage.content)}</div>
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+
+        // Update conversation list
+        await loadConversations();
+        renderConversations();
+
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        container.querySelector('.loading').textContent = 'Failed to send message';
+      } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    // Handle Enter key to send
+    document.getElementById('messageInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Auto-resize textarea
+    document.getElementById('messageInput').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString();
+    }
+  </script>
+</body>
+</html>

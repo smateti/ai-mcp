@@ -1,0 +1,49 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: mcp-chat-app
+
+  # H2 Database for chat history
+  datasource:
+    url: jdbc:h2:file:./data/mcp-chatdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+mcp:
+  server:
+    url: http://localhost:8082
+    execute-endpoint: /mcp/execute
+
+# Ollama configuration for LLM tool selection
+ollama:
+  base-url: http://localhost:11434
+  chat-model: llama3.1
+  timeout: 30000
+
+# Tool selection configuration
+tool:
+  selection:
+    confidence:
+      high-threshold: 0.8
+      low-threshold: 0.5
+    max-alternatives: 3
+    parameter-timeout-minutes: 5
+
+logging:
+  level:
+    com.example.chat: DEBUG
+    org.springframework.web: INFO

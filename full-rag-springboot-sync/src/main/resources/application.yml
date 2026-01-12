@@ -1,0 +1,74 @@
+server:
+  port: 8080
+  tomcat:
+    max-swallow-size: 200MB
+
+spring:
+  mvc:
+    view:
+      prefix: /WEB-INF/jsp/
+      suffix: .jsp
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+      file-size-threshold: 2MB
+
+  # H2 Database Configuration
+  datasource:
+    url: jdbc:h2:file:./data/chatdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Cache Configuration
+  cache:
+    type: ehcache
+    ehcache:
+      config: classpath:ehcache.xml
+
+rag:
+  llm:
+    provider: ollama  # llamacpp | ollama
+
+  llama:
+    embedBaseUrl: http://localhost:8000
+    embedModel: nomic_embed_text
+    chatBaseUrl: http://localhost:8000
+    chatModel: llama3.1
+
+  ollama:
+     baseUrl: http://localhost:11434
+     embedModel: nomic-embed-text
+     chatModel: llama3.1
+
+  qdrant:
+    baseUrl: http://localhost:6333
+    collection: rag_chunks_1
+
+    # Must match embedding dimension (length of embedding[0])
+    vectorSize: 768
+    distance: Cosine
+
+  chunking:
+    maxChars: 1200
+    overlapChars: 500
+    minChars: 500
+
+  retrieval:
+    topK: 5
+
+  performance:
+    maxConcurrentEmbeddings: 4
+    qdrantBatchSize: 64
