@@ -71,6 +71,10 @@ public class RagService {
   }
 
   public int ingest(String docId, String text) {
+    return ingest(docId, text, List.of());
+  }
+
+  public int ingest(String docId, String text, List<String> categories) {
     List<String> chunks = chunker.chunk(text);
     if (chunks.isEmpty()) return 0;
 
@@ -91,10 +95,19 @@ public class RagService {
           throw new IllegalStateException("Embedding vector looks wrong (dim=" + vec.size() + "). Check embedding server response parsing.");
         }
 
+        // Build payload with categories
+        Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("docId", docId);
+        payload.put("chunkIndex", i);
+        payload.put("text", chunk);
+        if (categories != null && !categories.isEmpty()) {
+          payload.put("categories", categories);
+        }
+
         Point p = new Point(
             stableId(docId + ":" + i + ":" + chunk),
             vec,
-            Map.of("docId", docId, "chunkIndex", i, "text", chunk)
+            payload
         );
 
         batch.add(p);
@@ -114,8 +127,12 @@ public class RagService {
   }
 
   public String ask(String question) {
+    return ask(question, null);
+  }
+
+  public String ask(String question, String category) {
     List<Double> qVec = embed.embed(question);
-    List<String> ctx = qdrant.searchPayloadTexts(qVec, topK);
+    List<String> ctx = qdrant.searchPayloadTexts(qVec, topK, category);
 
     String contextBlock = String.join("\n\n---\n\n", ctx);
 
@@ -142,11 +159,15 @@ Answer:
    * @return QueryResult containing answer and sources with relevance scores
    */
   public QueryResult askWithSources(String question, int topK) {
+    return askWithSources(question, topK, null);
+  }
+
+  public QueryResult askWithSources(String question, int topK, String category) {
     // Embed the question
     List<Double> qVec = embed.embed(question);
 
     // Search with scores
-    List<SearchResultWithScore> results = qdrant.searchWithScores(qVec, topK);
+    List<SearchResultWithScore> results = qdrant.searchWithScores(qVec, topK, category);
 
     // Build context from results
     String contextBlock = results.stream()

@@ -5,9 +5,9 @@ spring:
   application:
     name: service-dependency-api
 
-  # H2 Database Configuration
+  # H2 Database Configuration - File-based for persistence
   datasource:
-    url: jdbc:h2:mem:servicedb
+    url: jdbc:h2:file:./data/servicedb
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -20,13 +20,14 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: false
     defer-datasource-initialization: true
 
   sql:
     init:
       mode: always
+      continue-on-error: true
 
 # Swagger/OpenAPI Configuration
 springdoc:

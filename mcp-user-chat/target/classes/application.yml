@@ -1,0 +1,15 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: mcp-user-chat
+
+# External service URLs
+services:
+  category-admin: http://localhost:8085
+  mcp-chat: http://localhost:8083
+
+logging:
+  level:
+    com.example: DEBUG

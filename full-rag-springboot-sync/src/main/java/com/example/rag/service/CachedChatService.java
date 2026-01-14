@@ -1,90 +1,108 @@
 package com.example.rag.service;
 
 import com.example.rag.llm.ChatClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
  * Cached wrapper for chat services to avoid repeated LLM calls for the same questions.
  *
- * This service provides caching for both direct chat and RAG queries.
- * Now with frequency tracking - only frequently asked questions are cached.
+ * Features:
+ * - Caches all successful responses (30 min TTL)
+ * - Does NOT cache failures/errors
+ * - Evicts cache on service failures
+ * - No frequency tracking overhead
  */
 @Service
 public class CachedChatService {
 
+  private static final Logger log = LoggerFactory.getLogger(CachedChatService.class);
+
   private final ChatClient chatClient;
   private final RagService ragService;
-  private final QuestionFrequencyService frequencyService;
 
-  public CachedChatService(ChatClient chatClient,
-                           RagService ragService,
-                           QuestionFrequencyService frequencyService) {
+  public CachedChatService(ChatClient chatClient, RagService ragService) {
     this.chatClient = chatClient;
     this.ragService = ragService;
-    this.frequencyService = frequencyService;
   }
 
   /**
-   * Get chat response with smart caching based on frequency.
-   *
-   * Questions are only cached if they've been asked multiple times (threshold: 2).
-   * This prevents one-time questions from wasting cache space.
+   * Get chat response with caching.
+   * Cache is automatically evicted if service fails (exception thrown).
    *
    * @param prompt The user's question
    * @param temperature Temperature parameter for LLM
    * @param maxTokens Maximum tokens to generate
-   * @return LLM response (cached if frequent, fresh otherwise)
+   * @return LLM response (cached for 30 minutes)
    */
+  @Cacheable(value = "chatResponses", key = "#prompt", unless = "#result == null || #result.isEmpty()")
   public String getChatResponse(String prompt, double temperature, int maxTokens) {
-    // Track frequency and check if this should be cached
-    boolean isFrequent = frequencyService.recordAndCheckIfFrequent(prompt);
+    try {
+      log.debug("Cache miss or expired - fetching chat response for: {}", prompt);
+      String response = chatClient.chatOnce(prompt, temperature, maxTokens);
 
-    if (isFrequent) {
-      // Use cached version for frequently asked questions
-      return getChatResponseCached(prompt, temperature, maxTokens);
-    } else {
-      // Direct call for infrequent questions (not cached)
-      return chatClient.chatOnce(prompt, temperature, maxTokens);
+      // Check if response indicates an error
+      if (response == null || response.isEmpty() ||
+          response.toLowerCase().contains("error") ||
+          response.toLowerCase().contains("failed")) {
+        log.warn("Service returned error response, not caching");
+        throw new RuntimeException("Service error detected");
+      }
+
+      return response;
+    } catch (Exception e) {
+      log.error("Chat service failed, evicting cache for: {}", prompt, e);
+      evictChatCache(prompt);
+      throw e;
     }
   }
 
   /**
-   * Internal cached method - only called for frequent questions.
-   */
-  @Cacheable(value = "chatResponses", key = "#prompt")
-  protected String getChatResponseCached(String prompt, double temperature, int maxTokens) {
-    return chatClient.chatOnce(prompt, temperature, maxTokens);
-  }
-
-  /**
-   * Get RAG response with smart caching based on frequency.
-   *
-   * Questions are only cached if they've been asked multiple times (threshold: 2).
-   * RAG responses depend on document corpus, so caching is more selective.
+   * Get RAG response with caching.
+   * Cache is automatically evicted if service fails (exception thrown).
    *
    * @param question The user's question
-   * @return RAG-enhanced response (cached if frequent, fresh otherwise)
+   * @return RAG-enhanced response (cached for 30 minutes)
    */
+  @Cacheable(value = "ragResponses", key = "#question", unless = "#result == null || #result.isEmpty()")
   public String getRagResponse(String question) {
-    // Track frequency and check if this should be cached
-    boolean isFrequent = frequencyService.recordAndCheckIfFrequent(question);
+    try {
+      log.debug("Cache miss or expired - fetching RAG response for: {}", question);
+      String response = ragService.ask(question);
 
-    if (isFrequent) {
-      // Use cached version for frequently asked questions
-      return getRagResponseCached(question);
-    } else {
-      // Direct call for infrequent questions (not cached)
-      return ragService.ask(question);
+      // Check if response indicates an error
+      if (response == null || response.isEmpty() ||
+          response.toLowerCase().contains("error") ||
+          response.toLowerCase().contains("failed")) {
+        log.warn("RAG service returned error response, not caching");
+        throw new RuntimeException("RAG service error detected");
+      }
+
+      return response;
+    } catch (Exception e) {
+      log.error("RAG service failed, evicting cache for: {}", question, e);
+      evictRagCache(question);
+      throw e;
     }
   }
 
   /**
-   * Internal cached method - only called for frequent questions.
+   * Evict specific chat response from cache (used on failures)
    */
-  @Cacheable(value = "ragResponses", key = "#question")
-  protected String getRagResponseCached(String question) {
-    return ragService.ask(question);
+  @CacheEvict(value = "chatResponses", key = "#prompt")
+  public void evictChatCache(String prompt) {
+    log.info("Evicted cache for chat prompt: {}", prompt);
+  }
+
+  /**
+   * Evict specific RAG response from cache (used on failures)
+   */
+  @CacheEvict(value = "ragResponses", key = "#question")
+  public void evictRagCache(String question) {
+    log.info("Evicted cache for RAG question: {}", question);
   }
 
   /**

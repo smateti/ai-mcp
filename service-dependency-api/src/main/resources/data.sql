@@ -1,3 +1,10 @@
+-- Clear existing data to allow re-initialization
+-- These DELETE statements will be ignored on first run when tables don't exist yet
+DELETE FROM service_dependencies;
+DELETE FROM service_operations;
+DELETE FROM services;
+DELETE FROM applications;
+
 -- Insert 50 Applications
 INSERT INTO applications (id, application_id, name, description, owner, status) VALUES
 (1, 'APP-USER-MGMT', 'User Management System', 'Handles user authentication and profiles', 'Team Alpha', 'ACTIVE'),

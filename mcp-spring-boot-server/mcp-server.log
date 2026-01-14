@@ -7,42 +7,22 @@
  =========|_|==============|___/=/_/_/_/
  :: Spring Boot ::                (v3.2.1)
 
-2026-01-11T23:30:14.447-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Starting McpServerApplication using Java 21.0.9 with PID 30104 (D:\apps\ws\ws8\mcp-spring-boot-server\target\mcp-spring-boot-server-1.0.0.jar started by smate in D:\apps\ws\ws8\mcp-spring-boot-server)
-2026-01-11T23:30:14.448-05:00 DEBUG 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Running with Spring Boot v3.2.1, Spring v6.1.2
-2026-01-11T23:30:14.449-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : No active profile set, falling back to 1 default profile: "default"
-2026-01-11T23:30:18.332-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8082 (http)
-2026-01-11T23:30:18.350-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-2026-01-11T23:30:18.350-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
-2026-01-11T23:30:18.393-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-2026-01-11T23:30:18.397-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3592 ms
-2026-01-11T23:30:18.769-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered test API tool: jsonplaceholder-user - GET https://jsonplaceholder.typicode.com/users/{userId}
-2026-01-11T23:30:18.770-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered RAG tool: rag_ingest - POST http://localhost:8080/api/rag/ingest
-2026-01-11T23:30:18.771-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered RAG tool: rag_query - POST http://localhost:8080/api/rag/query
-2026-01-11T23:30:18.771-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Loading tools from dynamic tool registry...
-2026-01-11T23:30:18.771-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] c.e.mcp.service.ToolRegistryClient       : Fetching tools from registry at: http://localhost:8081
-2026-01-11T23:30:18.981-05:00 ERROR 30104 --- [mcp-spring-boot-server] [           main] c.e.mcp.service.ToolRegistryClient       : Failed to fetch tools from registry: Connection refused: getsockopt: localhost/127.0.0.1:8081
-2026-01-11T23:30:18.981-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Loaded 0 tools from registry
-2026-01-11T23:30:20.187-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8082 (http) with context path ''
-2026-01-11T23:30:20.235-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Started McpServerApplication in 7.384 seconds (process running for 8.911)
-2026-01-11T23:30:20.244-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] c.example.mcp.transport.StdioTransport   : MCP Server started - listening on stdio
-2026-01-11T23:30:20.244-05:00  INFO 30104 --- [mcp-spring-boot-server] [           main] c.example.mcp.transport.StdioTransport   : MCP Server shutting down
-2026-01-11T23:30:30.344-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2026-01-11T23:30:30.344-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2026-01-11T23:30:30.344-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
-2026-01-11T23:31:23.882-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-5] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/list with params: null
-2026-01-11T23:31:32.211-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-7] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/list with params: null
-2026-01-11T23:31:42.925-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-8] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/call with params: {name=jsonplaceholder-user, arguments={userId=6}}
-2026-01-11T23:31:42.935-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-8] com.example.mcp.service.ToolRegistry     : Executing registry tool: jsonplaceholder-user - GET https://jsonplaceholder.typicode.com/users/6
-2026-01-11T23:31:44.278-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-8] com.example.mcp.service.ToolRegistry     : Successfully executed registry tool: jsonplaceholder-user
-2026-01-11T23:31:52.403-05:00  INFO 30104 --- [mcp-spring-boot-server] [io-8082-exec-10] c.e.mcp.controller.McpSseController      : Starting SSE streaming for tool: echo with params: {message=Hello}
-2026-01-11T23:31:53.078-05:00  INFO 30104 --- [mcp-spring-boot-server] [pool-4-thread-1] c.e.mcp.controller.McpSseController      : SSE streaming completed successfully for tool: echo
-2026-01-11T23:31:53.089-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-4] c.e.mcp.controller.McpSseController      : SSE stream completed for: echo_1768192312412
-2026-01-11T23:32:11.631-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-2] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/list with params: null
-2026-01-11T23:32:16.514-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-3] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/call with params: {name=rag_query, arguments={question=how to schedule a batch job}}
-2026-01-11T23:32:16.515-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-3] com.example.mcp.service.ToolRegistry     : Executing registry tool: rag_query - POST http://localhost:8080/api/rag/query
-2026-01-11T23:32:33.013-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-3] com.example.mcp.service.ToolRegistry     : Successfully executed registry tool: rag_query
-2026-01-11T23:33:38.515-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-6] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/list with params: null
-2026-01-11T23:33:43.370-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/call with params: {name=rag_query, arguments={question=how to check elastic logs for batch job}}
-2026-01-11T23:33:43.370-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] com.example.mcp.service.ToolRegistry     : Executing registry tool: rag_query - POST http://localhost:8080/api/rag/query
-2026-01-11T23:33:49.017-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-1] com.example.mcp.service.ToolRegistry     : Successfully executed registry tool: rag_query
-2026-01-11T23:49:35.066-05:00  INFO 30104 --- [mcp-spring-boot-server] [nio-8082-exec-7] c.e.mcp.controller.McpTestController     : Executing MCP method: tools/list with params: null
+2026-01-14T18:18:22.975-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Starting McpServerApplication using Java 21.0.9 with PID 54336 (D:\apps\ws\ws8\mcp-spring-boot-server\target\mcp-spring-boot-server-1.0.0.jar started by smate in D:\apps\ws\ws8\mcp-spring-boot-server)
+2026-01-14T18:18:22.977-05:00 DEBUG 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-14T18:18:22.977-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : No active profile set, falling back to 1 default profile: "default"
+2026-01-14T18:18:24.045-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8082 (http)
+2026-01-14T18:18:24.055-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-14T18:18:24.055-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-14T18:18:24.080-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-14T18:18:24.081-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1042 ms
+2026-01-14T18:18:24.358-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered test API tool: jsonplaceholder-user - GET https://jsonplaceholder.typicode.com/users/{userId}
+2026-01-14T18:18:24.360-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered RAG tool: rag_ingest - POST http://localhost:8080/api/rag/ingest
+2026-01-14T18:18:24.360-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Registered RAG tool: rag_query - POST http://localhost:8080/api/rag/query
+2026-01-14T18:18:24.360-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Loading tools from dynamic tool registry...
+2026-01-14T18:18:24.360-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] c.e.mcp.service.ToolRegistryClient       : Fetching tools from registry at: http://localhost:8081
+2026-01-14T18:18:24.518-05:00 ERROR 54336 --- [mcp-spring-boot-server] [           main] c.e.mcp.service.ToolRegistryClient       : Failed to fetch tools from registry: Connection refused: getsockopt: localhost/127.0.0.1:8081
+2026-01-14T18:18:24.519-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.service.ToolRegistry     : Loaded 0 tools from registry
+2026-01-14T18:18:24.838-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8082 (http) with context path ''
+2026-01-14T18:18:24.853-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] com.example.mcp.McpServerApplication     : Started McpServerApplication in 2.274 seconds (process running for 2.65)
+2026-01-14T18:18:24.857-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] c.example.mcp.transport.StdioTransport   : MCP Server started - listening on stdio
+2026-01-14T18:18:24.857-05:00  INFO 54336 --- [mcp-spring-boot-server] [           main] c.example.mcp.transport.StdioTransport   : MCP Server shutting down

@@ -6,13 +6,21 @@ package com.example.rag.rest.dto;
  */
 public record QueryRequest(
     String question,
-    Integer topK
+    Integer topK,
+    String category  // Optional: Filter results by category
 ) {
     /**
      * Default constructor with default topK value.
      */
     public QueryRequest(String question) {
-        this(question, 5);
+        this(question, 5, null);
+    }
+
+    /**
+     * Constructor with topK but no category.
+     */
+    public QueryRequest(String question, Integer topK) {
+        this(question, topK, null);
     }
 
     /**

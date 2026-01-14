@@ -1,0 +1,11 @@
+com\example\userchat\dto\ChatResponse.class
+com\example\userchat\config\WebConfig.class
+com\example\userchat\McpUserChatApplication.class
+com\example\userchat\service\CategoryService$EnabledDocumentsResponse.class
+com\example\userchat\dto\CategoryDto.class
+com\example\userchat\controller\ChatController.class
+com\example\userchat\dto\ChatRequest.class
+com\example\userchat\service\ChatService.class
+com\example\userchat\service\CategoryService$EnabledToolsResponse.class
+com\example\userchat\service\CategoryService$1.class
+com\example\userchat\service\CategoryService.class

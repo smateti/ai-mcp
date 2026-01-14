@@ -141,6 +141,10 @@ public final class QdrantClient {
   }
 
   public List<String> searchPayloadTexts(List<Double> queryVector, int topK) {
+    return searchPayloadTexts(queryVector, topK, null);
+  }
+
+  public List<String> searchPayloadTexts(List<Double> queryVector, int topK, String categoryFilter) {
     ensureCollectionExists();
 
     try {
@@ -148,6 +152,22 @@ public final class QdrantClient {
       body.set("vector", toArray(queryVector));
       body.put("limit", topK);
       body.put("with_payload", true);
+
+      // Add category filter if specified
+      // Qdrant filter format: {"must": [{"key": "categories", "match": {"any": ["category-name"]}}]}
+      if (categoryFilter != null && !categoryFilter.isBlank()) {
+        ObjectNode matchAny = Json.MAPPER.createObjectNode();
+        matchAny.set("any", Json.MAPPER.createArrayNode().add(categoryFilter));
+
+        ObjectNode keyFilter = Json.MAPPER.createObjectNode();
+        keyFilter.put("key", "categories");
+        keyFilter.set("match", matchAny);
+
+        ObjectNode filter = Json.MAPPER.createObjectNode();
+        filter.set("must", Json.MAPPER.createArrayNode().add(keyFilter));
+
+        body.set("filter", filter);
+      }
 
       HttpRequest req = HttpRequest.newBuilder()
           .uri(URI.create(baseUrl + "/collections/" + collection + "/points/search"))
@@ -175,6 +195,10 @@ public final class QdrantClient {
    * @return list of search results with scores
    */
   public List<SearchResultWithScore> searchWithScores(List<Double> queryVector, int topK) {
+    return searchWithScores(queryVector, topK, null);
+  }
+
+  public List<SearchResultWithScore> searchWithScores(List<Double> queryVector, int topK, String categoryFilter) {
     ensureCollectionExists();
 
     try {
@@ -182,6 +206,21 @@ public final class QdrantClient {
       body.set("vector", toArray(queryVector));
       body.put("limit", topK);
       body.put("with_payload", true);
+
+      // Add category filter if specified
+      if (categoryFilter != null && !categoryFilter.isBlank()) {
+        ObjectNode matchAny = Json.MAPPER.createObjectNode();
+        matchAny.set("any", Json.MAPPER.createArrayNode().add(categoryFilter));
+
+        ObjectNode keyFilter = Json.MAPPER.createObjectNode();
+        keyFilter.put("key", "categories");
+        keyFilter.set("match", matchAny);
+
+        ObjectNode filter = Json.MAPPER.createObjectNode();
+        filter.set("must", Json.MAPPER.createArrayNode().add(keyFilter));
+
+        body.set("filter", filter);
+      }
 
       HttpRequest req = HttpRequest.newBuilder()
           .uri(URI.create(baseUrl + "/collections/" + collection + "/points/search"))

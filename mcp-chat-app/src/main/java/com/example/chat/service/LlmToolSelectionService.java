@@ -355,7 +355,9 @@ public class LlmToolSelectionService {
      */
     public String generateAnswer(String prompt) {
         try {
-            return chatClient.chatOnce(prompt, 0.7, 256);
+            // Use low temperature (0.1) for deterministic, consistent responses
+            // Especially important for structured data like lists and tables
+            return chatClient.chatOnce(prompt, 0.1, 512);
         } catch (Exception e) {
             logger.error("Failed to generate answer with LLM", e);
             throw new RuntimeException("Failed to generate natural language answer", e);

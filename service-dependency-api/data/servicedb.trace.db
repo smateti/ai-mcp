@@ -1,0 +1,15 @@
+2026-01-13 16:40:57.010714-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_DEPENDENCIES" not found; SQL statement:
+DELETE FROM service_dependencies [42102-224]
+2026-01-13 16:42:30.908779-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_DEPENDENCIES" not found; SQL statement:
+DELETE FROM service_dependencies [42102-224]
+2026-01-13 16:42:30.913640-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_OPERATIONS" not found; SQL statement:
+DELETE FROM service_operations [42102-224]
+2026-01-13 16:45:23.535302-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_DEPENDENCIES" not found; SQL statement:
+DELETE FROM service_dependencies [42102-224]
+2026-01-13 16:45:23.546781-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_OPERATIONS" not found; SQL statement:
+DELETE FROM service_operations [42102-224]

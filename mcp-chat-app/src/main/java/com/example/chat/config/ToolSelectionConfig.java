@@ -1,7 +1,9 @@
 package com.example.chat.config;
 
 import com.example.chat.llm.ChatClient;
+import com.example.chat.llm.LlamaCppChatClient;
 import com.example.chat.llm.OllamaChatClient;
+import com.example.chat.llm.OpenAIChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,11 +11,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ToolSelectionConfig {
 
-    @Value("${ollama.base-url:http://localhost:11434}")
-    private String ollamaBaseUrl;
+    @Value("${llm.provider:ollama-openai}")
+    private String llmProvider;
 
-    @Value("${ollama.chat-model:llama3.1}")
-    private String ollamaChatModel;
+    @Value("${llm.base-url:http://localhost:11434}")
+    private String llmBaseUrl;
+
+    @Value("${llm.chat-model:llama3.1}")
+    private String llmChatModel;
 
     @Value("${tool.selection.confidence.high-threshold:0.8}")
     private double highConfidenceThreshold;
@@ -29,7 +34,14 @@ public class ToolSelectionConfig {
 
     @Bean
     public ChatClient chatClient() {
-        return new OllamaChatClient(ollamaBaseUrl, ollamaChatModel);
+        return switch (llmProvider.toLowerCase()) {
+            case "ollama-native" -> new OllamaChatClient(llmBaseUrl, llmChatModel);
+            case "ollama-openai" -> new OpenAIChatClient(llmBaseUrl, llmChatModel);
+            case "llamacpp" -> new LlamaCppChatClient(llmBaseUrl, llmChatModel);
+            default -> throw new IllegalArgumentException(
+                "Unknown LLM provider: " + llmProvider + ". Valid options: ollama-native, ollama-openai, llamacpp"
+            );
+        };
     }
 
     @Bean

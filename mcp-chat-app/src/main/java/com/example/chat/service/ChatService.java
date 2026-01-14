@@ -248,8 +248,31 @@ public class ChatService {
                 }
                 break;
 
+            case "get_application_by_id":
+                if (args.isEmpty()) return null;
+                arguments.put("applicationId", args.trim());
+                break;
+
+            case "get_application_services_with_dependencies":
+                if (args.isEmpty()) return null;
+                arguments.put("applicationId", args.trim());
+                break;
+
             default:
-                return null;
+                // For unknown tools, try to parse as generic key=value pairs
+                if (!args.isEmpty()) {
+                    // Simple parsing: assume single parameter or key=value format
+                    if (args.contains("=")) {
+                        String[] kvPairs = args.split("\\s+");
+                        for (String kvPair : kvPairs) {
+                            String[] kv = kvPair.split("=", 2);
+                            if (kv.length == 2) {
+                                arguments.put(kv[0].trim(), kv[1].trim());
+                            }
+                        }
+                    }
+                }
+                break;
         }
 
         return arguments;
@@ -332,6 +355,60 @@ public class ChatService {
                     } else {
                         // Error case
                         response.append("❌ Ingestion failed: ").append(data.path("message").asText());
+                    }
+                } else if (toolName.equals("get_application_services_with_dependencies")) {
+                    // Format service dependency response
+                    JsonNode data = parsed.has("data") ? parsed.path("data") : parsed;
+                    if (data.isArray()) {
+                        response.append("**Services:**\n\n");
+                        for (JsonNode service : data) {
+                            response.append("### ").append(service.path("name").asText())
+                                   .append(" (`").append(service.path("serviceId").asText()).append("`)\n");
+                            response.append("- **Description:** ").append(service.path("description").asText()).append("\n");
+                            response.append("- **Endpoint:** ").append(service.path("endpoint").asText()).append("\n");
+
+                            JsonNode operations = service.path("operations");
+                            if (operations.isArray() && operations.size() > 0) {
+                                response.append("- **Operations:**\n");
+                                for (JsonNode op : operations) {
+                                    response.append("  - `").append(op.path("httpMethod").asText()).append(" ")
+                                           .append(op.path("path").asText()).append("` - ")
+                                           .append(op.path("description").asText()).append("\n");
+
+                                    JsonNode deps = op.path("dependencies");
+                                    if (deps.isArray() && deps.size() > 0) {
+                                        response.append("    Dependencies:\n");
+                                        for (JsonNode dep : deps) {
+                                            response.append("      - ")
+                                                   .append(dep.path("dependentApplicationId").asText()).append("/")
+                                                   .append(dep.path("dependentServiceId").asText()).append("/")
+                                                   .append(dep.path("dependentOperationId").asText())
+                                                   .append(" (").append(dep.path("dependencyType").asText()).append(")\n");
+                                        }
+                                    }
+                                }
+                            }
+                            response.append("\n");
+                        }
+                    } else {
+                        response.append(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsed));
+                    }
+                } else if (toolName.equals("get_application_by_id")) {
+                    // Format application info response
+                    JsonNode data = parsed.has("data") ? parsed.path("data") : parsed;
+                    response.append("**Application:** ").append(data.path("name").asText()).append("\n\n");
+                    response.append("- **Application ID:** ").append(data.path("applicationId").asText()).append("\n");
+                    response.append("- **Description:** ").append(data.path("description").asText()).append("\n");
+                    response.append("- **Owner:** ").append(data.path("owner").asText()).append("\n");
+                    response.append("- **Status:** ").append(data.path("status").asText()).append("\n\n");
+
+                    JsonNode services = data.path("services");
+                    if (services.isArray() && services.size() > 0) {
+                        response.append("**Services:** (").append(services.size()).append(" total)\n");
+                        for (JsonNode service : services) {
+                            response.append("- ").append(service.path("name").asText())
+                                   .append(" (`").append(service.path("serviceId").asText()).append("`)\n");
+                        }
                     }
                 } else {
                     // Generic JSON display
@@ -583,11 +660,14 @@ public class ChatService {
         prompt.append("A tool was executed and returned this information:\n\n");
         prompt.append(toolResult).append("\n\n");
         prompt.append("Based on this information, provide a direct, natural language answer to the user's question.\n");
-        prompt.append("IMPORTANT:\n");
-        prompt.append("1. Answer ONLY what the user asked for, not everything in the data\n");
-        prompt.append("2. Be concise and conversational\n");
-        prompt.append("3. If the user asked for a specific field (like 'name'), return just that value\n");
-        prompt.append("4. If the user asked a general question, provide a complete natural sentence\n\n");
+        prompt.append("CRITICAL REQUIREMENTS:\n");
+        prompt.append("1. If the data contains a LIST or TABLE, you MUST include ALL items exactly as shown\n");
+        prompt.append("2. Do NOT summarize, skip, or paraphrase list items\n");
+        prompt.append("3. If there are service names, IDs, or structured data - copy them EXACTLY\n");
+        prompt.append("4. Answer ONLY what the user asked for, but include complete data\n");
+        prompt.append("5. Be concise but NEVER omit data items\n");
+        prompt.append("6. For structured data (services, operations, dependencies), preserve ALL details\n\n");
+        prompt.append("Example: If the tool returned 3 services, your answer MUST mention all 3 services with their exact names and IDs.\n\n");
         prompt.append("Answer:");
 
         return prompt.toString();

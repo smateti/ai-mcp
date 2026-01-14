@@ -1,0 +1,94 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ----------------< com.example:full-rag-springboot-sync >----------------
+[INFO] Building full-rag-sync 0.0.2-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.3.2:run (default-cli) > test-compile @ full-rag-springboot-sync >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ full-rag-springboot-sync ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ full-rag-springboot-sync ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ full-rag-springboot-sync ---
+[INFO] skip non existing resourceDirectory D:\apps\ws\ws8\full-rag-springboot-sync\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ full-rag-springboot-sync ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] <<< spring-boot:3.3.2:run (default-cli) < test-compile @ full-rag-springboot-sync <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.3.2:run (default-cli) @ full-rag-springboot-sync ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.2)
+
+2026-01-12T23:39:42.256-05:00  INFO 55584 --- [           main] com.example.rag.RagApplication           : Starting RagApplication using Java 21.0.8 with PID 55584 (D:\apps\ws\ws8\full-rag-springboot-sync\target\classes started by smate in D:\apps\ws\ws8\full-rag-springboot-sync)
+2026-01-12T23:39:42.260-05:00  INFO 55584 --- [           main] com.example.rag.RagApplication           : No active profile set, falling back to 1 default profile: "default"
+2026-01-12T23:39:42.622-05:00  INFO 55584 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-12T23:39:42.655-05:00  INFO 55584 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 28 ms. Found 3 JPA repository interfaces.
+2026-01-12T23:39:42.951-05:00  INFO 55584 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-01-12T23:39:42.958-05:00  INFO 55584 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-12T23:39:42.959-05:00  INFO 55584 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.26]
+2026-01-12T23:39:43.083-05:00  INFO 55584 --- [           main] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+2026-01-12T23:39:43.087-05:00  INFO 55584 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-12T23:39:43.087-05:00  INFO 55584 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 783 ms
+2026-01-12T23:39:43.104-05:00  INFO 55584 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-01-12T23:39:43.215-05:00  INFO 55584 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:file:./data/chatdb user=SA
+2026-01-12T23:39:43.216-05:00  INFO 55584 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-01-12T23:39:43.222-05:00  INFO 55584 --- [           main] o.s.b.a.h2.H2ConsoleAutoConfiguration    : H2 console available at '/h2-console'. Database available at 'jdbc:h2:file:./data/chatdb'
+2026-01-12T23:39:43.286-05:00  INFO 55584 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-12T23:39:43.314-05:00  INFO 55584 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-01-12T23:39:43.337-05:00  INFO 55584 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-01-12T23:39:43.498-05:00  INFO 55584 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-12T23:39:43.523-05:00  WARN 55584 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-12T23:39:44.020-05:00  INFO 55584 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-12T23:39:44.056-05:00  INFO 55584 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-12T23:39:44.274-05:00  INFO 55584 --- [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-01-12T23:39:44.702-05:00  INFO 55584 --- [           main] org.ehcache.core.EhcacheManager          : Cache 'embeddings' created in EhcacheManager.
+2026-01-12T23:39:44.703-05:00  INFO 55584 --- [           main] org.ehcache.core.EhcacheManager          : Cache 'ragResponses' created in EhcacheManager.
+2026-01-12T23:39:44.704-05:00  INFO 55584 --- [           main] org.ehcache.core.EhcacheManager          : Cache 'chatResponses' created in EhcacheManager.
+2026-01-12T23:39:44.749-05:00  INFO 55584 --- [           main] org.ehcache.jsr107.Eh107CacheManager     : Registering Ehcache MBean javax.cache:type=CacheStatistics,CacheManager=file./D./apps/ws/ws8/full-rag-springboot-sync/target/classes/ehcache.xml,Cache=embeddings
+2026-01-12T23:39:44.750-05:00  INFO 55584 --- [           main] org.ehcache.jsr107.Eh107CacheManager     : Registering Ehcache MBean javax.cache:type=CacheStatistics,CacheManager=file./D./apps/ws/ws8/full-rag-springboot-sync/target/classes/ehcache.xml,Cache=ragResponses
+2026-01-12T23:39:44.750-05:00  INFO 55584 --- [           main] org.ehcache.jsr107.Eh107CacheManager     : Registering Ehcache MBean javax.cache:type=CacheStatistics,CacheManager=file./D./apps/ws/ws8/full-rag-springboot-sync/target/classes/ehcache.xml,Cache=chatResponses
+2026-01-12T23:39:44.771-05:00  WARN 55584 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-12T23:39:44.783-05:00  INFO 55584 --- [           main] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page template: index
+2026-01-12T23:39:44.966-05:00  INFO 55584 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-01-12T23:39:44.969-05:00  INFO 55584 --- [           main] com.example.rag.RagApplication           : Started RagApplication in 2.924 seconds (process running for 3.573)
+2026-01-12T23:40:06.783-05:00  INFO 55584 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-01-12T23:40:06.783-05:00  INFO 55584 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-01-12T23:40:06.784-05:00  INFO 55584 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+2026-01-13T00:12:57.049-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=4m44s87ms390µs900ns).
+2026-01-13T03:21:23.642-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m57s335ms292µs800ns).
+2026-01-13T05:36:08.814-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=2h14m52s571ms446µs900ns).
+2026-01-13T07:41:39.333-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=4m29s559ms134µs100ns).
+2026-01-13T10:58:37.323-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m58s601ms539µs700ns).
+2026-01-13T14:02:34.929-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m58s418ms47µs100ns).
+2026-01-13T15:22:29.384-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1h9m55s143ms584µs700ns).
+2026-01-13T16:00:32.329-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=32m33s716ms937µs200ns).
+2026-01-14T05:33:00.427-05:00  WARN 55584 --- [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=12h10m29s504ms792µs100ns).
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1 d 06:28 h
+[INFO] Finished at: 2026-01-14T06:08:17-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.2:run (default-cli) on project full-rag-springboot-sync: Process terminated with exit code: 1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

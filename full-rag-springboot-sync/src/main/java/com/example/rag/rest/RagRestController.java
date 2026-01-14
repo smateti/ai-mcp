@@ -53,8 +53,8 @@ public class RagRestController {
             // Validate request
             request.validate();
 
-            // Ingest the document
-            int chunksCreated = ragService.ingest(request.docId(), request.text());
+            // Ingest the document with categories
+            int chunksCreated = ragService.ingest(request.docId(), request.text(), request.getCategoriesOrEmpty());
 
             // Return success response
             return ResponseEntity.ok(IngestResponse.success(request.docId(), chunksCreated));
@@ -92,8 +92,8 @@ public class RagRestController {
             // Get topK value (with default)
             int topK = request.getTopKOrDefault();
 
-            // Execute query with sources
-            RagService.QueryResult result = ragService.askWithSources(request.question(), topK);
+            // Execute query with sources and optional category filter
+            RagService.QueryResult result = ragService.askWithSources(request.question(), topK, request.category());
 
             // Convert to DTO
             List<SourceMetadata> sources = result.sources().stream()

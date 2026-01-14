@@ -1,0 +1,49 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.1)
+
+2026-01-14T06:26:24.902-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.example.chat.McpChatApplication      : Starting McpChatApplication using Java 21.0.9 with PID 6652 (D:\apps\ws\ws8\mcp-chat-app\target\mcp-chat-app-1.0.0.jar started by smate in D:\apps\ws\ws8\mcp-chat-app)
+2026-01-14T06:26:24.905-05:00 DEBUG 6652 --- [mcp-chat-app] [           main] com.example.chat.McpChatApplication      : Running with Spring Boot v3.2.1, Spring v6.1.2
+2026-01-14T06:26:24.905-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.example.chat.McpChatApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-01-14T06:26:25.661-05:00  INFO 6652 --- [mcp-chat-app] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-14T06:26:25.775-05:00  INFO 6652 --- [mcp-chat-app] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 107 ms. Found 2 JPA repository interfaces.
+2026-01-14T06:26:26.422-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8083 (http)
+2026-01-14T06:26:26.438-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-01-14T06:26:26.438-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.17]
+2026-01-14T06:26:26.465-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-01-14T06:26:26.466-05:00  INFO 6652 --- [mcp-chat-app] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1495 ms
+2026-01-14T06:26:26.493-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-01-14T06:26:26.822-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection conn0: url=jdbc:h2:file:./data/mcp-chatdb user=SA
+2026-01-14T06:26:26.822-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-01-14T06:26:26.829-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.s.b.a.h2.H2ConsoleAutoConfiguration    : H2 console available at '/h2-console'. Database available at 'jdbc:h2:file:./data/mcp-chatdb'
+2026-01-14T06:26:27.169-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-14T06:26:27.362-05:00  INFO 6652 --- [mcp-chat-app] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.1.Final
+2026-01-14T06:26:27.404-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-01-14T06:26:27.576-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-14T06:26:27.609-05:00  WARN 6652 --- [mcp-chat-app] [           main] org.hibernate.orm.deprecation            : HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-14T06:26:28.254-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-14T06:26:28.292-05:00  INFO 6652 --- [mcp-chat-app] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-14T06:26:28.914-05:00  WARN 6652 --- [mcp-chat-app] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-14T06:26:28.931-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [static/index.html]
+2026-01-14T06:26:29.430-05:00  INFO 6652 --- [mcp-chat-app] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8083 (http) with context path ''
+2026-01-14T06:26:29.454-05:00  INFO 6652 --- [mcp-chat-app] [           main] com.example.chat.McpChatApplication      : Started McpChatApplication in 4.986 seconds (process running for 5.513)
+2026-01-14T06:31:20.173-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-2] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-01-14T06:31:20.173-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-01-14T06:31:20.174-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-2] o.s.web.servlet.DispatcherServlet        : Completed initialization in 0 ms
+2026-01-14T06:31:26.013-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-1] c.e.chat.controller.ChatController       : Received message from session 12607134-53a0-4976-8c18-c7a2e5b88448: what services are in APP-PAYMENT-GW application
+2026-01-14T06:31:48.728-05:00 DEBUG 6652 --- [mcp-chat-app] [nio-8083-exec-1] c.example.chat.service.McpClientService  : Executing tool: get_application_services_with_dependencies with arguments: {applicationId=APP-PAYMENT-GW}
+2026-01-14T06:32:28.487-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-4] c.e.chat.controller.ChatController       : Received message from session 595bbf96-60d0-4a24-af9b-458f2b0d71b1: how to schedule a batch job
+2026-01-14T06:32:30.137-05:00 DEBUG 6652 --- [mcp-chat-app] [nio-8083-exec-4] c.example.chat.service.McpClientService  : Executing tool: rag_query with arguments: {question=how to schedule a batch job}
+2026-01-14T06:34:46.096-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-6] c.e.chat.controller.ChatController       : Received message from session 595bbf96-60d0-4a24-af9b-458f2b0d71b1: how to schedule a batch job
+2026-01-14T06:34:47.514-05:00 DEBUG 6652 --- [mcp-chat-app] [nio-8083-exec-6] c.example.chat.service.McpClientService  : Executing tool: rag_query with arguments: {question=how to schedule a batch job}
+2026-01-14T06:49:01.040-05:00  INFO 6652 --- [mcp-chat-app] [nio-8083-exec-8] c.e.chat.controller.ChatController       : Received message from session 595bbf96-60d0-4a24-af9b-458f2b0d71b1: how to schedule a batch job
+2026-01-14T06:49:02.564-05:00 DEBUG 6652 --- [mcp-chat-app] [nio-8083-exec-8] c.example.chat.service.McpClientService  : Executing tool: rag_query with arguments: {question=how to schedule a batch job}
+2026-01-14T09:52:49.009-05:00  WARN 6652 --- [mcp-chat-app] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m52s492ms163µs700ns).
+2026-01-14T12:56:47.736-05:00  WARN 6652 --- [mcp-chat-app] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m59s544ms594µs300ns).
+2026-01-14T16:08:44.399-05:00  WARN 6652 --- [mcp-chat-app] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=3h1m57s294ms596µs500ns).
+2026-01-14T18:06:44.157-05:00  WARN 6652 --- [mcp-chat-app] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1h48m423ms360µs500ns).

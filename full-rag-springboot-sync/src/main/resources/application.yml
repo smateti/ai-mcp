@@ -40,18 +40,23 @@ spring:
 
 rag:
   llm:
-    provider: ollama  # llamacpp | ollama
+    # Provider type: ollama-native | ollama-openai | llamacpp | llamacpp-openai
+    # - ollama-native: Uses Ollama's native /api/chat and /api/embed endpoints
+    # - ollama-openai: Uses Ollama's OpenAI-compatible /v1/chat/completions and /v1/embeddings endpoints (port 11434)
+    # - llamacpp: Uses llama.cpp native /completion endpoint (port 8000, non-OpenAI format)
+    # - llamacpp-openai: Uses llama.cpp with OpenAI-compatible endpoints (port 8000)
+    provider: llamacpp-openai
 
-  llama:
-    embedBaseUrl: http://localhost:8000
-    embedModel: nomic_embed_text
-    chatBaseUrl: http://localhost:8000
+  # Configuration for each provider
+  ollama:
+    baseUrl: http://localhost:11434
+    embedModel: nomic-embed-text
     chatModel: llama3.1
 
-  ollama:
-     baseUrl: http://localhost:11434
-     embedModel: nomic-embed-text
-     chatModel: llama3.1
+  llama:
+    baseUrl: http://localhost:8000
+    embedModel: nomic-embed-text
+    chatModel: llama3.1
 
   qdrant:
     baseUrl: http://localhost:6333

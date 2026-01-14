@@ -28,10 +28,23 @@ mcp:
     url: http://localhost:8082
     execute-endpoint: /mcp/execute
 
-# Ollama configuration for LLM tool selection
-ollama:
-  base-url: http://localhost:11434
+# LLM Provider Configuration
+llm:
+  # Provider type: ollama-native | ollama-openai | llamacpp
+  # - ollama-native: Uses Ollama's native /api/chat endpoint
+  # - ollama-openai: Uses OpenAI-compatible /v1/chat/completions endpoint (works with Ollama port 11434 or llama.cpp port 8000)
+  # - llamacpp: Uses llama.cpp native /completion endpoint (port 8000, non-OpenAI format - NOT WORKING, use ollama-openai instead)
+  provider: ollama-openai
+
+  # Base URL for the LLM provider
+  # For Ollama: http://localhost:11434
+  # For llama.cpp with OpenAI compatibility: http://localhost:8000
+  base-url: http://localhost:8000
+
+  # Model name to use
   chat-model: llama3.1
+
+  # Request timeout in milliseconds
   timeout: 30000
 
 # Tool selection configuration

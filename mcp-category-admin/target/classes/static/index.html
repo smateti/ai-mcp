@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Category Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-primary: #f9fafb;
+            --bg-secondary: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        #app {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            top: 2px;
+        }
+
+        .tab:hover {
+            color: var(--primary);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-success {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Category Grid */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .category-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .category-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .category-card.inactive {
+            opacity: 0.6;
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+
+        .category-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .category-id {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .category-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .category-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stat i {
+            color: var(--primary);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        /* Lists */
+        .item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .item-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background-color: var(--secondary);
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .category-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-layer-group"></i> MCP Category Admin</h1>
+            <p>Manage tool and document categories for scoped MCP operations</p>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading categories...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div v-else>
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab" :class="{active: activeTab === 'categories'}" @click="activeTab = 'categories'">
+                    <i class="fas fa-th-large"></i> Categories
+                </button>
+                <button class="tab" :class="{active: activeTab === 'tools'}" @click="activeTab = 'tools'">
+                    <i class="fas fa-tools"></i> Tool Management
+                </button>
+            </div>
+
+            <!-- Categories Tab -->
+            <div v-if="activeTab === 'categories'">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">All Categories ({{ categories.length }})</h2>
+                        <button class="btn btn-primary" @click="showCreateModal">
+                            <i class="fas fa-plus"></i> Create Category
+                        </button>
+                    </div>
+
+                    <div v-if="categories.length === 0" class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <h3>No Categories Yet</h3>
+                        <p>Create your first category to get started</p>
+                    </div>
+
+                    <div v-else class="category-grid">
+                        <div v-for="category in categories" :key="category.id"
+                             class="category-card" :class="{inactive: !category.active}"
+                             @click="viewCategory(category)">
+                            <div class="category-header">
+                                <div>
+                                    <div class="category-name">{{ category.name }}</div>
+                                    <div class="category-id">{{ category.categoryId }}</div>
+                                </div>
+                                <span class="badge" :class="category.active ? 'badge-success' : 'badge-warning'">
+                                    {{ category.active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </div>
+                            <div class="category-description">{{ category.description }}</div>
+                            <div class="category-stats">
+                                <div class="stat">
+                                    <i class="fas fa-tools"></i>
+                                    <span>{{ category.toolCount }} tools</span>
+                                </div>
+                                <div class="stat">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span>{{ category.documentCount }} docs</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tool Management Tab -->
+            <div v-if="activeTab === 'tools'">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Category: {{ selectedCategory?.name || 'Select a category' }}</h2>
+                        <select v-model="selectedCategoryId" @change="loadCategoryDetails" class="form-input" style="width: auto;">
+                            <option value="">Select Category</option>
+                            <option v-for="cat in categories" :key="cat.id" :value="cat.categoryId">
+                                {{ cat.name }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div v-if="selectedCategory">
+                        <h3 style="margin-bottom: 16px; font-size: 16px; font-weight: 600;">
+                            <i class="fas fa-tools"></i> Tools ({{ selectedCategory.tools.length }})
+                            <button class="btn btn-sm btn-primary" @click="showAddToolModal" style="margin-left: 12px;">
+                                <i class="fas fa-plus"></i> Add Tool
+                            </button>
+                        </h3>
+                        <div class="item-list" v-if="selectedCategory.tools.length > 0">
+                            <div v-for="tool in selectedCategory.tools" :key="tool.id" class="item">
+                                <div class="item-info">
+                                    <div class="item-name">{{ tool.toolName || tool.toolId }}</div>
+                                    <div class="item-description">{{ tool.toolDescription }}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                        ID: <code>{{ tool.toolId }}</code> | Priority: {{ tool.priority }}
+                                    </div>
+                                </div>
+                                <div class="item-actions">
+                                    <label class="toggle">
+                                        <input type="checkbox" :checked="tool.enabled" @change="toggleTool(tool)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <button class="btn btn-sm btn-danger btn-icon" @click="removeTool(tool)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state">
+                            <i class="fas fa-tools"></i>
+                            <p>No tools assigned to this category</p>
+                        </div>
+
+                        <h3 style="margin: 32px 0 16px; font-size: 16px; font-weight: 600;">
+                            <i class="fas fa-file-alt"></i> Documents ({{ selectedCategory.documents.length }})
+                            <button class="btn btn-sm btn-primary" @click="showAddDocumentModal" style="margin-left: 12px;">
+                                <i class="fas fa-plus"></i> Add Document
+                            </button>
+                        </h3>
+                        <div class="item-list" v-if="selectedCategory.documents.length > 0">
+                            <div v-for="doc in selectedCategory.documents" :key="doc.id" class="item">
+                                <div class="item-info">
+                                    <div class="item-name">{{ doc.documentName || doc.documentId }}</div>
+                                    <div class="item-description">{{ doc.documentDescription }}</div>
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                        ID: <code>{{ doc.documentId }}</code> | Type: {{ doc.documentType || 'N/A' }}
+                                    </div>
+                                </div>
+                                <div class="item-actions">
+                                    <label class="toggle">
+                                        <input type="checkbox" :checked="doc.enabled" @change="toggleDocument(doc)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <button class="btn btn-sm btn-danger btn-icon" @click="removeDocument(doc)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state">
+                            <i class="fas fa-file-alt"></i>
+                            <p>No documents assigned to this category</p>
+                        </div>
+                    </div>
+                    <div v-else class="empty-state">
+                        <i class="fas fa-hand-pointer"></i>
+                        <p>Select a category to manage its tools and documents</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create/Edit Category Modal -->
+        <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 class="modal-title">{{ modalMode === 'create' ? 'Create' : 'Edit' }} Category</h3>
+                    <button class="btn btn-sm btn-icon btn-secondary" @click="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Category ID *</label>
+                        <input v-model="formData.categoryId" class="form-input" placeholder="e.g., batch-dev" :disabled="modalMode === 'edit'">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Name *</label>
+                        <input v-model="formData.name" class="form-input" placeholder="e.g., Batch App Development">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea v-model="formData.description" class="form-input" placeholder="Describe this category..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Display Order</label>
+                        <input v-model.number="formData.displayOrder" type="number" class="form-input" placeholder="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="closeModal">Cancel</button>
+                    <button class="btn btn-primary" @click="saveCategory">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Tool Modal -->
+        <div v-if="showToolModal" class="modal-overlay" @click.self="showToolModal = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add Tool</h3>
+                    <button class="btn btn-sm btn-icon btn-secondary" @click="showToolModal = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Tool ID *</label>
+                        <input v-model="toolForm.toolId" class="form-input" placeholder="e.g., rag_query">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tool Name</label>
+                        <input v-model="toolForm.toolName" class="form-input" placeholder="e.g., RAG Query">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea v-model="toolForm.toolDescription" class="form-input" placeholder="Describe this tool..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <input v-model.number="toolForm.priority" type="number" class="form-input" placeholder="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="showToolModal = false">Cancel</button>
+                    <button class="btn btn-primary" @click="addTool">
+                        <i class="fas fa-plus"></i> Add Tool
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Document Modal -->
+        <div v-if="showDocumentModal" class="modal-overlay" @click.self="showDocumentModal = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 class="modal-title">Add Document</h3>
+                    <button class="btn btn-sm btn-icon btn-secondary" @click="showDocumentModal = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Document ID *</label>
+                        <input v-model="documentForm.documentId" class="form-input" placeholder="e.g., doc1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Document Name</label>
+                        <input v-model="documentForm.documentName" class="form-input" placeholder="e.g., API Documentation">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea v-model="documentForm.documentDescription" class="form-input" placeholder="Describe this document..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Document Type</label>
+                        <select v-model="documentForm.documentType" class="form-input">
+                            <option value="">Select type...</option>
+                            <option value="pdf">PDF</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="text">Text</option>
+                            <option value="html">HTML</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="showDocumentModal = false">Cancel</button>
+                    <button class="btn btn-primary" @click="addDocument">
+                        <i class="fas fa-plus"></i> Add Document
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    loading: true,
+                    activeTab: 'categories',
+                    categories: [],
+                    selectedCategoryId: '',
+                    selectedCategory: null,
+                    showModal: false,
+                    showToolModal: false,
+                    showDocumentModal: false,
+                    modalMode: 'create',
+                    formData: {
+                        categoryId: '',
+                        name: '',
+                        description: '',
+                        displayOrder: 0
+                    },
+                    toolForm: {
+                        toolId: '',
+                        toolName: '',
+                        toolDescription: '',
+                        priority: 0
+                    },
+                    documentForm: {
+                        documentId: '',
+                        documentName: '',
+                        documentDescription: '',
+                        documentType: ''
+                    }
+                };
+            },
+            mounted() {
+                this.loadCategories();
+            },
+            methods: {
+                async loadCategories() {
+                    try {
+                        this.loading = true;
+                        const response = await axios.get('/api/categories');
+                        this.categories = response.data;
+                    } catch (error) {
+                        console.error('Failed to load categories:', error);
+                        alert('Failed to load categories');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async loadCategoryDetails() {
+                    if (!this.selectedCategoryId) {
+                        this.selectedCategory = null;
+                        return;
+                    }
+                    try {
+                        const response = await axios.get(`/api/categories/${this.selectedCategoryId}`);
+                        this.selectedCategory = response.data;
+                    } catch (error) {
+                        console.error('Failed to load category details:', error);
+                        alert('Failed to load category details');
+                    }
+                },
+                showCreateModal() {
+                    this.modalMode = 'create';
+                    this.formData = {
+                        categoryId: '',
+                        name: '',
+                        description: '',
+                        displayOrder: 0
+                    };
+                    this.showModal = true;
+                },
+                viewCategory(category) {
+                    this.activeTab = 'tools';
+                    this.selectedCategoryId = category.categoryId;
+                    this.loadCategoryDetails();
+                },
+                closeModal() {
+                    this.showModal = false;
+                },
+                async saveCategory() {
+                    try {
+                        if (this.modalMode === 'create') {
+                            await axios.post('/api/categories', this.formData);
+                        } else {
+                            await axios.put(`/api/categories/${this.formData.categoryId}`, this.formData);
+                        }
+                        await this.loadCategories();
+                        this.closeModal();
+                    } catch (error) {
+                        console.error('Failed to save category:', error);
+                        alert('Failed to save category: ' + (error.response?.data?.message || error.message));
+                    }
+                },
+                showAddToolModal() {
+                    this.toolForm = {
+                        toolId: '',
+                        toolName: '',
+                        toolDescription: '',
+                        priority: 0
+                    };
+                    this.showToolModal = true;
+                },
+                async addTool() {
+                    try {
+                        await axios.post(`/api/categories/${this.selectedCategoryId}/tools`, this.toolForm);
+                        await this.loadCategoryDetails();
+                        this.showToolModal = false;
+                    } catch (error) {
+                        console.error('Failed to add tool:', error);
+                        alert('Failed to add tool: ' + (error.response?.data?.message || error.message));
+                    }
+                },
+                async toggleTool(tool) {
+                    try {
+                        await axios.post(`/api/categories/${this.selectedCategoryId}/tools/${tool.toolId}/toggle-enabled`);
+                        await this.loadCategoryDetails();
+                    } catch (error) {
+                        console.error('Failed to toggle tool:', error);
+                        alert('Failed to toggle tool');
+                    }
+                },
+                async removeTool(tool) {
+                    if (!confirm(`Remove tool "${tool.toolName || tool.toolId}"?`)) return;
+                    try {
+                        await axios.delete(`/api/categories/${this.selectedCategoryId}/tools/${tool.toolId}`);
+                        await this.loadCategoryDetails();
+                    } catch (error) {
+                        console.error('Failed to remove tool:', error);
+                        alert('Failed to remove tool');
+                    }
+                },
+                showAddDocumentModal() {
+                    this.documentForm = {
+                        documentId: '',
+                        documentName: '',
+                        documentDescription: '',
+                        documentType: ''
+                    };
+                    this.showDocumentModal = true;
+                },
+                async addDocument() {
+                    try {
+                        await axios.post(`/api/categories/${this.selectedCategoryId}/documents`, this.documentForm);
+                        await this.loadCategoryDetails();
+                        this.showDocumentModal = false;
+                    } catch (error) {
+                        console.error('Failed to add document:', error);
+                        alert('Failed to add document: ' + (error.response?.data?.message || error.message));
+                    }
+                },
+                async toggleDocument(doc) {
+                    try {
+                        await axios.post(`/api/categories/${this.selectedCategoryId}/documents/${doc.documentId}/toggle-enabled`);
+                        await this.loadCategoryDetails();
+                    } catch (error) {
+                        console.error('Failed to toggle document:', error);
+                        alert('Failed to toggle document');
+                    }
+                },
+                async removeDocument(doc) {
+                    if (!confirm(`Remove document "${doc.documentName || doc.documentId}"?`)) return;
+                    try {
+                        await axios.delete(`/api/categories/${this.selectedCategoryId}/documents/${doc.documentId}`);
+                        await this.loadCategoryDetails();
+                    } catch (error) {
+                        console.error('Failed to remove document:', error);
+                        alert('Failed to remove document');
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
