@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/tools}">Tools</a></li>
+                <li class="breadcrumb-item active">Register Single Tool</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-plus-circle me-2"></i>Register Single Tool</h1>
+    </div>
+
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <div class="card">
+        <div class="card-body">
+            <p class="text-muted mb-4">
+                Register a single API endpoint as a tool. Load the OpenAPI specification, select a path and method,
+                then preview and customize the tool before registration.
+            </p>
+
+            <!-- Tab navigation for URL vs File -->
+            <ul class="nav nav-tabs mb-4" id="sourceTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="url-source-tab" data-bs-toggle="tab" data-bs-target="#url-source-pane"
+                            type="button" role="tab">
+                        <i class="bi bi-link-45deg me-1"></i>From URL
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="file-source-tab" data-bs-toggle="tab" data-bs-target="#file-source-pane"
+                            type="button" role="tab">
+                        <i class="bi bi-file-earmark-code me-1"></i>From File
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="sourceTabsContent">
+                <!-- URL Source Tab -->
+                <div class="tab-pane fade show active" id="url-source-pane" role="tabpanel">
+                    <form th:action="@{/tools/register-single/preview}" method="post" id="urlRegistrationForm">
+                        <input type="hidden" name="sourceType" value="url">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="toolId" class="form-label">Tool ID <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="toolId" name="toolId" required
+                                           placeholder="e.g., get-users, create-order">
+                                    <small class="text-muted">Unique identifier for this tool (no spaces)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="categoryId" class="form-label">Category (Optional)</label>
+                                    <select class="form-select" id="categoryId" name="categoryId">
+                                        <option value="">-- No Category --</option>
+                                        <option th:each="category : ${categories}"
+                                                th:value="${category.id}"
+                                                th:text="${category.name}">Category</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="openApiEndpoint" class="form-label">OpenAPI Specification URL <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="url" class="form-control" id="openApiEndpoint" name="openApiEndpoint" required
+                                       placeholder="http://localhost:8083/v3/api-docs">
+                                <button type="button" class="btn btn-outline-secondary" id="loadPathsBtn">
+                                    <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+                                    Load Paths
+                                </button>
+                            </div>
+                            <small class="text-muted">URL to the OpenAPI/Swagger specification</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="path" class="form-label">API Path <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="path" name="path" required disabled>
+                                        <option value="">-- Load OpenAPI spec first --</option>
+                                    </select>
+                                    <small class="text-muted">Select the API endpoint path</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="httpMethod" class="form-label">HTTP Method <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="httpMethod" name="httpMethod" required disabled>
+                                        <option value="">-- Select path first --</option>
+                                    </select>
+                                    <small class="text-muted">Auto-detected from OpenAPI</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="duplicateWarning" class="alert alert-warning d-none">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Warning:</strong> This tool (path + method) is already registered!
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="previewBtn" disabled>
+                                <i class="bi bi-eye me-2"></i>Preview Tool
+                            </button>
+                            <a th:href="@{/tools}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- File Source Tab -->
+                <div class="tab-pane fade" id="file-source-pane" role="tabpanel">
+                    <form th:action="@{/tools/register-single/preview-file}" method="post" enctype="multipart/form-data" id="fileRegistrationForm">
+                        <input type="hidden" name="sourceType" value="file">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fileToolId" class="form-label">Tool ID <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="fileToolId" name="toolId" required
+                                           placeholder="e.g., get-users, create-order">
+                                    <small class="text-muted">Unique identifier for this tool (no spaces)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fileCategoryId" class="form-label">Category (Optional)</label>
+                                    <select class="form-select" id="fileCategoryId" name="categoryId">
+                                        <option value="">-- No Category --</option>
+                                        <option th:each="category : ${categories}"
+                                                th:value="${category.id}"
+                                                th:text="${category.name}">Category</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="openApiFile" class="form-label">OpenAPI Specification File <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" id="openApiFile" name="openApiFile" required
+                                   accept=".json,.yaml,.yml">
+                            <small class="text-muted">Upload a JSON or YAML OpenAPI specification file</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fileBaseUrl" class="form-label">Base URL <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="fileBaseUrl" name="baseUrl" required
+                                   placeholder="http://localhost:8083">
+                            <small class="text-muted">The base URL where this API is hosted</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="filePath" class="form-label">API Path <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="filePath" name="path" required disabled>
+                                        <option value="">-- Upload file first --</option>
+                                    </select>
+                                    <small class="text-muted">Select after uploading the file</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="fileHttpMethod" class="form-label">HTTP Method <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="fileHttpMethod" name="httpMethod" required disabled>
+                                        <option value="">-- Select path first --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary" id="parseFileBtn">
+                                <i class="bi bi-file-earmark-check me-2"></i>Parse File
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="filePreviewBtn" disabled>
+                                <i class="bi bi-eye me-2"></i>Preview Tool
+                            </button>
+                            <a th:href="@{/tools}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Known Services</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Quick links to NAAG service OpenAPI specs:</p>
+            <div class="list-group list-group-flush">
+                <a href="#" class="list-group-item list-group-item-action quick-link"
+                   data-url="http://localhost:8083/v3/api-docs">
+                    <code>http://localhost:8083/v3/api-docs</code>
+                    <span class="text-muted ms-2">- Utility Tools (echo, calculator, time)</span>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action quick-link"
+                   data-url="http://localhost:8080/v3/api-docs">
+                    <code>http://localhost:8080/v3/api-docs</code>
+                    <span class="text-muted ms-2">- RAG Service (ingest, query)</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        let pathsData = [];
+
+        // Quick links
+        document.querySelectorAll('.quick-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('openApiEndpoint').value = this.dataset.url;
+                loadPaths();
+            });
+        });
+
+        // Load paths button
+        document.getElementById('loadPathsBtn').addEventListener('click', loadPaths);
+        document.getElementById('openApiEndpoint').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                loadPaths();
+            }
+        });
+
+        // Path selection change
+        document.getElementById('path').addEventListener('change', function() {
+            const selectedPath = this.value;
+            const pathInfo = pathsData.find(p => p.path === selectedPath);
+
+            const methodSelect = document.getElementById('httpMethod');
+            methodSelect.innerHTML = '<option value="">-- Select Method --</option>';
+
+            if (pathInfo && pathInfo.methods) {
+                pathInfo.methods.forEach(method => {
+                    const option = document.createElement('option');
+                    option.value = method;
+                    option.textContent = method;
+                    methodSelect.appendChild(option);
+                });
+                methodSelect.disabled = false;
+            }
+
+            updatePreviewButton();
+            checkDuplicate();
+        });
+
+        // Method selection change
+        document.getElementById('httpMethod').addEventListener('change', function() {
+            updatePreviewButton();
+            checkDuplicate();
+        });
+
+        // Tool ID change
+        document.getElementById('toolId').addEventListener('input', updatePreviewButton);
+
+        function loadPaths() {
+            const openApiUrl = document.getElementById('openApiEndpoint').value;
+            if (!openApiUrl) {
+                alert('Please enter OpenAPI Specification URL first');
+                return;
+            }
+
+            const loadBtn = document.getElementById('loadPathsBtn');
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.classList.remove('d-none');
+            loadBtn.disabled = true;
+
+            fetch(`/api/tools/openapi/paths?openApiUrl=${encodeURIComponent(openApiUrl)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                        return;
+                    }
+
+                    pathsData = data.paths || [];
+                    const pathSelect = document.getElementById('path');
+                    pathSelect.innerHTML = '<option value="">-- Select Path --</option>';
+
+                    pathsData.forEach(pathInfo => {
+                        const option = document.createElement('option');
+                        option.value = pathInfo.path;
+                        option.textContent = pathInfo.path + ' (' + pathInfo.methods.join(', ') + ')';
+                        pathSelect.appendChild(option);
+                    });
+
+                    pathSelect.disabled = false;
+                    document.getElementById('httpMethod').innerHTML = '<option value="">-- Select path first --</option>';
+                    document.getElementById('httpMethod').disabled = true;
+                })
+                .catch(error => {
+                    alert('Failed to load paths: ' + error.message);
+                })
+                .finally(() => {
+                    spinner.classList.add('d-none');
+                    loadBtn.disabled = false;
+                });
+        }
+
+        function updatePreviewButton() {
+            const toolId = document.getElementById('toolId').value;
+            const path = document.getElementById('path').value;
+            const method = document.getElementById('httpMethod').value;
+            const previewBtn = document.getElementById('previewBtn');
+
+            previewBtn.disabled = !(toolId && path && method);
+        }
+
+        function checkDuplicate() {
+            const openApiEndpoint = document.getElementById('openApiEndpoint').value;
+            const path = document.getElementById('path').value;
+            const httpMethod = document.getElementById('httpMethod').value;
+
+            if (!openApiEndpoint || !path || !httpMethod) {
+                document.getElementById('duplicateWarning').classList.add('d-none');
+                return;
+            }
+
+            fetch(`/api/tools/check-duplicate?openApiEndpoint=${encodeURIComponent(openApiEndpoint)}&path=${encodeURIComponent(path)}&httpMethod=${encodeURIComponent(httpMethod)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const warning = document.getElementById('duplicateWarning');
+                    const previewBtn = document.getElementById('previewBtn');
+
+                    if (data.exists) {
+                        warning.classList.remove('d-none');
+                        previewBtn.disabled = true;
+                    } else {
+                        warning.classList.add('d-none');
+                        updatePreviewButton();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking duplicate:', error);
+                });
+        }
+
+        // File upload handling
+        let filePathsData = [];
+
+        document.getElementById('parseFileBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('openApiFile');
+            if (!fileInput.files.length) {
+                alert('Please select an OpenAPI file first');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    // Send to server to parse
+                    fetch('/api/tools/parse-openapi-content', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content: content })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('Error parsing file: ' + data.error);
+                            return;
+                        }
+
+                        filePathsData = data.paths || [];
+                        const pathSelect = document.getElementById('filePath');
+                        pathSelect.innerHTML = '<option value="">-- Select Path --</option>';
+
+                        filePathsData.forEach(pathInfo => {
+                            const option = document.createElement('option');
+                            option.value = pathInfo.path;
+                            option.textContent = pathInfo.path + ' (' + pathInfo.methods.join(', ') + ')';
+                            pathSelect.appendChild(option);
+                        });
+
+                        pathSelect.disabled = false;
+                    })
+                    .catch(error => {
+                        alert('Error parsing file: ' + error.message);
+                    });
+                } catch (error) {
+                    alert('Error reading file: ' + error.message);
+                }
+            };
+
+            reader.readAsText(file);
+        });
+
+        document.getElementById('filePath').addEventListener('change', function() {
+            const selectedPath = this.value;
+            const pathInfo = filePathsData.find(p => p.path === selectedPath);
+
+            const methodSelect = document.getElementById('fileHttpMethod');
+            methodSelect.innerHTML = '<option value="">-- Select Method --</option>';
+
+            if (pathInfo && pathInfo.methods) {
+                pathInfo.methods.forEach(method => {
+                    const option = document.createElement('option');
+                    option.value = method;
+                    option.textContent = method;
+                    methodSelect.appendChild(option);
+                });
+                methodSelect.disabled = false;
+            }
+
+            updateFilePreviewButton();
+        });
+
+        document.getElementById('fileHttpMethod').addEventListener('change', updateFilePreviewButton);
+        document.getElementById('fileToolId').addEventListener('input', updateFilePreviewButton);
+        document.getElementById('fileBaseUrl').addEventListener('input', updateFilePreviewButton);
+
+        function updateFilePreviewButton() {
+            const toolId = document.getElementById('fileToolId').value;
+            const baseUrl = document.getElementById('fileBaseUrl').value;
+            const path = document.getElementById('filePath').value;
+            const method = document.getElementById('fileHttpMethod').value;
+            const previewBtn = document.getElementById('filePreviewBtn');
+
+            previewBtn.disabled = !(toolId && baseUrl && path && method);
+        }
+    </script>
+</th:block>
+</html>

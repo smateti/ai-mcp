@@ -24,15 +24,17 @@ public class CategoryService {
     public List<CategoryDto> getActiveCategories() {
         try {
             String url = categoryAdminUrl + "/api/categories/active";
+            log.info("Fetching categories from URL: {}", url);
             ResponseEntity<List<CategoryDto>> response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<List<CategoryDto>>() {}
             );
+            log.info("Received {} categories", response.getBody() != null ? response.getBody().size() : 0);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Failed to fetch categories", e);
+            log.error("Failed to fetch categories from {}: {}", categoryAdminUrl, e.getMessage());
             return Collections.emptyList();
         }
     }

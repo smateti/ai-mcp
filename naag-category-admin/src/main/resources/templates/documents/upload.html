@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/documents}">Documents</a></li>
+                <li class="breadcrumb-item active">Upload with Preview</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-cloud-upload me-2"></i>Upload Document with Q&A Preview</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Enhanced Upload Process:</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Upload a file or paste document content</li>
+                            <li>AI generates Q&A pairs to test retrieval quality</li>
+                            <li>Review generated Q&A and validation results</li>
+                            <li>Approve to add to RAG knowledge base, or retry if needed</li>
+                        </ol>
+                    </div>
+
+                    <form th:action="@{/documents/upload}" method="post" enctype="multipart/form-data">
+                        <!-- File Upload Section -->
+                        <div class="mb-4">
+                            <label for="file" class="form-label">
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload File
+                            </label>
+                            <input type="file" class="form-control" id="file" name="file"
+                                   th:accept="${acceptedFileTypes}"
+                                   onchange="handleFileSelect(this)">
+                            <small class="text-muted">
+                                Supported: <span th:text="${supportedExtensions}">PDF, DOC, DOCX, TXT, MD</span> (Max 200MB)
+                            </small>
+                        </div>
+
+                        <!-- File Preview Section -->
+                        <div id="filePreview" class="alert alert-success d-none mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-file-earmark-check me-2 fs-4"></i>
+                                <div>
+                                    <strong>Selected:</strong> <span id="fileName"></span>
+                                    <br>
+                                    <small class="text-muted">Size: <span id="fileSize"></span></small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile()">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <span class="badge bg-secondary">OR paste text below</span>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="docId" class="form-label">Document ID</label>
+                                <input type="text" class="form-control" id="docId" name="docId"
+                                       placeholder="unique-document-id">
+                                <small class="text-muted">Auto-generated from filename if uploading</small>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="title" class="form-label">Title</label>
+                                <input type="text" class="form-control" id="title" name="title"
+                                       placeholder="Document Title">
+                                <small class="text-muted">Auto-filled from filename if uploading</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="categoryId" class="form-label">Category</label>
+                            <select class="form-select" id="categoryId" name="categoryId">
+                                <option value="">-- No Category --</option>
+                                <option th:each="category : ${categories}"
+                                        th:value="${category.id}"
+                                        th:text="${category.name}">Category</option>
+                            </select>
+                            <small class="text-muted">Assign this document to a category for filtered queries</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="content" class="form-label">
+                                <i class="bi bi-textarea-t me-1"></i>Text Content
+                            </label>
+                            <textarea class="form-control" id="content" name="content" rows="12"
+                                      placeholder="Paste the document content here (if not uploading a file)..."></textarea>
+                            <small class="text-muted">Enter text directly, or leave empty when uploading a file</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-upload me-2"></i>Upload & Process
+                            </button>
+                            <a th:href="@{/documents}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightbulb me-2"></i>Tips</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li class="mb-2"><strong>PDF files:</strong> Text extracted automatically</li>
+                        <li class="mb-2"><strong>Word docs:</strong> .doc and .docx supported</li>
+                        <li class="mb-2"><strong>Markdown:</strong> Converted to plain text</li>
+                        <li class="mb-2">Use descriptive document IDs like <code>product-manual-v1</code></li>
+                        <li class="mb-2">The AI will generate both fine-grain and summary Q&A pairs</li>
+                        <li class="mb-2">Review the Q&A validation to ensure retrieval quality</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Upload</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-2">Need to bypass the preview process?</p>
+                    <a th:href="@{/documents/ingest}" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-fast-forward me-2"></i>Direct Ingest (Skip Preview)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        function handleFileSelect(input) {
+            const preview = document.getElementById('filePreview');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+            const docIdInput = document.getElementById('docId');
+            const titleInput = document.getElementById('title');
+            const contentArea = document.getElementById('content');
+
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                preview.classList.remove('d-none');
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+
+                // Auto-fill docId and title if empty
+                if (!docIdInput.value) {
+                    docIdInput.value = file.name.replace(/[^a-zA-Z0-9.-]/g, '-').replace(/-+/g, '-').toLowerCase();
+                }
+                if (!titleInput.value) {
+                    titleInput.value = file.name;
+                }
+
+                // Update placeholder
+                contentArea.placeholder = 'File selected - text will be extracted from the file';
+            }
+        }
+
+        function clearFile() {
+            const fileInput = document.getElementById('file');
+            const preview = document.getElementById('filePreview');
+            const contentArea = document.getElementById('content');
+
+            fileInput.value = '';
+            preview.classList.add('d-none');
+            contentArea.placeholder = 'Paste the document content here (if not uploading a file)...';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</th:block>
+</html>

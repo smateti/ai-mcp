@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/tools}">Tools</a></li>
+                <li class="breadcrumb-item active" th:text="${tool.id != null} ? 'Edit' : 'New'">Form</li>
+            </ol>
+        </nav>
+        <h1 th:text="${tool.id != null} ? 'Edit Tool' : 'New Tool'">Tool Form</h1>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form th:action="${tool.id != null} ? @{/tools/{id}(id=${tool.id})} : @{/tools}"
+                  method="post" th:object="${tool}">
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" th:field="*{name}" required
+                               placeholder="e.g., get_user, calculate_sum">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="categoryId" class="form-label">Category</label>
+                        <select class="form-select" id="categoryId" th:field="*{categoryId}">
+                            <option value="">-- No Category --</option>
+                            <option th:each="category : ${categories}"
+                                    th:value="${category.id}"
+                                    th:text="${category.name}">Category</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="description" th:field="*{description}" rows="2" required
+                              placeholder="Describe what this tool does"></textarea>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="serviceUrl" class="form-label">Service URL <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control" id="serviceUrl" th:field="*{serviceUrl}" required
+                               placeholder="http://localhost:8083">
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label for="method" class="form-label">HTTP Method <span class="text-danger">*</span></label>
+                        <select class="form-select" id="method" th:field="*{method}" required>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="path" class="form-label">Path <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="path" th:field="*{path}" required
+                           placeholder="/api/tools/execute">
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="active" th:field="*{active}">
+                        <label class="form-check-label" for="active">Active</label>
+                    </div>
+                    <small class="text-muted">Inactive tools won't be available for selection</small>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-2"></i>
+                        <span th:text="${tool.id != null} ? 'Update' : 'Create'">Save</span>
+                    </button>
+                    <a th:href="@{/tools}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg me-2"></i>Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</th:block>
+</html>

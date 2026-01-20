@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-chat-left-text me-2"></i>User Questions Analysis</h2>
+            <p class="text-muted mb-0">Analyze frequently asked questions and identify FAQ candidates</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Unique Questions</h6>
+                    <h3 id="uniqueQuestions">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Total Asks</h6>
+                    <h3 id="totalAsks">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title">FAQ Matched</h6>
+                    <h3 id="faqMatched">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Unmatched</h6>
+                    <h3 id="unmatched">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h6 class="card-title">FAQ Coverage</h6>
+                    <h3 id="faqCoverage">-</h3>
+                    <div class="progress mt-2" style="height: 8px;">
+                        <div class="progress-bar bg-success" id="coverageBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form class="row g-3" onsubmit="loadQuestions(); return false;">
+                <!-- Row 1: Time Filters -->
+                <div class="col-md-2">
+                    <label class="form-label">Time Range</label>
+                    <select class="form-select" id="timeRangeFilter" onchange="toggleCustomDateRange()">
+                        <option value="">All Time</option>
+                        <option value="15m">Last 15 min</option>
+                        <option value="1h">Last 1 hour</option>
+                        <option value="6h">Last 6 hours</option>
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+                <div class="col-md-2" id="customFromDate" style="display: none;">
+                    <label class="form-label">From Date</label>
+                    <input type="datetime-local" class="form-control" id="fromDateFilter">
+                </div>
+                <div class="col-md-2" id="customToDate" style="display: none;">
+                    <label class="form-label">To Date</label>
+                    <input type="datetime-local" class="form-control" id="toDateFilter">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">FAQ Status</label>
+                    <select class="form-select" id="faqStatusFilter">
+                        <option value="">All</option>
+                        <option value="false">Not Matched (New)</option>
+                        <option value="true">Matched to FAQ</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Min Frequency</label>
+                    <input type="number" class="form-control" id="minFrequencyFilter" value="1" min="1">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Sort By</label>
+                    <select class="form-select" id="sortByFilter">
+                        <option value="frequency">Most Asked</option>
+                        <option value="recent">Most Recent</option>
+                        <option value="oldest">Oldest First</option>
+                    </select>
+                </div>
+                <!-- Row 2: Search & Actions -->
+                <div class="col-md-3">
+                    <label class="form-label">Search Question</label>
+                    <input type="text" class="form-control" id="searchFilter" placeholder="Question text...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Max Results</label>
+                    <select class="form-select" id="maxResultsFilter">
+                        <option value="20">20</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Apply
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()">
+                        <i class="bi bi-x-circle me-1"></i>Reset
+                    </button>
+                    <button type="button" class="btn btn-outline-info" onclick="exportQuestions()">
+                        <i class="bi bi-download me-1"></i>Export
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Questions List -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>User Questions (Deduplicated by Similarity)</span>
+            <span class="text-muted" id="pageInfo">Loading...</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush" id="questionsList">
+                <div class="list-group-item text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center" id="pagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Promote to FAQ Modal -->
+    <div class="modal fade" id="promoteModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Promote to FAQ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="promoteQuestionId">
+                    <input type="hidden" id="promoteCategoryId">
+                    <div class="mb-3">
+                        <label class="form-label">Question</label>
+                        <textarea class="form-control" id="promoteQuestion" rows="2" readonly></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Frequency</label>
+                        <span id="promoteFrequency" class="badge bg-info ms-2">-</span>
+                        <span id="promoteCategoryBadge" class="badge bg-secondary ms-2">-</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Answer</strong> <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="promoteAnswer" rows="4" placeholder="Provide the answer for this FAQ..."></textarea>
+                        <div class="form-text">This answer will be stored in the FAQ database and returned when users ask similar questions.</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>This action will:</strong>
+                        <ol class="mb-0 mt-2">
+                            <li>Create a new FAQ entry with the question and your answer</li>
+                            <li>Add the FAQ to the searchable FAQ database (Qdrant)</li>
+                            <li>Remove this question from the analytics tracking</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="confirmPromote()">
+                        <i class="bi bi-arrow-up-circle me-1"></i>Create FAQ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dismiss Question Modal -->
+    <div class="modal fade" id="dismissModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Dismiss Question</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="dismissQuestionId">
+                    <p>Are you sure you want to dismiss this question?</p>
+                    <div class="mb-3">
+                        <textarea class="form-control" id="dismissQuestion" rows="2" readonly></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        This will permanently delete the question from analytics tracking.
+                        Use this for irrelevant or spam questions.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDismiss()">
+                        <i class="bi bi-trash me-1"></i>Delete Question
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Similar Modal -->
+    <div class="modal fade" id="similarModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Similar Questions</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="similarQuestionsList">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .question-item {
+            transition: background-color 0.2s;
+        }
+        .question-item:hover {
+            background-color: #f8f9fa;
+        }
+        .frequency-badge {
+            font-size: 1.2rem;
+            min-width: 60px;
+        }
+        .faq-matched {
+            border-left: 4px solid #198754;
+        }
+        .faq-unmatched {
+            border-left: 4px solid #ffc107;
+        }
+        .answer-section {
+            border-left: 3px solid #198754;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .answer-content {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+
+    <script th:inline="javascript">
+        const ragServiceUrl = /*[[${ragServiceUrl}]]*/ 'http://localhost:8080';
+        const categoryAdminUrl = /*[[${categoryAdminUrl}]]*/ 'http://localhost:8085';
+        const chatAppUrl = /*[[${chatAppUrl}]]*/ 'http://localhost:8087';
+        let currentPage = 0;
+        let promoteModal, similarModal, dismissModal;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            promoteModal = new bootstrap.Modal(document.getElementById('promoteModal'));
+            similarModal = new bootstrap.Modal(document.getElementById('similarModal'));
+            dismissModal = new bootstrap.Modal(document.getElementById('dismissModal'));
+            loadCategories();
+            loadAnalytics();
+            loadQuestions();
+        });
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${categoryAdminUrl}/api/categories/active`);
+                const categories = await response.json();
+                const select = document.getElementById('categoryFilter');
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id || cat.categoryId;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            }
+        }
+
+        async function loadAnalytics() {
+            const categoryId = document.getElementById('categoryFilter').value;
+            let url = `${ragServiceUrl}/api/questions/analytics`;
+            if (categoryId) url += `?categoryId=${categoryId}`;
+
+            try {
+                const response = await fetch(url);
+                const stats = await response.json();
+
+                document.getElementById('uniqueQuestions').textContent = stats.totalUniqueQuestions || 0;
+                document.getElementById('totalAsks').textContent = stats.totalQuestionCount || 0;
+                document.getElementById('faqMatched').textContent = stats.matchedFaqCount || 0;
+                document.getElementById('unmatched').textContent = stats.unmatchedCount || 0;
+
+                const coverage = stats.faqCoveragePercent || 0;
+                document.getElementById('faqCoverage').textContent = coverage.toFixed(1) + '%';
+                document.getElementById('coverageBar').style.width = coverage + '%';
+            } catch (error) {
+                console.error('Failed to load analytics:', error);
+            }
+        }
+
+        function refreshData() {
+            loadAnalytics();
+            loadQuestions();
+        }
+
+        function toggleCustomDateRange() {
+            const timeRange = document.getElementById('timeRangeFilter').value;
+            const fromDate = document.getElementById('customFromDate');
+            const toDate = document.getElementById('customToDate');
+            if (timeRange === 'custom') {
+                fromDate.style.display = 'block';
+                toDate.style.display = 'block';
+            } else {
+                fromDate.style.display = 'none';
+                toDate.style.display = 'none';
+            }
+        }
+
+        function getTimeRangeParams() {
+            const timeRange = document.getElementById('timeRangeFilter').value;
+            if (!timeRange) return {};
+
+            if (timeRange === 'custom') {
+                const fromDate = document.getElementById('fromDateFilter').value;
+                const toDate = document.getElementById('toDateFilter').value;
+                return {
+                    fromDate: fromDate ? new Date(fromDate).toISOString() : null,
+                    toDate: toDate ? new Date(toDate).toISOString() : null
+                };
+            }
+
+            // Calculate from date based on time range
+            const now = new Date();
+            let fromDate;
+            switch (timeRange) {
+                case '15m': fromDate = new Date(now - 15 * 60 * 1000); break;
+                case '1h': fromDate = new Date(now - 60 * 60 * 1000); break;
+                case '6h': fromDate = new Date(now - 6 * 60 * 60 * 1000); break;
+                case '24h': fromDate = new Date(now - 24 * 60 * 60 * 1000); break;
+                case '7d': fromDate = new Date(now - 7 * 24 * 60 * 60 * 1000); break;
+                case '30d': fromDate = new Date(now - 30 * 24 * 60 * 60 * 1000); break;
+                default: return {};
+            }
+            return { fromDate: fromDate.toISOString(), toDate: now.toISOString() };
+        }
+
+        function resetFilters() {
+            document.getElementById('timeRangeFilter').value = '';
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('faqStatusFilter').value = '';
+            document.getElementById('minFrequencyFilter').value = '1';
+            document.getElementById('sortByFilter').value = 'frequency';
+            document.getElementById('searchFilter').value = '';
+            document.getElementById('maxResultsFilter').value = '50';
+            document.getElementById('fromDateFilter').value = '';
+            document.getElementById('toDateFilter').value = '';
+            toggleCustomDateRange();
+            loadQuestions();
+            loadAnalytics();
+        }
+
+        function exportQuestions() {
+            // Build export URL with current filters
+            const categoryId = document.getElementById('categoryFilter').value;
+            const faqStatus = document.getElementById('faqStatusFilter').value;
+            const minFrequency = document.getElementById('minFrequencyFilter').value;
+            const timeParams = getTimeRangeParams();
+
+            let url = `${ragServiceUrl}/api/questions/export?format=csv`;
+            if (categoryId) url += `&categoryId=${categoryId}`;
+            if (faqStatus !== '') url += `&hasMatchedFaq=${faqStatus}`;
+            if (minFrequency) url += `&minFrequency=${minFrequency}`;
+            if (timeParams.fromDate) url += `&fromDate=${encodeURIComponent(timeParams.fromDate)}`;
+            if (timeParams.toDate) url += `&toDate=${encodeURIComponent(timeParams.toDate)}`;
+
+            window.open(url, '_blank');
+        }
+
+        async function loadQuestions(page = 0) {
+            currentPage = page;
+            const categoryId = document.getElementById('categoryFilter').value;
+            const faqStatus = document.getElementById('faqStatusFilter').value;
+            const minFrequency = document.getElementById('minFrequencyFilter').value;
+            const maxResults = document.getElementById('maxResultsFilter').value;
+            const search = document.getElementById('searchFilter').value;
+            const sortBy = document.getElementById('sortByFilter').value;
+            const timeParams = getTimeRangeParams();
+
+            let url = `${ragServiceUrl}/api/questions/frequent?page=${page}&size=${maxResults}`;
+            if (categoryId) url += `&categoryId=${categoryId}`;
+            if (faqStatus !== '') url += `&hasMatchedFaq=${faqStatus}`;
+            if (minFrequency) url += `&minFrequency=${minFrequency}`;
+            if (sortBy) url += `&sortBy=${sortBy}`;
+            if (timeParams.fromDate) url += `&fromDate=${encodeURIComponent(timeParams.fromDate)}`;
+            if (timeParams.toDate) url += `&toDate=${encodeURIComponent(timeParams.toDate)}`;
+
+            // If search is specified, use search endpoint instead
+            if (search) {
+                url = `${ragServiceUrl}/api/questions/search?query=${encodeURIComponent(search)}&page=${page}&size=${maxResults}`;
+                if (timeParams.fromDate) url += `&fromDate=${encodeURIComponent(timeParams.fromDate)}`;
+                if (timeParams.toDate) url += `&toDate=${encodeURIComponent(timeParams.toDate)}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                renderQuestions(data);
+            } catch (error) {
+                console.error('Failed to load questions:', error);
+                document.getElementById('questionsList').innerHTML = `
+                    <div class="list-group-item text-center text-danger py-4">
+                        Failed to load questions. Please check if RAG service is running.
+                    </div>`;
+            }
+        }
+
+        // Cache for FAQ answers to avoid repeated fetches
+        const faqAnswerCache = {};
+
+        function renderQuestions(data) {
+            const container = document.getElementById('questionsList');
+
+            if (!data.content || data.content.length === 0) {
+                container.innerHTML = `<div class="list-group-item text-center py-4 text-muted">No questions found matching filters</div>`;
+                document.getElementById('pageInfo').textContent = '0 questions';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = data.content.map(q => `
+                <div class="list-group-item question-item ${q.matchedFaqId ? 'faq-matched' : 'faq-unmatched'}">
+                    <div class="row align-items-start">
+                        <div class="col-auto">
+                            <span class="badge ${q.frequency >= 10 ? 'bg-danger' : (q.frequency >= 5 ? 'bg-warning text-dark' : 'bg-secondary')} frequency-badge">
+                                ${q.frequency}x
+                            </span>
+                        </div>
+                        <div class="col">
+                            <div class="fw-bold">${escapeHtml(q.question)}</div>
+                            <div class="text-muted small mt-1">
+                                ${q.categoryId ? `<span class="badge bg-info me-2">${escapeHtml(q.categoryId)}</span>` : ''}
+                                <span><i class="bi bi-clock"></i> First: ${formatDate(q.firstAskedAt)}</span>
+                                ${q.lastAskedAt && q.lastAskedAt !== q.firstAskedAt ? `<span class="ms-2">Last: ${formatTimeAgo(q.lastAskedAt)}</span>` : ''}
+                            </div>
+                            ${q.matchedFaqId ? `
+                                <div class="text-success small mt-1">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    Matched to FAQ (${(q.matchedFaqScore * 100).toFixed(0)}% similar)
+                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="toggleAnswer('${q.id}')">
+                                        <span id="toggle-${q.id}">Show Answer</span>
+                                    </button>
+                                </div>
+                                <div id="answer-${q.id}" class="answer-section mt-2 p-2 bg-light rounded" style="display: none;">
+                                    <div class="d-flex align-items-center mb-1">
+                                        <i class="bi bi-chat-left-quote text-success me-2"></i>
+                                        <strong class="small text-success">FAQ Answer:</strong>
+                                    </div>
+                                    <div class="answer-content small" id="answer-content-${q.id}">
+                                        <span class="text-muted"><i class="spinner-border spinner-border-sm me-1"></i>Loading...</span>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="text-warning small mt-1">
+                                    <i class="bi bi-exclamation-circle me-1"></i>
+                                    No FAQ match - potential new FAQ
+                                </div>
+                            `}
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-sm btn-outline-secondary me-1" onclick="viewSimilar('${q.id}', '${escapeJs(q.question)}')">
+                                <i class="bi bi-people"></i> Similar
+                            </button>
+                            ${!q.matchedFaqId ? `
+                                <button class="btn btn-sm btn-outline-success me-1" onclick="promoteToFaq('${q.id}', '${escapeJs(q.question)}', ${q.frequency}, '${escapeJs(q.categoryId || '')}')">
+                                    <i class="bi bi-arrow-up-circle"></i> Promote
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-sm btn-outline-danger" onclick="dismissQuestion('${q.id}', '${escapeJs(q.question)}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Page info
+            const start = data.number * data.size + 1;
+            const end = Math.min(start + data.content.length - 1, data.totalElements);
+            document.getElementById('pageInfo').textContent = `${start}-${end} of ${data.totalElements} questions`;
+
+            // Pagination
+            renderPagination(data);
+        }
+
+        function renderPagination(data) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = data.totalPages;
+            const currentPage = data.number;
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            html += `<li class="page-item ${currentPage === 0 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadQuestions(${currentPage - 1}); return false;">Previous</a>
+            </li>`;
+
+            for (let i = Math.max(0, currentPage - 2); i < Math.min(totalPages, currentPage + 3); i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="loadQuestions(${i}); return false;">${i + 1}</a>
+                </li>`;
+            }
+
+            html += `<li class="page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadQuestions(${currentPage + 1}); return false;">Next</a>
+            </li>`;
+
+            pagination.innerHTML = html;
+        }
+
+        async function toggleAnswer(questionId) {
+            const answerDiv = document.getElementById(`answer-${questionId}`);
+            const toggleBtn = document.getElementById(`toggle-${questionId}`);
+            const contentDiv = document.getElementById(`answer-content-${questionId}`);
+
+            if (answerDiv.style.display === 'none') {
+                answerDiv.style.display = 'block';
+                toggleBtn.textContent = 'Hide Answer';
+
+                // Fetch answer if not cached
+                if (!faqAnswerCache[questionId]) {
+                    try {
+                        const response = await fetch(`${ragServiceUrl}/api/questions/${questionId}/matched-faq`);
+                        const data = await response.json();
+                        if (data.found) {
+                            faqAnswerCache[questionId] = data.answer;
+                            contentDiv.innerHTML = escapeHtml(data.answer);
+                        } else {
+                            contentDiv.innerHTML = '<span class="text-muted">Answer not available</span>';
+                        }
+                    } catch (error) {
+                        console.error('Failed to load FAQ answer:', error);
+                        contentDiv.innerHTML = '<span class="text-danger">Failed to load answer</span>';
+                    }
+                } else {
+                    contentDiv.innerHTML = escapeHtml(faqAnswerCache[questionId]);
+                }
+            } else {
+                answerDiv.style.display = 'none';
+                toggleBtn.textContent = 'Show Answer';
+            }
+        }
+
+        async function promoteToFaq(questionId, question, frequency, categoryId) {
+            document.getElementById('promoteQuestionId').value = questionId;
+            document.getElementById('promoteCategoryId').value = categoryId || '';
+            document.getElementById('promoteQuestion').value = question;
+            document.getElementById('promoteFrequency').textContent = frequency + 'x asked';
+            document.getElementById('promoteCategoryBadge').textContent = categoryId || 'No category';
+            document.getElementById('promoteAnswer').value = '';
+
+            const answerField = document.getElementById('promoteAnswer');
+            answerField.placeholder = 'Loading answer from audit trail...';
+
+            // Remove any existing hint
+            const existingHint = document.getElementById('answerSuggestionHint');
+            if (existingHint) existingHint.remove();
+
+            promoteModal.show();
+
+            try {
+                // First, try to get the answer from the audit trail (the actual response given to the user)
+                const auditResponse = await fetch(`${chatAppUrl}/api/audit/answer-by-question?question=${encodeURIComponent(question)}`);
+                const auditData = await auditResponse.json();
+
+                if (auditData.found && auditData.answer) {
+                    answerField.value = auditData.answer;
+                    answerField.placeholder = 'Edit the answer if needed...';
+
+                    // Show a hint that this is from audit trail
+                    const hint = document.createElement('div');
+                    hint.id = 'answerSuggestionHint';
+                    hint.className = 'alert alert-info py-1 px-2 mt-2 small';
+                    hint.innerHTML = `<i class="bi bi-clock-history me-1"></i>Answer loaded from audit trail (${auditData.timestamp ? new Date(auditData.timestamp).toLocaleString() : 'recent'}). Review and edit if needed.`;
+
+                    answerField.parentNode.appendChild(hint);
+                } else {
+                    // Fall back to checking for similar FAQ answer
+                    try {
+                        const faqResponse = await fetch(`${ragServiceUrl}/api/questions/check-faq-match`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ question: question, categoryId: categoryId || null })
+                        });
+                        const faqData = await faqResponse.json();
+
+                        if (faqData.found && faqData.answer) {
+                            answerField.value = faqData.answer;
+                            answerField.placeholder = 'Edit the answer if needed...';
+
+                            const hint = document.createElement('div');
+                            hint.id = 'answerSuggestionHint';
+                            hint.className = 'alert alert-success py-1 px-2 mt-2 small';
+                            hint.innerHTML = `<i class="bi bi-lightbulb me-1"></i>Suggested answer from similar FAQ (${(faqData.score * 100).toFixed(0)}% match). You can edit before creating.`;
+
+                            answerField.parentNode.appendChild(hint);
+                        } else {
+                            answerField.placeholder = 'No answer found in audit trail. Please provide the answer...';
+                        }
+                    } catch (faqError) {
+                        console.error('Failed to check FAQ match:', faqError);
+                        answerField.placeholder = 'No answer found. Please provide the answer...';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load answer from audit trail:', error);
+                answerField.placeholder = 'Failed to load answer. Please provide the answer...';
+            }
+        }
+
+        async function confirmPromote() {
+            const questionId = document.getElementById('promoteQuestionId').value;
+            const answer = document.getElementById('promoteAnswer').value.trim();
+
+            if (!answer) {
+                alert('Please provide an answer for this FAQ.');
+                document.getElementById('promoteAnswer').focus();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/questions/${questionId}/promote-to-faq`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        answer: answer,
+                        promotedBy: 'admin'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    promoteModal.hide();
+                    loadAnalytics();
+                    loadQuestions(currentPage);
+                    alert('FAQ created successfully!\n\nThe question has been added to the FAQ database and will be used to answer similar questions.');
+                } else {
+                    alert('Failed to create FAQ: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to promote:', error);
+                alert('Failed to create FAQ. Please try again.');
+            }
+        }
+
+        function dismissQuestion(questionId, question) {
+            document.getElementById('dismissQuestionId').value = questionId;
+            document.getElementById('dismissQuestion').value = question;
+            dismissModal.show();
+        }
+
+        async function confirmDismiss() {
+            const questionId = document.getElementById('dismissQuestionId').value;
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/questions/${questionId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    dismissModal.hide();
+                    loadAnalytics();
+                    loadQuestions(currentPage);
+                } else {
+                    alert('Failed to delete question.');
+                }
+            } catch (error) {
+                console.error('Failed to delete:', error);
+                alert('Failed to delete question.');
+            }
+        }
+
+        async function viewSimilar(questionId, question) {
+            document.getElementById('similarQuestionsList').innerHTML = `
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>`;
+            similarModal.show();
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/questions/similar?question=${encodeURIComponent(question)}&minScore=0.6&limit=10`);
+                const similar = await response.json();
+
+                if (similar.length === 0) {
+                    document.getElementById('similarQuestionsList').innerHTML = `
+                        <div class="text-center text-muted py-4">No similar questions found</div>`;
+                    return;
+                }
+
+                document.getElementById('similarQuestionsList').innerHTML = similar.map(q => `
+                    <div class="card mb-2">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div>${escapeHtml(q.question)}</div>
+                                    <small class="text-muted">
+                                        Frequency: ${q.frequency}x
+                                    </small>
+                                </div>
+                                <span class="badge ${q.score >= 0.9 ? 'bg-success' : (q.score >= 0.7 ? 'bg-warning text-dark' : 'bg-secondary')}">
+                                    ${(q.score * 100).toFixed(0)}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load similar questions:', error);
+                document.getElementById('similarQuestionsList').innerHTML = `
+                    <div class="text-center text-danger py-4">Failed to load similar questions</div>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeJs(text) {
+            if (!text) return '';
+            return text.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        }
+
+        function formatTimeAgo(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+
+            if (seconds < 60) return 'just now';
+            if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+            if (seconds < 86400) return Math.floor(seconds / 3600) + ' hours ago';
+            if (seconds < 604800) return Math.floor(seconds / 86400) + ' days ago';
+            return date.toLocaleDateString();
+        }
+    </script>
+</th:block>
+</html>

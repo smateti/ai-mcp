@@ -1,0 +1,11 @@
+package com.naag.utilitytools;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class NaagUtilityToolsApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(NaagUtilityToolsApplication.class, args);
+    }
+}

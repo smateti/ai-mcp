@@ -27,6 +27,14 @@ public class LlmToolSelectionService {
     public LlmToolSelectionService(ChatClient chatClient, ObjectMapper objectMapper) {
         this.chatClient = chatClient;
         this.objectMapper = objectMapper;
+        logger.info("LlmToolSelectionService initialized with ChatClient: {}", chatClient.getClass().getName());
+    }
+
+    /**
+     * Get the ChatClient class name (for debugging)
+     */
+    public String getChatClientClassName() {
+        return chatClient.getClass().getName();
     }
 
     /**
@@ -34,23 +42,32 @@ public class LlmToolSelectionService {
      */
     public ToolSelectionResult selectTool(String userMessage, List<Tool> availableTools) {
         try {
+            logger.debug("selectTool called with {} available tools", availableTools.size());
+
             // 1. Build prompt with tool descriptions
             String prompt = buildToolSelectionPrompt(userMessage, availableTools);
+            logger.debug("Built prompt, length={}", prompt.length());
 
             // 2. Call LLM with low temperature for consistency
+            logger.debug("Calling LLM...");
             String llmResponse = chatClient.chatOnce(prompt, 0.2, 512);
+            logger.debug("LLM raw response (first 500 chars): {}",
+                llmResponse != null ? llmResponse.substring(0, Math.min(500, llmResponse.length())) : "NULL");
 
             // 3. Parse JSON response
-            return parseToolSelection(llmResponse);
+            ToolSelectionResult result = parseToolSelection(llmResponse);
+            logger.info("Tool selection result: tool={}, confidence={}, reasoning={}",
+                result.selectedTool(), result.confidence(), result.reasoning());
+            return result;
 
         } catch (Exception e) {
-            logger.error("LLM tool selection failed", e);
+            logger.error("LLM tool selection failed: {} - {}", e.getClass().getName(), e.getMessage(), e);
             // Return low confidence result to trigger fallback
             return new ToolSelectionResult(
                 null,
                 0.0,
                 Map.of(),
-                "LLM selection failed: " + e.getMessage(),
+                "LLM selection failed: " + e.getClass().getName() + ": " + e.getMessage(),
                 List.of()
             );
         }
@@ -135,15 +152,26 @@ public class LlmToolSelectionService {
 
     private String buildToolSelectionPrompt(String userMessage, List<Tool> tools) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("You are a precise tool selection assistant. Analyze the user's message and select the most appropriate tool.\n\n");
-        prompt.append("CRITICAL: Extract parameters with EXACT types as specified below.\n\n");
-        prompt.append("Available Tools:\n");
 
-        int index = 1;
+        // System instruction
+        prompt.append("You are an intelligent tool selection assistant. Your task is to analyze the user's message and select the most appropriate tool from the available tools list.\n\n");
+
+        // User message first for context
+        prompt.append("## User Message\n");
+        prompt.append("\"").append(userMessage).append("\"\n\n");
+
+        // Available tools with rich documentation from schema
+        prompt.append("## Available Tools\n\n");
+
         for (Tool tool : tools) {
-            prompt.append(String.format("%d. %s - %s\n", index++, tool.name(), tool.description()));
+            prompt.append("### ").append(tool.name()).append("\n");
 
-            // Extract parameters from schema
+            // Description
+            if (tool.description() != null && !tool.description().isEmpty()) {
+                prompt.append("**Description:** ").append(tool.description()).append("\n");
+            }
+
+            // Parameters with full documentation from schema
             if (tool.inputSchema() != null && tool.inputSchema().has("properties")) {
                 JsonNode properties = tool.inputSchema().get("properties");
                 JsonNode required = tool.inputSchema().get("required");
@@ -153,42 +181,97 @@ public class LlmToolSelectionService {
                     required.forEach(field -> requiredFields.add(field.asText()));
                 }
 
-                prompt.append("   Parameters:\n");
+                prompt.append("**Parameters:**\n");
                 properties.fields().forEachRemaining(entry -> {
                     String paramName = entry.getKey();
                     JsonNode paramSchema = entry.getValue();
+
                     String type = paramSchema.has("type") ? paramSchema.get("type").asText() : "any";
+                    String description = paramSchema.has("description") ? paramSchema.get("description").asText() : "";
+                    String example = paramSchema.has("example") ? paramSchema.get("example").asText() : "";
+                    String defaultValue = paramSchema.has("default") ? paramSchema.get("default").asText() : "";
                     boolean isRequired = requiredFields.contains(paramName);
 
-                    prompt.append(String.format("     - %s: %s%s\n",
-                        paramName, type.toUpperCase(), isRequired ? " (REQUIRED)" : " (optional)"));
+                    prompt.append("  - `").append(paramName).append("` (").append(type).append(")");
+                    if (isRequired) {
+                        prompt.append(" **[REQUIRED]**");
+                    } else if (!defaultValue.isEmpty()) {
+                        prompt.append(" [default: ").append(defaultValue).append("]");
+                    }
+                    if (!description.isEmpty()) {
+                        prompt.append(": ").append(description);
+                    }
+                    if (!example.isEmpty()) {
+                        prompt.append(" Example: ").append(example);
+                    }
+                    prompt.append("\n");
                 });
             } else {
-                prompt.append("   Parameters: none\n");
+                prompt.append("**Parameters:** None\n");
             }
             prompt.append("\n");
         }
 
-        prompt.append("User Message: \"").append(userMessage).append("\"\n\n");
-        prompt.append("RESPOND WITH VALID JSON ONLY (no markdown, no code blocks, no explanation):\n");
+        // Instructions for selection
+        prompt.append("## Instructions\n\n");
+        prompt.append("**CRITICAL FIRST STEP: Identify the question type**\n\n");
+
+        prompt.append("### Question Type 1: GENERAL KNOWLEDGE / HOW-TO QUESTIONS\n");
+        prompt.append("These are questions about concepts, best practices, explanations, tutorials, or how to do something.\n");
+        prompt.append("**Key indicators:**\n");
+        prompt.append("- Questions starting with: \"how do\", \"how to\", \"what is\", \"explain\", \"what are the best practices\"\n");
+        prompt.append("- Questions about general concepts WITHOUT mentioning specific entity IDs in the USER'S question\n");
+        prompt.append("- Questions about architecture, patterns, methodologies, technologies\n");
+        prompt.append("**Examples:**\n");
+        prompt.append("- \"how do you develop microservice using spring boot\" → rag_query\n");
+        prompt.append("- \"what is REST API\" → rag_query\n");
+        prompt.append("- \"explain batch processing\" → rag_query\n");
+        prompt.append("- \"best practices for microservices\" → rag_query\n");
+        prompt.append("- \"how to implement authentication\" → rag_query\n");
+        prompt.append("**Action:** Use `rag_query` tool for knowledge base search\n\n");
+
+        prompt.append("### Question Type 2: SPECIFIC DATA LOOKUP\n");
+        prompt.append("These are questions requesting specific data about a particular entity (application, service, user) that exists in a database.\n");
+        prompt.append("**Key indicators:**\n");
+        prompt.append("- User's message contains SPECIFIC ENTITY IDs: APP-XXX, SVC-XXX, user ID numbers\n");
+        prompt.append("- Questions asking ABOUT a specific entity (\"in APP-ORDER-PROC\", \"for APP-USER-MGMT\", \"user 5\")\n");
+        prompt.append("- Questions like: \"what services are IN [specific app]\", \"show me [specific entity]\", \"get [specific ID]\"\n");
+        prompt.append("**Examples:**\n");
+        prompt.append("- \"what services are in APP-ORDER-PROC application\" → get_application_services_with_dependencies (APP-ORDER-PROC is in USER'S question)\n");
+        prompt.append("- \"get services for APP-USER-MGMT\" → get_application_services_with_dependencies (APP-USER-MGMT is in USER'S question)\n");
+        prompt.append("- \"show me user 5\" → jsonplaceholder-user (user ID 5 is in USER'S question)\n");
+        prompt.append("- \"what is APP-PAYMENT-GW\" → get_application_by_id (APP-PAYMENT-GW is in USER'S question)\n");
+        prompt.append("**Action:** Use specific data lookup tools (get_application_by_id, get_application_services_with_dependencies, jsonplaceholder-user)\n\n");
+
+        prompt.append("**CRITICAL DISTINCTION:**\n");
+        prompt.append("- If the USER'S MESSAGE is asking HOW TO do something general → rag_query\n");
+        prompt.append("- If the USER'S MESSAGE mentions a SPECIFIC ENTITY ID and asks about THAT entity → data lookup tool\n");
+        prompt.append("- IGNORE entity IDs that appear in tool descriptions/examples - ONLY look at the USER'S MESSAGE above!\n\n");
+
+        prompt.append("### Other Instructions:\n");
+        prompt.append("1. Select the SINGLE best tool from the available tools list\n");
+        prompt.append("2. Extract parameter values from the USER'S MESSAGE (not from tool descriptions)\n");
+        prompt.append("3. Use ONLY tool names that exist in the available tools list\n");
+        prompt.append("4. Set confidence based on clarity:\n");
+        prompt.append("   - 0.9-1.0: Very clear intent and tool match\n");
+        prompt.append("   - 0.7-0.9: Clear intent, good tool match\n");
+        prompt.append("   - 0.5-0.7: Somewhat clear, possible match\n");
+        prompt.append("   - Below 0.5: Unclear intent or poor match\n\n");
+
+        // Response format
+        prompt.append("## Response Format\n");
+        prompt.append("Respond with valid JSON only (no markdown, no explanation):\n");
+        prompt.append("```\n");
         prompt.append("{\n");
-        prompt.append("  \"tool\": \"tool_name\",\n");
+        prompt.append("  \"tool\": \"exact_tool_name\",\n");
         prompt.append("  \"confidence\": 0.95,\n");
         prompt.append("  \"parameters\": {\n");
-        prompt.append("    \"stringParam\": \"text value\",\n");
-        prompt.append("    \"numberParam\": 42,\n");
-        prompt.append("    \"integerParam\": 10\n");
+        prompt.append("    \"param1\": \"extracted_value\",\n");
+        prompt.append("    \"param2\": 123\n");
         prompt.append("  },\n");
-        prompt.append("  \"reasoning\": \"Brief explanation\",\n");
-        prompt.append("  \"alternatives\": [{\"tool\": \"other_tool\", \"confidence\": 0.3, \"reasoning\": \"Could also be...\"}]\n");
-        prompt.append("}\n\n");
-        prompt.append("CRITICAL RULES:\n");
-        prompt.append("1. For NUMBER type: use actual numbers like 42, 3.14 (NOT strings like \"42\")\n");
-        prompt.append("2. For INTEGER type: use integers like 5, 10 (NOT strings like \"5\")\n");
-        prompt.append("3. For STRING type: use quoted strings like \"hello\"\n");
-        prompt.append("4. confidence must be between 0.0 and 1.0\n");
-        prompt.append("5. Extract ALL recognizable parameters from the message\n");
-        prompt.append("6. If numbers are mentioned (e.g., \"add 3 and 5\"), extract them as actual numbers: {\"a\": 3, \"b\": 5}\n");
+        prompt.append("  \"reasoning\": \"Brief explanation of why this tool was selected\"\n");
+        prompt.append("}\n");
+        prompt.append("```\n");
 
         return prompt.toString();
     }
@@ -251,8 +334,21 @@ public class LlmToolSelectionService {
     }
 
     private ToolSelectionResult parseToolSelection(String llmResponse) throws JsonProcessingException {
-        // Clean up response if it contains markdown code blocks
+        logger.debug("parseToolSelection input (first 500 chars): {}",
+            llmResponse != null ? llmResponse.substring(0, Math.min(500, llmResponse.length())) : "NULL");
+
+        if (llmResponse == null || llmResponse.isBlank()) {
+            logger.warn("LLM returned null or blank response");
+            return new ToolSelectionResult(null, 0.0, Map.of(), "LLM returned empty response", List.of());
+        }
+
+        // Clean up response if it contains markdown formatting
         String cleanedResponse = llmResponse.trim();
+
+        // Remove markdown headers (## Response, # Response, etc.)
+        cleanedResponse = cleanedResponse.replaceAll("(?m)^#+\\s+.*$", "").trim();
+
+        // Remove markdown code blocks
         if (cleanedResponse.startsWith("```json")) {
             cleanedResponse = cleanedResponse.substring(7);
         }
@@ -264,11 +360,36 @@ public class LlmToolSelectionService {
         }
         cleanedResponse = cleanedResponse.trim();
 
+        // Find the first { and last } to extract just the JSON object
+        int firstBrace = cleanedResponse.indexOf('{');
+        int lastBrace = cleanedResponse.lastIndexOf('}');
+        if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
+            cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+        }
+        cleanedResponse = cleanedResponse.trim();
+
+        logger.debug("parseToolSelection cleanedResponse: {}", cleanedResponse);
+
         JsonNode responseNode = objectMapper.readTree(cleanedResponse);
 
-        String tool = responseNode.has("tool") ? responseNode.get("tool").asText() : null;
-        double confidence = responseNode.has("confidence") ? responseNode.get("confidence").asDouble() : 0.0;
-        String reasoning = responseNode.has("reasoning") ? responseNode.get("reasoning").asText() : "";
+        // Handle both expected format and llama.cpp function-call format
+        // Expected: {"tool": "name", "confidence": 0.9, "parameters": {...}, "reasoning": "..."}
+        // llama.cpp may return: {"name": "name", "parameters": {...}}
+        String tool = null;
+        if (responseNode.has("tool")) {
+            tool = responseNode.get("tool").asText();
+        } else if (responseNode.has("name")) {
+            // Fallback for llama.cpp function-call format
+            tool = responseNode.get("name").asText();
+            logger.debug("Using 'name' field as tool (llama.cpp function-call format)");
+        }
+
+        double confidence = responseNode.has("confidence") ? responseNode.get("confidence").asDouble() : 0.8; // Default to 0.8 if not specified
+        String reasoning = responseNode.has("reasoning") ? responseNode.get("reasoning").asText() : "Tool selected by LLM";
+
+        // Debug: Log what was parsed
+        logger.info("Parsed from LLM: tool={}, confidence={}, reasoning={}, hasToolField={}, hasConfidenceField={}",
+            tool, confidence, reasoning, responseNode.has("tool"), responseNode.has("confidence"));
 
         Map<String, Object> parameters = new HashMap<>();
         if (responseNode.has("parameters") && responseNode.get("parameters").isObject()) {

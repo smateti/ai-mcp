@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-question-circle me-2"></i>FAQ Management</h2>
+            <p class="text-muted mb-0">Manage approved FAQs across all documents</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary" onclick="refreshStats()">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- FAQ Query Toggle -->
+    <div class="alert mb-4" id="faqQueryStatus">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-lightning-charge me-2"></i>
+                <strong>FAQ Query Mode:</strong>
+                <span id="faqQueryStatusText">Loading...</span>
+                <small class="text-muted ms-2">When enabled, user questions are first checked against FAQs before RAG</small>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="faqQueryToggle" onchange="toggleFaqQuery()">
+                <label class="form-check-label" for="faqQueryToggle">Enable FAQ Query</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total FAQs</h6>
+                    <h3 id="totalFaqs">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Total Access</h6>
+                    <h3 id="totalAccess">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Qdrant Points</h6>
+                    <h3 id="qdrantPoints">-</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Collection Status</h6>
+                    <h3 id="collectionStatus">-</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form class="row g-3" onsubmit="loadFaqs(); return false;">
+                <div class="col-md-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Search</label>
+                    <input type="text" class="form-control" id="searchFilter" placeholder="Search questions or answers...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Per Page</label>
+                    <select class="form-select" id="pageSizeFilter">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search me-1"></i>Search
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FAQ List -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>FAQ List</span>
+            <span class="text-muted" id="pageInfo">Loading...</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Question</th>
+                            <th>Answer</th>
+                            <th>Category</th>
+                            <th>Access</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="faqTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center" id="pagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit FAQ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editFaqId">
+                    <div class="mb-3">
+                        <label class="form-label">Question</label>
+                        <textarea class="form-control" id="editQuestion" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Answer</label>
+                        <textarea class="form-control" id="editAnswer" rows="5"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveFaq()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Similarity Modal -->
+    <div class="modal fade" id="similarityModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Find Similar FAQs</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="sourceFaqId">
+
+                    <!-- Source FAQ Info -->
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-star me-1"></i>Source FAQ (Answer will be copied from this)
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-1"><strong>Question:</strong></p>
+                            <p id="sourceQuestion" class="text-muted"></p>
+                            <p class="mb-1"><strong>Answer:</strong></p>
+                            <p id="sourceAnswer" class="text-muted" style="max-height: 100px; overflow-y: auto;"></p>
+                        </div>
+                    </div>
+
+                    <!-- Similarity Threshold -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Minimum Similarity</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="minSimilarity" value="90" min="50" max="100">
+                                <span class="input-group-text">%</span>
+                                <button class="btn btn-outline-primary" onclick="refreshSimilarFaqs()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end">
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Select similar FAQs below and click "Merge" to copy the answer from the source FAQ to them.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Similar FAQs Table -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover table-sm">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 40px;">
+                                        <input type="checkbox" class="form-check-input" id="selectAllSimilar" onchange="toggleSelectAllSimilar()">
+                                    </th>
+                                    <th style="width: 80px;">Score</th>
+                                    <th>Question</th>
+                                    <th>Current Answer</th>
+                                </tr>
+                            </thead>
+                            <tbody id="similarFaqsBody">
+                                <tr>
+                                    <td colspan="4" class="text-center py-4">
+                                        <div class="spinner-border text-info" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- No Similar FAQs Message -->
+                    <div id="noSimilarFaqs" class="text-center py-4 text-muted" style="display: none;">
+                        <i class="bi bi-emoji-smile" style="font-size: 2rem;"></i>
+                        <p class="mb-0 mt-2">No similar FAQs found above the threshold.</p>
+                        <small>Try lowering the similarity percentage.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="me-auto">
+                        <span id="selectedCount" class="text-muted">0 selected</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-warning" id="mergeBtn" onclick="mergeFaqs()" disabled>
+                        <i class="bi bi-arrow-left-right me-1"></i>Merge Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const ragServiceUrl = /*[[${ragServiceUrl}]]*/ 'http://localhost:8080';
+        const categoryAdminUrl = /*[[${categoryAdminUrl}]]*/ 'http://localhost:8085';
+        let currentPage = 0;
+        let editModal;
+        let similarityModal;
+        let currentSourceFaqId = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            editModal = new bootstrap.Modal(document.getElementById('editModal'));
+            similarityModal = new bootstrap.Modal(document.getElementById('similarityModal'));
+            loadCategories();
+            loadFaqs();
+            loadStats();
+            loadFaqQueryStatus();
+        });
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${categoryAdminUrl}/api/categories/active`);
+                const categories = await response.json();
+                const select = document.getElementById('categoryFilter');
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id || cat.categoryId;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/stats`);
+                const stats = await response.json();
+                document.getElementById('totalFaqs').textContent = stats.totalFaqs || 0;
+                document.getElementById('totalAccess').textContent = stats.totalAccess || 0;
+                document.getElementById('qdrantPoints').textContent = stats.pointsCount || 0;
+                document.getElementById('collectionStatus').textContent = stats.status || 'N/A';
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function refreshStats() {
+            loadStats();
+            loadFaqs();
+        }
+
+        async function loadFaqs(page = 0) {
+            currentPage = page;
+            const categoryId = document.getElementById('categoryFilter').value;
+            const search = document.getElementById('searchFilter').value;
+            const size = document.getElementById('pageSizeFilter').value;
+
+            let url = `${ragServiceUrl}/api/faq-management?page=${page}&size=${size}`;
+            if (categoryId) url += `&categoryId=${categoryId}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                renderFaqs(data);
+            } catch (error) {
+                console.error('Failed to load FAQs:', error);
+                document.getElementById('faqTableBody').innerHTML = `
+                    <tr><td colspan="5" class="text-center text-danger py-4">
+                        Failed to load FAQs. Please check if RAG service is running.
+                    </td></tr>`;
+            }
+        }
+
+        function renderFaqs(data) {
+            const tbody = document.getElementById('faqTableBody');
+
+            if (!data.content || data.content.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No FAQs found</td></tr>`;
+                document.getElementById('pageInfo').textContent = '0 FAQs';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            tbody.innerHTML = data.content.map(faq => `
+                <tr>
+                    <td style="max-width: 300px;">
+                        <div class="text-truncate" title="${escapeHtml(faq.question)}">
+                            ${escapeHtml(faq.question)}
+                        </div>
+                        <small class="text-muted">${faq.questionType || ''}</small>
+                    </td>
+                    <td style="max-width: 400px;">
+                        <div class="text-truncate" title="${escapeHtml(faq.answer)}">
+                            ${escapeHtml(faq.answer.substring(0, 200))}${faq.answer.length > 200 ? '...' : ''}
+                        </div>
+                    </td>
+                    <td><span class="badge bg-secondary">${faq.categoryId || 'N/A'}</span></td>
+                    <td>
+                        <span class="badge bg-info">${faq.accessCount || 0}</span>
+                        ${faq.lastAccessedAt ? `<br><small class="text-muted">${formatDate(faq.lastAccessedAt)}</small>` : ''}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info me-1" onclick="showSimilarFaqs(${faq.id})" title="Find Similar FAQs">
+                            <i class="bi bi-diagram-3"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editFaq(${faq.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deactivateFaq(${faq.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Page info
+            const start = data.number * data.size + 1;
+            const end = Math.min(start + data.content.length - 1, data.totalElements);
+            document.getElementById('pageInfo').textContent = `${start}-${end} of ${data.totalElements} FAQs`;
+
+            // Pagination
+            renderPagination(data);
+        }
+
+        function renderPagination(data) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = data.totalPages;
+            const currentPage = data.number;
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+
+            // Previous
+            html += `<li class="page-item ${currentPage === 0 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadFaqs(${currentPage - 1}); return false;">Previous</a>
+            </li>`;
+
+            // Page numbers
+            for (let i = Math.max(0, currentPage - 2); i < Math.min(totalPages, currentPage + 3); i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="loadFaqs(${i}); return false;">${i + 1}</a>
+                </li>`;
+            }
+
+            // Next
+            html += `<li class="page-item ${currentPage >= totalPages - 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="loadFaqs(${currentPage + 1}); return false;">Next</a>
+            </li>`;
+
+            pagination.innerHTML = html;
+        }
+
+        async function editFaq(faqId) {
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/${faqId}`);
+                const faq = await response.json();
+
+                document.getElementById('editFaqId').value = faq.id;
+                document.getElementById('editQuestion').value = faq.question;
+                document.getElementById('editAnswer').value = faq.answer;
+
+                editModal.show();
+            } catch (error) {
+                console.error('Failed to load FAQ:', error);
+                alert('Failed to load FAQ details.');
+            }
+        }
+
+        async function saveFaq() {
+            const faqId = document.getElementById('editFaqId').value;
+            const question = document.getElementById('editQuestion').value;
+            const answer = document.getElementById('editAnswer').value;
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/${faqId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question, answer })
+                });
+
+                if (response.ok) {
+                    editModal.hide();
+                    loadFaqs(currentPage);
+                    alert('FAQ updated successfully!');
+                } else {
+                    alert('Failed to update FAQ.');
+                }
+            } catch (error) {
+                console.error('Failed to save FAQ:', error);
+                alert('Failed to save FAQ.');
+            }
+        }
+
+        async function deactivateFaq(faqId) {
+            if (!confirm('Are you sure you want to deactivate this FAQ?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/${faqId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadFaqs(currentPage);
+                    loadStats();
+                    alert('FAQ deactivated.');
+                } else {
+                    alert('Failed to deactivate FAQ.');
+                }
+            } catch (error) {
+                console.error('Failed to deactivate FAQ:', error);
+                alert('Failed to deactivate FAQ.');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+
+        async function loadFaqQueryStatus() {
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/settings`);
+                const settings = await response.json();
+                updateFaqQueryUI(settings.faqQueryEnabled);
+            } catch (error) {
+                console.error('Failed to load FAQ settings:', error);
+                updateFaqQueryUI(false);
+            }
+        }
+
+        function updateFaqQueryUI(enabled) {
+            const toggle = document.getElementById('faqQueryToggle');
+            const statusText = document.getElementById('faqQueryStatusText');
+            const statusAlert = document.getElementById('faqQueryStatus');
+
+            toggle.checked = enabled;
+
+            if (enabled) {
+                statusText.textContent = 'ENABLED';
+                statusText.className = 'badge bg-success';
+                statusAlert.className = 'alert alert-success mb-4';
+            } else {
+                statusText.textContent = 'DISABLED';
+                statusText.className = 'badge bg-secondary';
+                statusAlert.className = 'alert alert-secondary mb-4';
+            }
+        }
+
+        async function toggleFaqQuery() {
+            const toggle = document.getElementById('faqQueryToggle');
+            const enabled = toggle.checked;
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/settings/toggle-faq-query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        enabled: enabled,
+                        updatedBy: 'admin'
+                    })
+                });
+
+                if (response.ok) {
+                    const settings = await response.json();
+                    updateFaqQueryUI(settings.faqQueryEnabled);
+                } else {
+                    // Revert toggle on error
+                    toggle.checked = !enabled;
+                    alert('Failed to update FAQ query setting.');
+                }
+            } catch (error) {
+                console.error('Failed to toggle FAQ query:', error);
+                // Revert toggle on error
+                toggle.checked = !enabled;
+                alert('Failed to update FAQ query setting.');
+            }
+        }
+
+        // ========== Similarity & Merge Functions ==========
+
+        async function showSimilarFaqs(faqId) {
+            currentSourceFaqId = faqId;
+            document.getElementById('sourceFaqId').value = faqId;
+
+            // Fetch FAQ details
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/${faqId}`);
+                const faq = await response.json();
+                document.getElementById('sourceQuestion').textContent = faq.question || '';
+                document.getElementById('sourceAnswer').textContent = faq.answer || '';
+            } catch (error) {
+                console.error('Failed to load FAQ details:', error);
+                document.getElementById('sourceQuestion').textContent = 'Error loading question';
+                document.getElementById('sourceAnswer').textContent = 'Error loading answer';
+            }
+
+            // Reset selection
+            document.getElementById('selectAllSimilar').checked = false;
+            updateSelectedCount();
+
+            // Show modal and load similar FAQs
+            similarityModal.show();
+            await loadSimilarFaqs(faqId);
+        }
+
+        async function loadSimilarFaqs(faqId) {
+            const minScore = (document.getElementById('minSimilarity').value || 90) / 100;
+            const tbody = document.getElementById('similarFaqsBody');
+            const noResults = document.getElementById('noSimilarFaqs');
+
+            // Show loading
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4">
+                <div class="spinner-border text-info" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </td></tr>`;
+            noResults.style.display = 'none';
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/${faqId}/similar?minScore=${minScore}&limit=20`);
+                const similarFaqs = await response.json();
+
+                if (!similarFaqs || similarFaqs.length === 0) {
+                    tbody.innerHTML = '';
+                    noResults.style.display = 'block';
+                    return;
+                }
+
+                noResults.style.display = 'none';
+                tbody.innerHTML = similarFaqs.map(faq => `
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input similar-faq-check"
+                                   data-faq-id="${faq.faqId}" onchange="updateSelectedCount()">
+                        </td>
+                        <td>
+                            <span class="badge ${getScoreBadgeClass(faq.scorePercent)}">${faq.scorePercent}%</span>
+                        </td>
+                        <td>
+                            <div style="max-width: 350px;">
+                                ${escapeHtml(faq.question)}
+                            </div>
+                            <small class="text-muted">${faq.categoryId || ''}</small>
+                        </td>
+                        <td>
+                            <div class="text-truncate" style="max-width: 300px;" title="${escapeHtml(faq.answer)}">
+                                ${escapeHtml((faq.answer || '').substring(0, 150))}${(faq.answer || '').length > 150 ? '...' : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Failed to load similar FAQs:', error);
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">
+                    Failed to load similar FAQs. Please try again.
+                </td></tr>`;
+            }
+        }
+
+        function refreshSimilarFaqs() {
+            if (currentSourceFaqId) {
+                loadSimilarFaqs(currentSourceFaqId);
+            }
+        }
+
+        function getScoreBadgeClass(score) {
+            if (score >= 95) return 'bg-success';
+            if (score >= 90) return 'bg-info';
+            if (score >= 80) return 'bg-warning';
+            return 'bg-secondary';
+        }
+
+        function toggleSelectAllSimilar() {
+            const selectAll = document.getElementById('selectAllSimilar').checked;
+            document.querySelectorAll('.similar-faq-check').forEach(cb => {
+                cb.checked = selectAll;
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('.similar-faq-check:checked').length;
+            document.getElementById('selectedCount').textContent = `${selected} selected`;
+            document.getElementById('mergeBtn').disabled = selected === 0;
+        }
+
+        async function mergeFaqs() {
+            const sourceFaqId = currentSourceFaqId;
+            const targetFaqIds = [];
+
+            document.querySelectorAll('.similar-faq-check:checked').forEach(cb => {
+                const faqId = cb.dataset.faqId;
+                if (faqId) {
+                    // Try to parse as number, otherwise keep as string
+                    const parsed = parseInt(faqId);
+                    targetFaqIds.push(isNaN(parsed) ? faqId : parsed);
+                }
+            });
+
+            if (targetFaqIds.length === 0) {
+                alert('Please select at least one FAQ to merge.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to copy the answer from the source FAQ to ${targetFaqIds.length} selected FAQ(s)?\n\nThis will replace their current answers.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq-management/merge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sourceFaqId: sourceFaqId,
+                        targetFaqIds: targetFaqIds
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(`Successfully merged answer to ${result.mergedCount} FAQ(s).`);
+                    similarityModal.hide();
+                    loadFaqs(currentPage);
+                } else {
+                    alert('Failed to merge FAQs: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to merge FAQs:', error);
+                alert('Failed to merge FAQs. Please try again.');
+            }
+        }
+    </script>
+</th:block>
+</html>

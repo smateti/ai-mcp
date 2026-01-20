@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <!-- Extract data from JsonNode for easier access -->
+    <th:block th:with="upload=${details?.get('upload')},
+                       qaPairs=${details?.get('qaPairs')},
+                       stats=${details?.get('stats')},
+                       status=${details?.get('upload')?.get('status')?.asText()}">
+
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/documents}">Documents</a></li>
+                <li class="breadcrumb-item active">Preview Upload</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-file-earmark-check me-2"></i>Document Preview</h1>
+            <span id="statusBadge" class="badge fs-6"
+                  th:classappend="${status == 'READY_FOR_REVIEW'} ? 'bg-success' :
+                                  (${status == 'FAILED'} ? 'bg-danger' :
+                                  (${status == 'MOVED_TO_RAG'} ? 'bg-info' : 'bg-warning'))"
+                  th:text="${status ?: 'UNKNOWN'}">STATUS</span>
+        </div>
+    </div>
+
+    <!-- Processing Progress (shown while processing) -->
+    <div id="processingCard" class="card mb-4"
+         th:classappend="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG' || status == 'FAILED'} ? 'd-none' : ''">
+        <div class="card-body">
+            <h5><i class="bi bi-gear-wide-connected me-2 spinning"></i>Processing Document...</h5>
+            <div class="progress mb-2" style="height: 25px;">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                     role="progressbar" style="width: 10%">10%</div>
+            </div>
+            <p id="progressMessage" class="text-muted mb-0">Initializing...</p>
+        </div>
+    </div>
+
+    <!-- Document Info -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Document Information</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Document ID</dt>
+                        <dd class="col-sm-9"><code th:text="${upload?.get('docId')?.asText() ?: 'N/A'}">doc-id</code></dd>
+
+                        <dt class="col-sm-3">Title</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('title')?.asText() ?: '(No title)'}">Title</dd>
+
+                        <dt class="col-sm-3">Category</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('categoryId')?.asText() ?: '(None)'}">Category</dd>
+
+                        <dt class="col-sm-3">Chunks</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('totalChunks')?.asInt() ?: 0}">0</dd>
+
+                        <dt class="col-sm-3">Created</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('createdAt')?.asText() ?: 'N/A'}">Date</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Validation Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="fs-4 text-success" th:text="${stats?.get('passed')?.asInt() ?: 0}">0</div>
+                            <small class="text-muted">Passed</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 text-danger" th:text="${stats?.get('failed')?.asInt() ?: 0}">0</div>
+                            <small class="text-muted">Failed</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 text-info" th:text="${stats?.get('averageScore') != null && !stats.get('averageScore').isNull()} ? ${#numbers.formatDecimal(stats.get('averageScore').asDouble(), 1, 2)} : 'N/A'">N/A</div>
+                            <small class="text-muted">Avg Score</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Q&A Pairs Table -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>Generated Q&A Pairs</h5>
+            <span class="badge bg-secondary" th:text="${qaPairs?.size() ?: 0} + ' pairs'">0 pairs</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" th:if="${qaPairs != null && qaPairs.size() > 0}">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Type</th>
+                            <th style="width: 30%;">Question</th>
+                            <th style="width: 25%;">Expected Answer</th>
+                            <th style="width: 25%;">RAG Answer</th>
+                            <th style="width: 80px;">Score</th>
+                            <th style="width: 80px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="qa : ${qaPairs}">
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${qa.get('questionType')?.asText() == 'FINE_GRAIN'} ? 'bg-primary' : 'bg-info'"
+                                      th:text="${qa.get('questionType')?.asText() == 'FINE_GRAIN'} ? 'Detail' : 'Summary'">Type</span>
+                            </td>
+                            <td class="small" th:text="${#strings.abbreviate(qa.get('question')?.asText() ?: '', 100)}">Question</td>
+                            <td class="small text-muted" th:text="${#strings.abbreviate(qa.get('expectedAnswer')?.asText() ?: '', 80)}">Expected</td>
+                            <td class="small" th:text="${qa.get('ragAnswer') != null && !qa.get('ragAnswer').isNull()} ? ${#strings.abbreviate(qa.get('ragAnswer').asText(), 80)} : '-'">RAG Answer</td>
+                            <td>
+                                <th:block th:if="${qa.get('similarityScore') != null && !qa.get('similarityScore').isNull()}">
+                                    <span th:with="score=${qa.get('similarityScore').asDouble()}"
+                                          th:text="${#numbers.formatDecimal(score * 100, 1, 0)} + '%'"
+                                          th:classappend="${score >= 0.7} ? 'text-success' : (${score >= 0.4} ? 'text-warning' : 'text-danger')">0%</span>
+                                </th:block>
+                                <span th:if="${qa.get('similarityScore') == null || qa.get('similarityScore').isNull()}">-</span>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:with="valStatus=${qa.get('validationStatus')?.asText()}"
+                                      th:classappend="${valStatus == 'PASSED'} ? 'bg-success' :
+                                                      (${valStatus == 'FAILED'} ? 'bg-danger' : 'bg-warning')"
+                                      th:text="${valStatus ?: 'PENDING'}">Status</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="text-center py-4 text-muted" th:if="${qaPairs == null || qaPairs.size() == 0}">
+                    <i class="bi bi-hourglass-split fs-1"></i>
+                    <p>Q&A pairs will appear here once processing completes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="card" th:if="${status == 'READY_FOR_REVIEW'}">
+        <div class="card-body">
+            <div class="d-flex gap-2 justify-content-between">
+                <div>
+                    <form th:action="@{/documents/uploads/{id}/approve(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('Approve and move this document to the RAG knowledge base?');">
+                            <i class="bi bi-check-circle me-2"></i>Approve & Add to RAG
+                        </button>
+                    </form>
+                </div>
+                <div class="d-flex gap-2">
+                    <form th:action="@{/documents/uploads/{id}/retry(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-repeat me-2"></i>Retry Processing
+                        </button>
+                    </form>
+                    <form th:action="@{/documents/uploads/{id}/delete(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this upload? This cannot be undone.');">
+                            <i class="bi bi-trash me-2"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Failed State Actions -->
+    <div class="card" th:if="${status == 'FAILED'}">
+        <div class="card-body">
+            <div class="alert alert-danger mb-3">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Processing Failed:</strong> <span th:text="${upload?.get('errorMessage')?.asText() ?: 'Unknown error'}">Error</span>
+            </div>
+            <div class="d-flex gap-2">
+                <form th:action="@{/documents/uploads/{id}/retry(id=${uploadId})}" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-repeat me-2"></i>Retry Processing
+                    </button>
+                </form>
+                <form th:action="@{/documents/uploads/{id}/delete(id=${uploadId})}" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this upload?');">
+                        <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                </form>
+                <a th:href="@{/documents}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Documents
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moved to RAG State -->
+    <div class="card" th:if="${status == 'MOVED_TO_RAG'}">
+        <div class="card-body text-center">
+            <i class="bi bi-check-circle text-success fs-1"></i>
+            <h4 class="mt-2">Document Successfully Added to RAG</h4>
+            <p class="text-muted">This document is now available in the knowledge base.</p>
+            <a th:href="@{/documents}" class="btn btn-primary">
+                <i class="bi bi-arrow-left me-2"></i>Back to Documents
+            </a>
+        </div>
+    </div>
+
+    <style>
+        .spinning {
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <script th:inline="javascript">
+        const uploadId = /*[[${uploadId}]]*/ '';
+        const sseEndpoint = /*[[${sseEndpoint}]]*/ '';
+        const currentStatus = /*[[${status}]]*/ '';
+
+        // Only connect SSE if still processing
+        if (currentStatus && !['READY_FOR_REVIEW', 'MOVED_TO_RAG', 'FAILED', 'DELETED'].includes(currentStatus)) {
+            const eventSource = new EventSource(sseEndpoint);
+
+            eventSource.addEventListener('processing', function(event) {
+                const data = JSON.parse(event.data);
+                document.getElementById('progressBar').style.width = data.progress + '%';
+                document.getElementById('progressBar').textContent = data.progress + '%';
+                document.getElementById('progressMessage').textContent = data.message;
+            });
+
+            eventSource.addEventListener('completed', function(event) {
+                const data = JSON.parse(event.data);
+                eventSource.close();
+                // Reload page to show results
+                window.location.reload();
+            });
+
+            eventSource.addEventListener('error', function(event) {
+                const data = JSON.parse(event.data);
+                eventSource.close();
+                window.location.reload();
+            });
+
+            eventSource.onerror = function(err) {
+                console.error('SSE error:', err);
+                eventSource.close();
+                // Retry reload after a delay
+                setTimeout(() => window.location.reload(), 5000);
+            };
+        }
+    </script>
+
+    </th:block>
+</th:block>
+</html>

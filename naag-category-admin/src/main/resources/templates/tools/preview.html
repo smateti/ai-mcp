@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/tools}">Tools</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/tools/register-single}">Register Single Tool</a></li>
+                <li class="breadcrumb-item active">Preview</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-eye me-2"></i>Preview Tool</h1>
+    </div>
+
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <form th:action="@{/tools/register-single/confirm}" method="post">
+        <!-- Hidden fields for form submission -->
+        <input type="hidden" name="toolId" th:value="${request.get('toolId')}">
+        <input type="hidden" name="openApiEndpoint" th:value="${request.get('openApiEndpoint')}">
+        <input type="hidden" name="path" th:value="${request.get('path')}">
+        <input type="hidden" name="httpMethod" th:value="${request.get('httpMethod')}">
+        <input type="hidden" name="categoryId" th:value="${request.get('categoryId')}">
+        <!-- OpenAPI content for file-based registration -->
+        <input type="hidden" name="openApiContent" th:if="${request.get('openApiContent') != null}" th:value="${request.get('openApiContent')}">
+
+        <!-- Tool Information Card -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Tool Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th style="width: 150px;">Tool ID:</th>
+                                <td><code th:text="${request.get('toolId')}"></code></td>
+                            </tr>
+                            <tr>
+                                <th>Name:</th>
+                                <td th:text="${preview.get('name') != null ? preview.get('name').asText() : ''}"></td>
+                            </tr>
+                            <tr>
+                                <th>HTTP Method:</th>
+                                <td>
+                                    <th:block th:with="method=${preview.get('httpMethod') != null ? preview.get('httpMethod').asText() : ''}">
+                                        <span class="badge"
+                                              th:classappend="${method == 'GET' ? 'bg-success' :
+                                                               method == 'POST' ? 'bg-primary' :
+                                                               method == 'PUT' ? 'bg-warning' :
+                                                               method == 'DELETE' ? 'bg-danger' : 'bg-secondary'}"
+                                              th:text="${method}">GET</span>
+                                    </th:block>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Path:</th>
+                                <td><code th:text="${preview.get('path') != null ? preview.get('path').asText() : ''}"></code></td>
+                            </tr>
+                            <tr th:if="${preview.get('baseUrl') != null and !preview.get('baseUrl').isNull()}">
+                                <th>Base URL (from spec):</th>
+                                <td><code th:text="${preview.get('baseUrl').asText()}"></code></td>
+                            </tr>
+                            <tr th:if="${preview.get('baseUrl') == null or preview.get('baseUrl').isNull()}">
+                                <th>Base URL:</th>
+                                <td><span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Not specified in OpenAPI spec - please enter below</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label"><strong>OpenAPI Description:</strong></label>
+                            <div class="alert alert-light"
+                                 th:text="${preview.get('description') != null and !preview.get('description').isNull() ? preview.get('description').asText() : '(no description)'}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="mb-3">
+                    <label for="baseUrl" class="form-label"><strong>Base URL (editable):</strong></label>
+                    <input type="text" class="form-control" id="baseUrl" name="baseUrl"
+                           th:value="${request.get('baseUrl') != null and !request.get('baseUrl').isEmpty() ? request.get('baseUrl') : (preview.get('baseUrl') != null and !preview.get('baseUrl').isNull() ? preview.get('baseUrl').asText() : '')}"
+                           placeholder="https://api.example.com" required>
+                    <small class="text-muted">The base URL from OpenAPI spec (editable). This is where API calls will be made.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="humanReadableDescription" class="form-label">
+                        <strong>Human-Readable Explanation for AI Models:</strong>
+                    </label>
+                    <textarea class="form-control" id="humanReadableDescription" name="humanReadableDescription"
+                              rows="4" placeholder="Add a clear explanation of what this tool does, when to use it, and any important context that an AI model should know..."
+                              th:text="${preview.get('description') != null and !preview.get('description').isNull() ? preview.get('description').asText() : ''}"></textarea>
+                    <small class="text-muted">This helps AI models understand the purpose and usage of this tool. (Pre-populated with OpenAPI description - you can edit it)</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parameters Card -->
+        <div class="card mb-4" th:if="${preview.get('parameters') != null and preview.get('parameters').size() > 0}">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Input Parameters</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    <small>Add human-readable explanations and examples for each parameter to help AI models understand how to use them correctly.</small>
+                </p>
+
+                <th:block th:each="parameter : ${preview.get('parameters')}">
+                    <th:block th:with="nestingLevel=${parameter.get('nestingLevel') != null ? parameter.get('nestingLevel').asInt() : 0},
+                                       paramName=${parameter.get('name') != null ? parameter.get('name').asText() : ''},
+                                       paramType=${parameter.get('type') != null ? parameter.get('type').asText() : 'string'},
+                                       paramRequired=${parameter.get('required') != null and parameter.get('required').asBoolean()},
+                                       paramIn=${parameter.get('in') != null ? parameter.get('in').asText() : ''},
+                                       paramDesc=${parameter.get('description') != null and !parameter.get('description').isNull() ? parameter.get('description').asText() : ''},
+                                       paramExample=${parameter.get('example') != null and !parameter.get('example').isNull() ? parameter.get('example').asText() : ''},
+                                       paramEnum=${parameter.get('enumValues') != null and !parameter.get('enumValues').isNull() ? parameter.get('enumValues').asText() : ''}">
+                        <div class="parameter-card mb-3 p-3 border rounded"
+                             th:style="'margin-left: ' + (${nestingLevel} * 20) + 'px;'">
+
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <span th:if="${nestingLevel > 0}" class="text-muted me-1">|_ </span>
+                                    <strong th:text="${paramName}">paramName</strong>
+                                    <span class="badge bg-secondary ms-2" th:text="${paramType}">string</span>
+                                    <span class="badge" th:classappend="${paramRequired ? 'bg-danger' : 'bg-info'}"
+                                          th:text="${paramRequired ? 'required' : 'optional'}">required</span>
+                                    <span class="badge bg-light text-dark" th:text="'in: ' + ${paramIn}">in: body</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-light p-2 rounded mb-3">
+                                <small>
+                                    <strong>OpenAPI Description:</strong>
+                                    <span th:text="${paramDesc != '' ? paramDesc : '(no description)'}"></span>
+                                </small>
+                                <br th:if="${paramExample != ''}"/>
+                                <small th:if="${paramExample != ''}">
+                                    <strong>OpenAPI Example:</strong>
+                                    <code th:text="${paramExample}"></code>
+                                </small>
+                                <br th:if="${paramEnum != ''}"/>
+                                <small th:if="${paramEnum != ''}">
+                                    <strong>Allowed Values:</strong>
+                                    <code th:text="${paramEnum}"></code>
+                                </small>
+                            </div>
+
+                            <!-- Hidden fields for parameter data -->
+                            <input type="hidden" name="paramNames" th:value="${paramName}">
+                            <input type="hidden" name="paramTypes" th:value="${paramType}">
+                            <input type="hidden" name="paramRequired" th:value="${paramRequired}">
+                            <input type="hidden" name="paramIn" th:value="${paramIn}">
+                            <input type="hidden" name="paramDescriptions" th:value="${paramDesc}">
+                            <input type="hidden" name="paramNestingLevels" th:value="${nestingLevel}">
+
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <label class="form-label"><small>Human-Readable Description:</small></label>
+                                    <textarea class="form-control form-control-sm" name="paramHumanDescriptions"
+                                              rows="2" placeholder="Add a human-readable explanation for AI models..."
+                                              th:text="${paramDesc}"></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><small>Custom Example (optional):</small></label>
+                                    <input class="form-control form-control-sm" name="paramExamples"
+                                           type="text" th:value="${paramExample}"
+                                           placeholder="Add or override example...">
+                                </div>
+                            </div>
+                        </div>
+                    </th:block>
+                </th:block>
+            </div>
+        </div>
+
+        <!-- Responses Card -->
+        <div class="card mb-4" th:if="${preview.get('responses') != null and preview.get('responses').size() > 0}">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-reply me-2"></i>Response Definitions</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    <small>Add human-readable explanations for each response to help AI models understand the output.</small>
+                </p>
+
+                <th:block th:each="response : ${preview.get('responses')}">
+                    <th:block th:with="statusCode=${response.get('statusCode') != null ? response.get('statusCode').asText() : ''},
+                                       respDesc=${response.get('description') != null and !response.get('description').isNull() ? response.get('description').asText() : ''},
+                                       respType=${response.get('type') != null and !response.get('type').isNull() ? response.get('type').asText() : ''}">
+                        <div class="response-card mb-4 p-3 border rounded">
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="badge me-2"
+                                      th:classappend="${#strings.startsWith(statusCode, '2') ? 'bg-success' :
+                                                       #strings.startsWith(statusCode, '4') ? 'bg-warning' :
+                                                       #strings.startsWith(statusCode, '5') ? 'bg-danger' : 'bg-secondary'}"
+                                      th:text="${statusCode}">200</span>
+                                <span class="badge bg-light text-dark" th:if="${respType != ''}" th:text="${respType}">object</span>
+                            </div>
+
+                            <div class="bg-light p-2 rounded mb-3">
+                                <small>
+                                    <strong>OpenAPI Description:</strong>
+                                    <span th:text="${respDesc != '' ? respDesc : '(no description)'}"></span>
+                                </small>
+                            </div>
+
+                            <input type="hidden" name="responseStatusCodes" th:value="${statusCode}">
+                            <input type="hidden" name="responseDescriptions" th:value="${respDesc}">
+                            <input type="hidden" name="responseTypes" th:value="${respType}">
+
+                            <div class="mb-3">
+                                <label class="form-label"><small>Human-Readable Description:</small></label>
+                                <textarea class="form-control form-control-sm" name="responseHumanDescriptions"
+                                          rows="2" placeholder="Explain what this response means and when it occurs..."
+                                          th:text="${respDesc}"></textarea>
+                            </div>
+
+                            <!-- Response Properties -->
+                            <div th:if="${response.get('parameters') != null and response.get('parameters').size() > 0}" class="ms-3 mt-3 border-start ps-3">
+                                <h6 class="text-muted mb-3"><i class="bi bi-list-nested me-1"></i>Response Properties</h6>
+
+                                <th:block th:each="respParam : ${response.get('parameters')}">
+                                    <th:block th:with="rpNestingLevel=${respParam.get('nestingLevel') != null ? respParam.get('nestingLevel').asInt() : 0},
+                                                       rpName=${respParam.get('name') != null ? respParam.get('name').asText() : ''},
+                                                       rpType=${respParam.get('type') != null ? respParam.get('type').asText() : 'string'},
+                                                       rpDesc=${respParam.get('description') != null and !respParam.get('description').isNull() ? respParam.get('description').asText() : ''},
+                                                       rpExample=${respParam.get('example') != null and !respParam.get('example').isNull() ? respParam.get('example').asText() : ''},
+                                                       rpEnum=${respParam.get('enumValues') != null and !respParam.get('enumValues').isNull() ? respParam.get('enumValues').asText() : ''}">
+                                        <div class="response-param-card mb-3 p-2 border rounded"
+                                             th:style="'margin-left: ' + (${rpNestingLevel} * 20) + 'px; border-left: 3px solid #3498db !important;'">
+
+                                            <div class="d-flex align-items-center mb-2">
+                                                <span th:if="${rpNestingLevel > 0}" class="text-muted me-1">|_ </span>
+                                                <strong th:text="${rpName}">propName</strong>
+                                                <span class="badge bg-secondary ms-2" th:text="${rpType}">string</span>
+                                            </div>
+
+                                            <div class="bg-white p-2 rounded mb-2">
+                                                <small>
+                                                    <strong>OpenAPI Description:</strong>
+                                                    <span th:text="${rpDesc != '' ? rpDesc : '(no description)'}"></span>
+                                                </small>
+                                                <br th:if="${rpExample != ''}"/>
+                                                <small th:if="${rpExample != ''}">
+                                                    <strong>Example:</strong>
+                                                    <code th:text="${rpExample}"></code>
+                                                </small>
+                                                <br th:if="${rpEnum != ''}"/>
+                                                <small th:if="${rpEnum != ''}">
+                                                    <strong>Allowed Values:</strong>
+                                                    <code th:text="${rpEnum}"></code>
+                                                </small>
+                                            </div>
+
+                                            <input type="hidden" name="responseParamNames" th:value="${rpName}">
+                                            <input type="hidden" name="responseParamTypes" th:value="${rpType}">
+                                            <input type="hidden" name="responseParamDescriptions" th:value="${rpDesc}">
+                                            <input type="hidden" name="responseParamNestingLevels" th:value="${rpNestingLevel}">
+                                            <input type="hidden" name="responseParamStatusCodes" th:value="${statusCode}">
+
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <label class="form-label"><small>Human-Readable Description:</small></label>
+                                                    <textarea class="form-control form-control-sm" name="responseParamHumanDescriptions"
+                                                              rows="2" placeholder="Add a human-readable explanation..."
+                                                              th:text="${rpDesc}"></textarea>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label"><small>Custom Example (optional):</small></label>
+                                                    <input class="form-control form-control-sm" name="responseParamExamples"
+                                                           type="text" th:value="${rpExample}"
+                                                           placeholder="Add example...">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </th:block>
+                                </th:block>
+                            </div>
+                        </div>
+                    </th:block>
+                </th:block>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="d-flex gap-2 mb-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-lg me-2"></i>Confirm Registration
+            </button>
+            <a th:href="@{/tools/register-single}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-arrow-left me-2"></i>Back to Form
+            </a>
+            <a th:href="@{/tools}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-x-lg me-2"></i>Cancel
+            </a>
+        </div>
+    </form>
+</th:block>
+</html>

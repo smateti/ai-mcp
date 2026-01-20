@@ -41,3 +41,19 @@ logging:
   level:
     com.example.servicedep: DEBUG
     org.springframework.web: INFO
+
+# Actuator/Prometheus Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true

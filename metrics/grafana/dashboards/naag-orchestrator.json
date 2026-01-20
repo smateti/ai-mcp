@@ -1,0 +1,166 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "# AI Orchestrator Metrics\nTool selection, LLM calls, and orchestration performance",
+        "mode": "markdown"
+      },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "ms"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 3 },
+      "id": 2,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "orchestrator_last_orchestration_time_ms", "legendFormat": "Orchestration", "refId": "A" }],
+      "title": "Last Orchestration Time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "ms"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 3 },
+      "id": 3,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "orchestrator_last_tool_selection_time_ms", "legendFormat": "Tool Selection", "refId": "A" }],
+      "title": "Last Tool Selection Time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "ms"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 3 },
+      "id": 4,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "orchestrator_last_llm_time_ms", "legendFormat": "LLM", "refId": "A" }],
+      "title": "Last LLM Time",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 3 },
+      "id": 5,
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "expr": "orchestrator_last_confidence_score", "legendFormat": "Confidence", "refId": "A" }],
+      "title": "Last Confidence Score",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "ms"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rate(orchestrator_orchestration_duration_seconds_sum[5m]) / rate(orchestrator_orchestration_duration_seconds_count[5m]) * 1000", "legendFormat": "Orchestration", "refId": "A" },
+        { "expr": "rate(orchestrator_tool_selection_duration_seconds_sum[5m]) / rate(orchestrator_tool_selection_duration_seconds_count[5m]) * 1000", "legendFormat": "Tool Selection", "refId": "B" },
+        { "expr": "rate(orchestrator_llm_chat_duration_seconds_sum[5m]) / rate(orchestrator_llm_chat_duration_seconds_count[5m]) * 1000", "legendFormat": "LLM Chat", "refId": "C" },
+        { "expr": "rate(orchestrator_tool_execution_duration_seconds_sum[5m]) / rate(orchestrator_tool_execution_duration_seconds_count[5m]) * 1000", "legendFormat": "Tool Execution", "refId": "D" }
+      ],
+      "title": "Average Durations (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "mappings": [] }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "list", "placement": "right" }, "pieType": "donut" },
+      "targets": [
+        { "expr": "orchestrator_confidence_high_total", "legendFormat": "High Confidence", "refId": "A" },
+        { "expr": "orchestrator_confidence_medium_total", "legendFormat": "Medium Confidence", "refId": "B" },
+        { "expr": "orchestrator_confidence_low_total", "legendFormat": "Low Confidence", "refId": "C" }
+      ],
+      "title": "Confidence Distribution",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80 }
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 15 },
+      "id": 8,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rate(orchestrator_requests_total_total[5m]) * 60", "legendFormat": "Requests/min", "refId": "A" },
+        { "expr": "rate(orchestrator_requests_errors_total[5m]) * 60", "legendFormat": "Errors/min", "refId": "B" }
+      ],
+      "title": "Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80 }
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 15 },
+      "id": 9,
+      "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        { "expr": "rate(orchestrator_tool_executions_total_total[5m]) * 60", "legendFormat": "Executions/min", "refId": "A" },
+        { "expr": "rate(orchestrator_tool_executions_errors_total[5m]) * 60", "legendFormat": "Errors/min", "refId": "B" }
+      ],
+      "title": "Tool Execution Rate",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["naag", "orchestrator"],
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "NAAG AI Orchestrator",
+  "uid": "naag-orchestrator",
+  "version": 1
+}

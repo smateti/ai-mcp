@@ -37,7 +37,7 @@ public class ResponseDefinition {
     @Column
     private String type;
 
-    @Column(length = 2000)
+    @Column(length = 10000)
     private String schema;
 
     @OneToMany(mappedBy = "responseDefinition", cascade = CascadeType.ALL, orphanRemoval = true)

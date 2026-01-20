@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/categories}">Categories</a></li>
+                <li class="breadcrumb-item active" th:text="${category.id != null} ? 'Edit' : 'New'">Form</li>
+            </ol>
+        </nav>
+        <h1 th:text="${category.id != null} ? 'Edit Category' : 'New Category'">Category Form</h1>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form th:action="${category.id != null} ? @{/categories/{id}(id=${category.id})} : @{/categories}"
+                  method="post" th:object="${category}">
+
+                <div class="mb-3">
+                    <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="name" th:field="*{name}" required
+                           placeholder="Enter category name">
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" th:field="*{description}" rows="3"
+                              placeholder="Enter category description"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="active" th:field="*{active}">
+                        <label class="form-check-label" for="active">Active</label>
+                    </div>
+                    <small class="text-muted">Inactive categories won't be shown in tool selection</small>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-2"></i>
+                        <span th:text="${category.id != null} ? 'Update' : 'Create'">Save</span>
+                    </button>
+                    <a th:href="@{/categories}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg me-2"></i>Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</th:block>
+</html>

@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Service to handle chat conversations and determine when to use RAG tools
@@ -21,6 +22,7 @@ public class ChatService {
 
     private final McpClientService mcpClient;
     private final LlmToolSelectionService toolSelector;
+    private final CategoryAdminClient categoryAdminClient;
     private final com.example.chat.config.ToolSelectionConfig.ToolSelectionThresholds thresholds;
     private final Map<String, ChatSession> sessions = new ConcurrentHashMap<>();
 
@@ -38,17 +40,22 @@ public class ChatService {
 
     public ChatService(McpClientService mcpClient,
                        LlmToolSelectionService toolSelector,
+                       CategoryAdminClient categoryAdminClient,
                        com.example.chat.config.ToolSelectionConfig.ToolSelectionThresholds thresholds) {
         this.mcpClient = mcpClient;
         this.toolSelector = toolSelector;
+        this.categoryAdminClient = categoryAdminClient;
         this.thresholds = thresholds;
     }
 
     /**
      * Process user message and return response
      */
-    public ChatMessage processMessage(String sessionId, String userMessage) {
+    public ChatMessage processMessage(String sessionId, String userMessage, String categoryId) {
         ChatSession session = getOrCreateSession(sessionId);
+
+        // Store categoryId in session for filtering tools
+        session.setCategoryId(categoryId);
 
         // Add user message to history
         ChatMessage userMsg = ChatMessage.user(userMessage);
@@ -428,16 +435,38 @@ public class ChatService {
     }
 
     /**
-     * Handle LLM-powered tool selection
+     * Handle LLM-powered tool selection.
+     * The LLM analyzes the user message and selects the appropriate tool
+     * based on tool descriptions and parameter schemas from MCP.
      */
     private ChatMessage handleLlmToolSelection(ChatSession session, String userMessage) {
-        // 1. Get available tools from MCP
+        // 1. Get available tools from MCP - the LLM will use their descriptions
         List<McpClientService.Tool> availableTools = mcpClient.listTools();
 
-        // 2. Let LLM select tool and extract parameters
+        // 1.5. Filter by category if categoryId is set (dynamic tool selection)
+        if (session.getCategoryId() != null && !session.getCategoryId().isBlank()) {
+            List<String> enabledToolIds = categoryAdminClient.getEnabledTools(session.getCategoryId());
+            availableTools = availableTools.stream()
+                .filter(tool -> enabledToolIds.contains(tool.name()))
+                .collect(Collectors.toList());
+            log.info("Filtered to {} enabled tools for category {}",
+                     availableTools.size(), session.getCategoryId());
+        }
+
+        // 2. Pattern-based fast path: Check for specific entity ID patterns
+        // This helps when LLM struggles with "what services in APP-XXX" type queries
+        String fastPathResult = tryFastPathPatternMatch(userMessage, availableTools);
+        if (fastPathResult != null) {
+            return ChatMessage.assistant(fastPathResult, Map.of("selectionMode", "pattern-match"));
+        }
+
+        // 3. Let LLM select tool and extract parameters based on tool documentation
+        log.debug("Using LLM tool selection for message: {}", userMessage);
         LlmToolSelectionService.ToolSelectionResult selection = toolSelector.selectTool(userMessage, availableTools);
 
-        // 3. Handle based on confidence
+        log.info("LLM selected tool: {} with confidence: {}", selection.selectedTool(), selection.confidence());
+
+        // 4. Handle based on confidence
         if (selection.confidence() < thresholds.lowThreshold()) {
             // Low confidence - ask user to choose
             return askUserToChooseTool(session, selection, userMessage);
@@ -446,7 +475,7 @@ public class ChatService {
             return askUserToConfirm(session, selection);
         }
 
-        // 4. High confidence - validate parameters
+        // 5. High confidence - validate parameters
         McpClientService.Tool selectedTool = findTool(availableTools, selection.selectedTool());
         if (selectedTool == null) {
             return ChatMessage.assistant(
@@ -465,8 +494,207 @@ public class ChatService {
             return askForMissingParameters(session, selection, validation, selectedTool);
         }
 
-        // 5. Execute tool
+        // 6. Execute tool
         return executeToolWithLlmSelection(selection, userMessage);
+    }
+
+    /**
+     * Fast path pattern matching for specific entity queries.
+     * Detects patterns like "APP-XXX" and routes to appropriate tools.
+     * Returns formatted response if matched, null otherwise.
+     */
+    private String tryFastPathPatternMatch(String userMessage, List<McpClientService.Tool> availableTools) {
+        // Pattern 1: Detect APP-XXX pattern (application IDs)
+        java.util.regex.Pattern appPattern = java.util.regex.Pattern.compile("\\bAPP-[A-Z0-9-]+\\b");
+        java.util.regex.Matcher appMatcher = appPattern.matcher(userMessage.toUpperCase());
+
+        if (appMatcher.find()) {
+            String applicationId = appMatcher.group();
+
+            // CRITICAL: Only use pattern matching if the question is clearly about the SPECIFIC application
+            // Check for question patterns that indicate querying about a specific application:
+            // - "what services are in APP-XXX"
+            // - "show me services for APP-XXX"
+            // - "APP-XXX services"
+            // - "get APP-XXX application"
+            // - "what is APP-XXX"
+
+            String lowerMessage = userMessage.toLowerCase();
+
+            // Check if this is a specific application query (not a general knowledge question)
+            // Look for patterns like "in APP-XXX", "for APP-XXX", "APP-XXX application", "about APP-XXX"
+            boolean isSpecificAppQuery = lowerMessage.matches(".*\\b(in|for|of|about)\\s+" + applicationId.toLowerCase().replace("-", "\\-") + "\\b.*")
+                || lowerMessage.matches(".*\\b" + applicationId.toLowerCase().replace("-", "\\-") + "\\s+(application|services|info|details|operations)\\b.*")
+                || lowerMessage.matches(".*\\b(what|show|get|list).*\\b" + applicationId.toLowerCase().replace("-", "\\-") + "\\b.*");
+
+            if (!isSpecificAppQuery) {
+                // This is NOT a specific application query - it's a general question that happens to mention an app ID
+                // Let LLM handle it instead
+                log.debug("Pattern matched APP-XXX but query doesn't seem to be about that specific application - using LLM");
+                return null;
+            }
+
+            // Check if query is about services/operations
+            if (lowerMessage.matches(".*\\b(service|operation|dependency|dependencies).*")) {
+                // Try to use get_application_services_with_dependencies
+                McpClientService.Tool servicesTool = findTool(availableTools, "get_application_services_with_dependencies");
+                if (servicesTool != null) {
+                    log.info("Fast path: Detected application services query for {}", applicationId);
+
+                    Map<String, Object> params = Map.of("applicationId", applicationId);
+                    McpClientService.ToolExecutionResult result = mcpClient.executeTool("get_application_services_with_dependencies", params);
+
+                    if (result.success()) {
+                        return formatApplicationServicesResponse(applicationId, result);
+                    }
+                }
+            } else {
+                // General application info query
+                McpClientService.Tool appTool = findTool(availableTools, "get_application_by_id");
+                if (appTool != null) {
+                    log.info("Fast path: Detected application info query for {}", applicationId);
+
+                    Map<String, Object> params = Map.of("applicationId", applicationId);
+                    McpClientService.ToolExecutionResult result = mcpClient.executeTool("get_application_by_id", params);
+
+                    if (result.success()) {
+                        return formatApplicationInfoResponse(applicationId, result);
+                    }
+                }
+            }
+        }
+
+        // Pattern 2: Detect user ID pattern (for jsonplaceholder-user)
+        if (userMessage.toLowerCase().matches(".*\\b(user|show me user|get user).*\\b\\d+\\b.*")) {
+            java.util.regex.Pattern userIdPattern = java.util.regex.Pattern.compile("\\b(\\d+)\\b");
+            java.util.regex.Matcher userIdMatcher = userIdPattern.matcher(userMessage);
+
+            if (userIdMatcher.find()) {
+                String userId = userIdMatcher.group(1);
+                McpClientService.Tool userTool = findTool(availableTools, "jsonplaceholder-user");
+
+                if (userTool != null) {
+                    log.info("Fast path: Detected user query for ID {}", userId);
+
+                    Map<String, Object> params = Map.of("userId", Integer.parseInt(userId));
+                    McpClientService.ToolExecutionResult result = mcpClient.executeTool("jsonplaceholder-user", params);
+
+                    if (result.success()) {
+                        return "✅ **Tool executed:** `jsonplaceholder-user` (pattern-matched)\n\n" +
+                               formatToolResponse("jsonplaceholder-user", result);
+                    }
+                }
+            }
+        }
+
+        return null; // No pattern match, proceed with LLM selection
+    }
+
+    /**
+     * Format application services response
+     */
+    private String formatApplicationServicesResponse(String applicationId, McpClientService.ToolExecutionResult result) {
+        try {
+            StringBuilder response = new StringBuilder();
+            response.append("✅ **Tool executed:** `get_application_services_with_dependencies` (pattern-matched)\n\n");
+            response.append("**Services for ").append(applicationId).append(":**\n\n");
+
+            // Parse MCP response structure: content[0].text contains JSON string
+            JsonNode contentNode = result.result().path("content").get(0).path("text");
+            String responseText = contentNode.asText();
+
+            // Parse the JSON string to get actual data
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            JsonNode parsed = mapper.readTree(responseText);
+
+            // Extract data array
+            JsonNode data = parsed.has("data") ? parsed.path("data") : parsed;
+
+            if (data.isArray()) {
+                int serviceCount = 0;
+                for (JsonNode service : data) {
+                    serviceCount++;
+                    response.append(serviceCount).append(". **")
+                            .append(service.path("name").asText())
+                            .append("** (`").append(service.path("serviceId").asText()).append("`)\n");
+                    response.append("   - **Description:** ").append(service.path("description").asText()).append("\n");
+                    response.append("   - **Endpoint:** ").append(service.path("endpoint").asText()).append("\n");
+
+                    JsonNode operations = service.path("operations");
+                    if (operations.isArray() && operations.size() > 0) {
+                        response.append("   - **Operations:** ").append(operations.size()).append(" total\n");
+                        for (JsonNode op : operations) {
+                            response.append("     - `").append(op.path("httpMethod").asText())
+                                   .append(" ").append(op.path("path").asText())
+                                   .append("` - ").append(op.path("description").asText()).append("\n");
+
+                            JsonNode deps = op.path("dependencies");
+                            if (deps.isArray() && deps.size() > 0) {
+                                response.append("       **Dependencies:** ");
+                                for (int i = 0; i < deps.size(); i++) {
+                                    if (i > 0) response.append(", ");
+                                    JsonNode dep = deps.get(i);
+                                    response.append(dep.path("dependentApplicationId").asText())
+                                           .append("/").append(dep.path("dependentServiceId").asText())
+                                           .append(" (").append(dep.path("dependencyType").asText()).append(")");
+                                }
+                                response.append("\n");
+                            }
+                        }
+                    }
+                    response.append("\n");
+                }
+            }
+
+            return response.toString();
+        } catch (Exception e) {
+            log.error("Error formatting application services response", e);
+            return "✅ **Tool executed:** `get_application_services_with_dependencies`\n\n" +
+                   formatToolResponse("get_application_services_with_dependencies", result).getContent();
+        }
+    }
+
+    /**
+     * Format application info response
+     */
+    private String formatApplicationInfoResponse(String applicationId, McpClientService.ToolExecutionResult result) {
+        try {
+            StringBuilder response = new StringBuilder();
+            response.append("✅ **Tool executed:** `get_application_by_id` (pattern-matched)\n\n");
+
+            // Parse MCP response structure: content[0].text contains JSON string
+            JsonNode contentNode = result.result().path("content").get(0).path("text");
+            String responseText = contentNode.asText();
+
+            // Parse the JSON string to get actual data
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            JsonNode parsed = mapper.readTree(responseText);
+
+            // Extract data
+            JsonNode data = parsed.has("data") ? parsed.path("data") : parsed;
+
+            response.append("**Application Information:**\n\n");
+            response.append("- **Name:** ").append(data.path("name").asText()).append("\n");
+            response.append("- **Application ID:** ").append(data.path("applicationId").asText()).append("\n");
+            response.append("- **Description:** ").append(data.path("description").asText()).append("\n");
+            response.append("- **Owner:** ").append(data.path("owner").asText()).append("\n");
+            response.append("- **Status:** ").append(data.path("status").asText()).append("\n\n");
+
+            JsonNode services = data.path("services");
+            if (services.isArray() && services.size() > 0) {
+                response.append("**Services:** (").append(services.size()).append(" total)\n");
+                for (JsonNode service : services) {
+                    response.append("- ").append(service.path("name").asText())
+                           .append(" (`").append(service.path("serviceId").asText()).append("`)\n");
+                }
+            }
+
+            return response.toString();
+        } catch (Exception e) {
+            log.error("Error formatting application info response", e);
+            return "✅ **Tool executed:** `get_application_by_id`\n\n" +
+                   formatToolResponse("get_application_by_id", result).getContent();
+        }
     }
 
     /**
@@ -504,7 +732,8 @@ public class ChatService {
 
         return ChatMessage.assistant(message.toString(), Map.of(
             "type", "clarification",
-            "confidence", selection.confidence()
+            "confidence", selection.confidence(),
+            "reasoning", selection.reasoning() != null ? selection.reasoning() : ""
         ));
     }
 
@@ -615,15 +844,23 @@ public class ChatService {
         // Format response
         ChatMessage toolResponse = formatToolResponse(selection.selectedTool(), result);
 
-        // Generate natural language answer to the user's question
-        String naturalAnswer = generateNaturalAnswer(userQuestion, toolResponse.getContent(), selection.selectedTool());
+        // Skip extra LLM call for RAG queries - they already return well-formed answers
+        // This saves ~7 seconds per query
+        String finalAnswer;
+        if ("rag_query".equals(selection.selectedTool())) {
+            // RAG already returns a natural language answer, use it directly
+            finalAnswer = toolResponse.getContent();
+        } else {
+            // For other tools, generate natural language answer
+            finalAnswer = generateNaturalAnswer(userQuestion, toolResponse.getContent(), selection.selectedTool());
+        }
 
         Map<String, Object> metadata = new HashMap<>(toolResponse.getMetadata());
         metadata.put("llmConfidence", selection.confidence());
         metadata.put("llmReasoning", selection.reasoning());
         metadata.put("selectionMode", "llm");
 
-        return ChatMessage.assistant(naturalAnswer, metadata);
+        return ChatMessage.assistant(finalAnswer, metadata);
     }
 
     /**

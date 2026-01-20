@@ -2,6 +2,7 @@ package com.example.categoryadmin.controller;
 
 import com.example.categoryadmin.dto.*;
 import com.example.categoryadmin.service.CategoryService;
+import com.example.categoryadmin.service.McpClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class CategoryController {
 
     private final CategoryService categoryService;
+    private final McpClientService mcpClientService;
 
     @PostMapping
     @Operation(summary = "Create a new category")
@@ -70,6 +72,12 @@ public class CategoryController {
 
     // Tool Management
 
+    @GetMapping("/available-tools")
+    @Operation(summary = "Get available tools from MCP server")
+    public ResponseEntity<List<McpClientService.ToolInfo>> getAvailableTools() {
+        return ResponseEntity.ok(mcpClientService.listTools());
+    }
+
     @PostMapping("/{categoryId}/tools")
     @Operation(summary = "Add tool to category")
     public ResponseEntity<CategoryToolDto> addToolToCategory(
@@ -106,6 +114,19 @@ public class CategoryController {
             @PathVariable String categoryId,
             @PathVariable String toolId) {
         return ResponseEntity.ok(categoryService.toggleToolEnabled(categoryId, toolId));
+    }
+
+    @PutMapping("/{categoryId}/tools/{toolId}/priority")
+    @Operation(summary = "Update tool priority")
+    public ResponseEntity<CategoryToolDto> updateToolPriority(
+            @PathVariable String categoryId,
+            @PathVariable String toolId,
+            @RequestBody Map<String, Integer> body) {
+        Integer priority = body.get("priority");
+        if (priority == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(categoryService.updateToolPriority(categoryId, toolId, priority));
     }
 
     // Document Management

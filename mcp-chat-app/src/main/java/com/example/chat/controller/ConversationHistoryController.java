@@ -94,8 +94,9 @@ public class ConversationHistoryController {
 
     // Process with ChatService (includes MCP tool selection and execution)
     // Use conversation ID as session ID to maintain context
+    // No category filtering for conversation history (uses all tools)
     com.example.chat.model.ChatMessage chatResponse = chatService.processMessage(
-        "conv_" + id, userMessage);
+        "conv_" + id, userMessage, null);
 
     String aiResponse = chatResponse.getContent();
 

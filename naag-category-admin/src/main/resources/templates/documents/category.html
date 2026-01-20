@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/documents}">Documents</a></li>
+                <li class="breadcrumb-item active" th:text="${category?.name ?: 'Category'}">Category</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="bi bi-folder me-2"></i>
+                <span th:text="${category?.name ?: 'Unknown Category'}">Category</span>
+            </h1>
+            <a th:href="@{/documents/upload}" class="btn btn-primary">
+                <i class="bi bi-cloud-upload me-2"></i>Upload Document
+            </a>
+        </div>
+    </div>
+
+    <!-- Category Info -->
+    <div class="card mb-4" th:if="${category != null}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <p th:if="${category.description}" th:text="${category.description}" class="mb-0">Description</p>
+                    <p th:unless="${category.description}" class="text-muted mb-0">No description</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="badge" th:classappend="${category.active} ? 'bg-success' : 'bg-secondary'"
+                          th:text="${category.active} ? 'Active' : 'Inactive'">Status</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents in RAG -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-database me-2"></i>Documents in RAG Knowledge Base</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" th:if="${documents != null && !documents.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Document ID</th>
+                            <th>Title</th>
+                            <th>Chunks</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="doc : ${documents}">
+                            <td><code th:text="${doc.docId}">doc-id</code></td>
+                            <td th:text="${doc.title ?: '(No title)'}">Title</td>
+                            <td th:text="${doc.chunkCount ?: 0}">0</td>
+                            <td class="text-end">
+                                <form th:action="@{/documents/{docId}/delete(docId=${doc.docId})}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Delete this document from RAG?');">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center py-4 text-muted" th:if="${documents == null || documents.isEmpty()}">
+                <i class="bi bi-database fs-1"></i>
+                <p>No documents in RAG for this category</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload History -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Upload History</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" th:if="${uploads != null && !uploads.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Document ID</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Q&A Pairs</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="upload : ${uploads}">
+                            <td>
+                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}" class="text-decoration-none">
+                                    <code th:text="${upload.get('docId').asText()}">doc-id</code>
+                                </a>
+                            </td>
+                            <td th:text="${upload.has('title') && !upload.get('title').isNull()} ? ${upload.get('title').asText()} : '(No title)'">Title</td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${upload.get('status').asText() == 'READY_FOR_REVIEW'} ? 'bg-success' :
+                                                      (${upload.get('status').asText() == 'FAILED'} ? 'bg-danger' :
+                                                      (${upload.get('status').asText() == 'MOVED_TO_RAG'} ? 'bg-info' : 'bg-warning'))"
+                                      th:text="${upload.get('status').asText()}">STATUS</span>
+                            </td>
+                            <td>
+                                <span th:text="${upload.has('questionsGenerated')} ? ${upload.get('questionsGenerated').asInt()} : 0">0</span>
+                                /
+                                <span th:text="${upload.has('questionsValidated')} ? ${upload.get('questionsValidated').asInt()} : 0">0</span>
+                            </td>
+                            <td th:text="${upload.has('createdAt') && !upload.get('createdAt').isNull()} ? ${#strings.substring(upload.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
+                            <td class="text-end">
+                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}"
+                                   class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center py-4 text-muted" th:if="${uploads == null || uploads.isEmpty()}">
+                <i class="bi bi-inbox fs-1"></i>
+                <p>No uploads for this category</p>
+            </div>
+        </div>
+    </div>
+</th:block>
+</html>

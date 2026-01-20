@@ -1,6 +1,7 @@
 package com.example.rag.config;
 
 import com.example.rag.llama.LlamaChatClient;
+import com.example.rag.llama.LlamaCppOpenAIChatClient;
 import com.example.rag.llama.LlamaEmbeddingsClient;
 import com.example.rag.llm.ChatClient;
 import com.example.rag.llm.EmbeddingsClient;
@@ -89,6 +90,6 @@ public class LlmProviderConfig {
       @Value("${rag.llama.baseUrl}") String baseUrl,
       @Value("${rag.llama.chatModel}") String model
   ) {
-    return new OpenAIChatClient(baseUrl, model);
+    return new LlamaCppOpenAIChatClient(baseUrl, model);
   }
 }

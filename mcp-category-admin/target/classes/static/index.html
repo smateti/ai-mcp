@@ -481,6 +481,168 @@
             transform: translateX(20px);
         }
 
+        /* Document Upload */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: var(--bg-primary);
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .upload-area.drag-over {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.1);
+        }
+
+        .upload-area i {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 16px;
+        }
+
+        .upload-area h3 {
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .upload-area p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .text-preview {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .upload-progress {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .upload-result {
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .upload-result.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .upload-result.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .char-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        .rag-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .rag-status.online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .rag-status.offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .rag-status i {
+            font-size: 10px;
+        }
+
+        /* File type icons */
+        .text-danger {
+            color: #dc3545 !important;
+        }
+
+        .text-primary {
+            color: #2563eb !important;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-secondary {
+            background: var(--background-secondary);
+            color: var(--text-secondary);
+        }
+
+        .alert-info {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .alert-info i {
+            margin-top: 2px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .category-grid {
@@ -516,6 +678,9 @@
                 </button>
                 <button class="tab" :class="{active: activeTab === 'tools'}" @click="activeTab = 'tools'">
                     <i class="fas fa-tools"></i> Tool Management
+                </button>
+                <button class="tab" :class="{active: activeTab === 'upload'}" @click="activeTab = 'upload'; checkRagHealth()">
+                    <i class="fas fa-cloud-upload-alt"></i> Document Upload
                 </button>
             </div>
 
@@ -583,6 +748,10 @@
                             <button class="btn btn-sm btn-primary" @click="showAddToolModal" style="margin-left: 12px;">
                                 <i class="fas fa-plus"></i> Add Tool
                             </button>
+                            <button v-if="selectedCategory.tools.length > 0" class="btn btn-sm btn-secondary"
+                                    @click="showManagePrioritiesModal" style="margin-left: 8px;">
+                                <i class="fas fa-sort-numeric-down"></i> Manage Priorities
+                            </button>
                         </h3>
                         <div class="item-list" v-if="selectedCategory.tools.length > 0">
                             <div v-for="tool in selectedCategory.tools" :key="tool.id" class="item">
@@ -611,8 +780,8 @@
 
                         <h3 style="margin: 32px 0 16px; font-size: 16px; font-weight: 600;">
                             <i class="fas fa-file-alt"></i> Documents ({{ selectedCategory.documents.length }})
-                            <button class="btn btn-sm btn-primary" @click="showAddDocumentModal" style="margin-left: 12px;">
-                                <i class="fas fa-plus"></i> Add Document
+                            <button class="btn btn-sm btn-primary" @click="goToUploadDocument" style="margin-left: 12px;">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Document
                             </button>
                         </h3>
                         <div class="item-list" v-if="selectedCategory.documents.length > 0">
@@ -643,6 +812,161 @@
                     <div v-else class="empty-state">
                         <i class="fas fa-hand-pointer"></i>
                         <p>Select a category to manage its tools and documents</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Upload Tab -->
+            <div v-if="activeTab === 'upload'">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Document to RAG
+                        </h2>
+                        <span class="rag-status" :class="ragStatus.available ? 'online' : 'offline'">
+                            <i class="fas fa-circle"></i>
+                            {{ ragStatus.available ? 'RAG Service Online' : 'RAG Service Offline' }}
+                        </span>
+                    </div>
+
+                    <div v-if="!ragStatus.available" class="upload-result error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        RAG service is not available. Please ensure the RAG service is running on port 8080.
+                    </div>
+
+                    <div v-else>
+                        <!-- Upload Form -->
+                        <div class="form-group">
+                            <label class="form-label">Category *</label>
+                            <select v-model="uploadForm.categoryId" class="form-input">
+                                <option value="">Select a category...</option>
+                                <option v-for="cat in categories" :key="cat.id" :value="cat.categoryId">
+                                    {{ cat.name }} ({{ cat.categoryId }})
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Document ID *</label>
+                            <input v-model="uploadForm.docId" class="form-input"
+                                   placeholder="e.g., spring-boot-guide-v1">
+                            <div class="char-count">Unique identifier for this document</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Document Name</label>
+                            <input v-model="uploadForm.documentName" class="form-input"
+                                   placeholder="e.g., Spring Boot Development Guide">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <input v-model="uploadForm.description" class="form-input"
+                                   placeholder="Brief description of the document">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Document Type</label>
+                            <select v-model="uploadForm.documentType" class="form-input">
+                                <option value="text">Plain Text</option>
+                                <option value="markdown">Markdown</option>
+                                <option value="html">HTML</option>
+                                <option value="pdf">PDF</option>
+                                <option value="word">Word Document</option>
+                            </select>
+                        </div>
+
+                        <!-- File Upload Area -->
+                        <div class="form-group">
+                            <label class="form-label">Document File *</label>
+                            <div class="upload-area"
+                                 @dragover.prevent="dragOver = true"
+                                 @dragleave="dragOver = false"
+                                 @drop.prevent="handleFileDrop"
+                                 :class="{'drag-over': dragOver}">
+                                <i class="fas fa-file-upload"></i>
+                                <h3>Drop a file here</h3>
+                                <p>Supports PDF, Word (.doc, .docx), and text files (.txt, .md, .html)</p>
+                                <input type="file" @change="handleFileSelect" accept=".pdf,.doc,.docx,.txt,.md,.html,.json"
+                                       style="display: none" ref="fileInput">
+                                <button class="btn btn-secondary" @click="$refs.fileInput.click()" style="margin-top: 16px;">
+                                    <i class="fas fa-folder-open"></i> Browse Files
+                                </button>
+                                <div v-if="selectedFile" style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+                                    <i :class="getFileIcon(selectedFile.name)" style="margin-right: 8px;"></i>
+                                    <strong>{{ selectedFile.name }}</strong>
+                                    <span style="color: var(--text-secondary); margin-left: 8px;">({{ formatFileSize(selectedFile.size) }})</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Or paste text directly -->
+                        <div class="form-group">
+                            <label class="form-label">Or paste content directly:</label>
+                            <textarea v-model="uploadForm.text" class="form-input"
+                                      rows="8" placeholder="Paste your document content here..."></textarea>
+                            <div class="char-count">
+                                {{ uploadForm.text.length.toLocaleString() }} characters
+                                <span v-if="uploadForm.text.length > 0">
+                                    (~{{ Math.ceil(uploadForm.text.length / 1000) }} chunks estimated)
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Preview -->
+                        <div v-if="uploadForm.text" class="form-group">
+                            <label class="form-label">Content Preview (first 500 chars):</label>
+                            <div class="text-preview">{{ uploadForm.text.substring(0, 500) }}{{ uploadForm.text.length > 500 ? '...' : '' }}</div>
+                        </div>
+                        <div v-else-if="selectedFile && (selectedFile.name.endsWith('.pdf') || selectedFile.name.endsWith('.doc') || selectedFile.name.endsWith('.docx'))" class="form-group">
+                            <label class="form-label">File Info:</label>
+                            <div class="text-preview" style="text-align: center; padding: 30px;">
+                                <i :class="getFileIcon(selectedFile.name)" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                                <p style="margin-bottom: 8px;"><strong>{{ selectedFile.name }}</strong></p>
+                                <p style="color: var(--text-secondary);">{{ formatFileSize(selectedFile.size) }}</p>
+                                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 16px;">
+                                    Text will be extracted from this document when uploaded.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Upload Button -->
+                        <div style="margin-top: 24px;">
+                            <button class="btn btn-primary"
+                                    @click="uploadDocument"
+                                    :disabled="uploading || !canUpload">
+                                <i :class="uploading ? 'fas fa-spinner fa-spin' : 'fas fa-upload'"></i>
+                                {{ uploading ? 'Uploading...' : 'Upload to RAG' }}
+                            </button>
+                            <button class="btn btn-secondary" @click="resetUploadForm" style="margin-left: 12px;">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                        </div>
+
+                        <!-- Upload Progress -->
+                        <div v-if="uploading" class="upload-progress" style="margin-top: 20px;">
+                            <i class="fas fa-cog fa-spin" style="font-size: 24px; color: var(--primary);"></i>
+                            <p style="margin-top: 12px;">Processing document and creating embeddings...</p>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" style="width: 50%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Upload Result -->
+                        <div v-if="uploadResult" class="upload-result" :class="uploadResult.success ? 'success' : 'error'">
+                            <div v-if="uploadResult.success">
+                                <i class="fas fa-check-circle"></i>
+                                <strong>Success!</strong> Document uploaded successfully.
+                                <br>
+                                <span style="font-size: 14px;">
+                                    Created {{ uploadResult.chunksCreated }} chunks in the RAG knowledge base.
+                                </span>
+                            </div>
+                            <div v-else>
+                                <i class="fas fa-exclamation-circle"></i>
+                                <strong>Upload Failed:</strong> {{ uploadResult.errorMessage }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -688,79 +1012,104 @@
         <div v-if="showToolModal" class="modal-overlay" @click.self="showToolModal = false">
             <div class="modal">
                 <div class="modal-header">
-                    <h3 class="modal-title">Add Tool</h3>
+                    <h3 class="modal-title">Add Tool to Category</h3>
                     <button class="btn btn-sm btn-icon btn-secondary" @click="showToolModal = false">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Tool ID *</label>
-                        <input v-model="toolForm.toolId" class="form-input" placeholder="e.g., rag_query">
+                    <div v-if="loadingAvailableTools" style="text-align: center; padding: 20px;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading available tools...
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Tool Name</label>
-                        <input v-model="toolForm.toolName" class="form-input" placeholder="e.g., RAG Query">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <textarea v-model="toolForm.toolDescription" class="form-input" placeholder="Describe this tool..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Priority</label>
-                        <input v-model.number="toolForm.priority" type="number" class="form-input" placeholder="0">
+                    <div v-else>
+                        <div class="form-group">
+                            <label class="form-label">Select Tool *</label>
+                            <select v-model="toolForm.toolId" @change="onToolSelected" class="form-input">
+                                <option value="">-- Select a tool --</option>
+                                <option v-for="tool in availableTools" :key="tool.name" :value="tool.name"
+                                        :disabled="isToolAlreadyAdded(tool.name)">
+                                    {{ tool.name }} {{ isToolAlreadyAdded(tool.name) ? '(Already added)' : '' }}
+                                </option>
+                            </select>
+                        </div>
+                        <div v-if="selectedAvailableTool" class="form-group">
+                            <label class="form-label">Tool Description</label>
+                            <textarea v-model="selectedAvailableTool.description" class="form-input"
+                                      rows="3" readonly style="background: var(--background-secondary);"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Custom Name (optional)</label>
+                            <input v-model="toolForm.toolName" class="form-input"
+                                   placeholder="Leave empty to use tool ID">
+                            <small style="color: var(--text-secondary); font-size: 12px;">
+                                Optional: Provide a friendly name for this tool
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Custom Description (optional)</label>
+                            <textarea v-model="toolForm.toolDescription" class="form-input"
+                                      placeholder="Leave empty to use tool's default description"></textarea>
+                        </div>
+                        <div class="alert alert-info" style="margin-top: 16px; padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Priority Management:</strong> After adding tools, use the "Manage Priorities" button to adjust tool priorities and avoid duplicates.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @click="showToolModal = false">Cancel</button>
-                    <button class="btn btn-primary" @click="addTool">
+                    <button class="btn btn-primary" @click="addTool" :disabled="!toolForm.toolId">
                         <i class="fas fa-plus"></i> Add Tool
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Add Document Modal -->
-        <div v-if="showDocumentModal" class="modal-overlay" @click.self="showDocumentModal = false">
-            <div class="modal">
+        <!-- Manage Tool Priorities Modal -->
+        <div v-if="showPriorityModal" class="modal-overlay" @click.self="showPriorityModal = false">
+            <div class="modal" style="max-width: 700px;">
                 <div class="modal-header">
-                    <h3 class="modal-title">Add Document</h3>
-                    <button class="btn btn-sm btn-icon btn-secondary" @click="showDocumentModal = false">
+                    <h3 class="modal-title">Manage Tool Priorities - {{ selectedCategory?.name }}</h3>
+                    <button class="btn btn-sm btn-icon btn-secondary" @click="showPriorityModal = false">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label class="form-label">Document ID *</label>
-                        <input v-model="documentForm.documentId" class="form-input" placeholder="e.g., doc1">
+                    <p style="margin-bottom: 16px; color: var(--text-secondary);">
+                        Lower priority numbers are selected first. Adjust priorities to control tool selection order.
+                    </p>
+                    <div v-if="selectedCategory && selectedCategory.tools.length > 0">
+                        <div v-for="(tool, index) in sortedToolsByPriority" :key="tool.id"
+                             style="display: flex; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600;">{{ tool.toolName || tool.toolId }}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                                    ID: <code>{{ tool.toolId }}</code>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="font-size: 12px; font-weight: 600; margin-right: 4px;">Priority:</label>
+                                <input type="number" v-model.number="tool.priority" @change="updateToolPriorityValue(tool)"
+                                       class="form-input" style="width: 80px;" min="0">
+                                <span :class="{'badge': true, 'badge-success': tool.enabled, 'badge-secondary': !tool.enabled}">
+                                    {{ tool.enabled ? 'Enabled' : 'Disabled' }}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Document Name</label>
-                        <input v-model="documentForm.documentName" class="form-input" placeholder="e.g., API Documentation">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <textarea v-model="documentForm.documentDescription" class="form-input" placeholder="Describe this document..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Document Type</label>
-                        <select v-model="documentForm.documentType" class="form-input">
-                            <option value="">Select type...</option>
-                            <option value="pdf">PDF</option>
-                            <option value="markdown">Markdown</option>
-                            <option value="text">Text</option>
-                            <option value="html">HTML</option>
-                        </select>
+                    <div v-else class="empty-state">
+                        <i class="fas fa-tools"></i>
+                        <p>No tools to manage</p>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @click="showDocumentModal = false">Cancel</button>
-                    <button class="btn btn-primary" @click="addDocument">
-                        <i class="fas fa-plus"></i> Add Document
+                    <button class="btn btn-primary" @click="showPriorityModal = false">
+                        <i class="fas fa-check"></i> Done
                     </button>
                 </div>
             </div>
         </div>
+
     </div>
 
     <script>
@@ -776,7 +1125,10 @@
                     selectedCategory: null,
                     showModal: false,
                     showToolModal: false,
-                    showDocumentModal: false,
+                    showPriorityModal: false,
+                    loadingAvailableTools: false,
+                    availableTools: [],
+                    selectedAvailableTool: null,
                     modalMode: 'create',
                     formData: {
                         categoryId: '',
@@ -787,16 +1139,46 @@
                     toolForm: {
                         toolId: '',
                         toolName: '',
-                        toolDescription: '',
-                        priority: 0
+                        toolDescription: ''
                     },
-                    documentForm: {
-                        documentId: '',
+                    // Document Upload state
+                    uploadForm: {
+                        categoryId: '',
+                        docId: '',
                         documentName: '',
-                        documentDescription: '',
-                        documentType: ''
-                    }
+                        description: '',
+                        text: '',
+                        documentType: 'text'
+                    },
+                    ragStatus: {
+                        available: false,
+                        supportedFileTypes: []
+                    },
+                    uploading: false,
+                    uploadResult: null,
+                    dragOver: false,
+                    selectedFile: null,
+                    uploadMode: 'file' // 'file' or 'text'
                 };
+            },
+            computed: {
+                canUpload() {
+                    const hasCategory = this.uploadForm.categoryId;
+                    const hasFile = this.selectedFile !== null;
+                    const hasText = this.uploadForm.text && this.uploadForm.text.trim().length > 0;
+                    // For file upload, docId is optional (auto-generated from filename)
+                    // For text upload, docId is required
+                    if (hasFile) {
+                        return hasCategory;
+                    }
+                    return hasCategory && this.uploadForm.docId && hasText;
+                },
+                sortedToolsByPriority() {
+                    if (!this.selectedCategory || !this.selectedCategory.tools) {
+                        return [];
+                    }
+                    return [...this.selectedCategory.tools].sort((a, b) => a.priority - b.priority);
+                }
             },
             mounted() {
                 this.loadCategories();
@@ -859,23 +1241,80 @@
                         alert('Failed to save category: ' + (error.response?.data?.message || error.message));
                     }
                 },
-                showAddToolModal() {
+                async showAddToolModal() {
                     this.toolForm = {
                         toolId: '',
                         toolName: '',
-                        toolDescription: '',
-                        priority: 0
+                        toolDescription: ''
                     };
+                    this.selectedAvailableTool = null;
                     this.showToolModal = true;
+
+                    // Refresh category details to ensure we have the latest tool list
+                    await this.loadCategoryDetails();
+                    console.log('Current category tools:', this.selectedCategory?.tools?.map(t => t.toolId));
+
+                    // Load available tools from MCP server
+                    await this.loadAvailableTools();
+                    console.log('Available tools from MCP:', this.availableTools?.map(t => t.name));
+                },
+                async loadAvailableTools() {
+                    try {
+                        this.loadingAvailableTools = true;
+                        const response = await axios.get('/api/categories/available-tools');
+                        this.availableTools = response.data;
+                    } catch (error) {
+                        console.error('Failed to load available tools:', error);
+                        alert('Failed to load available tools from MCP server. Make sure the MCP server is running.');
+                        this.availableTools = [];
+                    } finally {
+                        this.loadingAvailableTools = false;
+                    }
+                },
+                onToolSelected() {
+                    // Find the selected tool and populate description
+                    this.selectedAvailableTool = this.availableTools.find(t => t.name === this.toolForm.toolId);
+                },
+                isToolAlreadyAdded(toolId) {
+                    if (!this.selectedCategory || !this.selectedCategory.tools) return false;
+                    return this.selectedCategory.tools.some(t => t.toolId === toolId);
                 },
                 async addTool() {
+                    if (!this.toolForm.toolId) {
+                        alert('Please select a tool');
+                        return;
+                    }
+
                     try {
-                        await axios.post(`/api/categories/${this.selectedCategoryId}/tools`, this.toolForm);
+                        // If no custom name/description provided, use defaults from selected tool
+                        const payload = {
+                            toolId: this.toolForm.toolId,
+                            toolName: this.toolForm.toolName || this.toolForm.toolId,
+                            toolDescription: this.toolForm.toolDescription || (this.selectedAvailableTool?.description || ''),
+                            priority: 0 // Default priority, can be adjusted later
+                        };
+
+                        await axios.post(`/api/categories/${this.selectedCategoryId}/tools`, payload);
                         await this.loadCategoryDetails();
                         this.showToolModal = false;
                     } catch (error) {
                         console.error('Failed to add tool:', error);
                         alert('Failed to add tool: ' + (error.response?.data?.message || error.message));
+                    }
+                },
+                showManagePrioritiesModal() {
+                    this.showPriorityModal = true;
+                },
+                async updateToolPriorityValue(tool) {
+                    try {
+                        await axios.put(`/api/categories/${this.selectedCategoryId}/tools/${tool.toolId}/priority`, {
+                            priority: tool.priority
+                        });
+                        // Optionally reload to confirm
+                        await this.loadCategoryDetails();
+                    } catch (error) {
+                        console.error('Failed to update tool priority:', error);
+                        alert('Failed to update priority: ' + (error.response?.data?.message || error.message));
                     }
                 },
                 async toggleTool(tool) {
@@ -897,23 +1336,12 @@
                         alert('Failed to remove tool');
                     }
                 },
-                showAddDocumentModal() {
-                    this.documentForm = {
-                        documentId: '',
-                        documentName: '',
-                        documentDescription: '',
-                        documentType: ''
-                    };
-                    this.showDocumentModal = true;
-                },
-                async addDocument() {
-                    try {
-                        await axios.post(`/api/categories/${this.selectedCategoryId}/documents`, this.documentForm);
-                        await this.loadCategoryDetails();
-                        this.showDocumentModal = false;
-                    } catch (error) {
-                        console.error('Failed to add document:', error);
-                        alert('Failed to add document: ' + (error.response?.data?.message || error.message));
+                goToUploadDocument() {
+                    // Switch to upload tab and pre-select the current category
+                    this.activeTab = 'upload';
+                    this.checkRagHealth();
+                    if (this.selectedCategoryId) {
+                        this.uploadForm.categoryId = this.selectedCategoryId;
                     }
                 },
                 async toggleDocument(doc) {
@@ -933,6 +1361,179 @@
                     } catch (error) {
                         console.error('Failed to remove document:', error);
                         alert('Failed to remove document');
+                    }
+                },
+
+                // Document Upload methods
+                async checkRagHealth() {
+                    try {
+                        const response = await axios.get('/api/documents/health');
+                        this.ragStatus = {
+                            available: response.data.ragServiceAvailable,
+                            supportedFileTypes: response.data.supportedFileTypes || []
+                        };
+                    } catch (error) {
+                        console.error('Failed to check RAG health:', error);
+                        this.ragStatus = { available: false, supportedFileTypes: [] };
+                    }
+                },
+
+                handleFileDrop(event) {
+                    this.dragOver = false;
+                    const files = event.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.selectFile(files[0]);
+                    }
+                },
+
+                handleFileSelect(event) {
+                    const files = event.target.files;
+                    if (files.length > 0) {
+                        this.selectFile(files[0]);
+                    }
+                },
+
+                selectFile(file) {
+                    // Validate file type
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    const supportedTypes = ['pdf', 'doc', 'docx', 'txt', 'md', 'html', 'htm', 'json'];
+                    if (!supportedTypes.includes(ext)) {
+                        alert(`Unsupported file type: .${ext}\nSupported types: PDF, DOC, DOCX, TXT, MD, HTML`);
+                        return;
+                    }
+
+                    this.selectedFile = file;
+                    this.uploadMode = 'file';
+
+                    // Auto-fill document name from filename if empty
+                    if (!this.uploadForm.documentName) {
+                        this.uploadForm.documentName = file.name.replace(/\.[^/.]+$/, '');
+                    }
+                    // Auto-fill docId from filename if empty
+                    if (!this.uploadForm.docId) {
+                        this.uploadForm.docId = file.name.replace(/\.[^/.]+$/, '')
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-|-$/g, '');
+                    }
+
+                    // Set document type based on extension
+                    if (ext === 'pdf') {
+                        this.uploadForm.documentType = 'pdf';
+                    } else if (ext === 'doc' || ext === 'docx') {
+                        this.uploadForm.documentType = 'word';
+                    } else if (ext === 'md') {
+                        this.uploadForm.documentType = 'markdown';
+                    } else if (ext === 'html' || ext === 'htm') {
+                        this.uploadForm.documentType = 'html';
+                    } else {
+                        this.uploadForm.documentType = 'text';
+                    }
+
+                    // For text files, also read content for preview
+                    if (['txt', 'md', 'html', 'htm', 'json'].includes(ext)) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.uploadForm.text = e.target.result;
+                        };
+                        reader.onerror = () => {
+                            console.error('Failed to read file for preview');
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        // For binary files (PDF, Word), clear text preview
+                        this.uploadForm.text = '';
+                    }
+                },
+
+                getFileIcon(filename) {
+                    if (!filename) return 'fas fa-file';
+                    const ext = filename.split('.').pop().toLowerCase();
+                    switch (ext) {
+                        case 'pdf': return 'fas fa-file-pdf text-danger';
+                        case 'doc':
+                        case 'docx': return 'fas fa-file-word text-primary';
+                        case 'txt': return 'fas fa-file-alt';
+                        case 'md': return 'fab fa-markdown';
+                        case 'html':
+                        case 'htm': return 'fas fa-file-code';
+                        default: return 'fas fa-file';
+                    }
+                },
+
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                async uploadDocument() {
+                    if (!this.canUpload) return;
+
+                    this.uploading = true;
+                    this.uploadResult = null;
+
+                    try {
+                        let response;
+
+                        if (this.selectedFile) {
+                            // File upload via multipart form
+                            const formData = new FormData();
+                            formData.append('file', this.selectedFile);
+                            formData.append('categoryId', this.uploadForm.categoryId);
+                            if (this.uploadForm.docId) {
+                                formData.append('docId', this.uploadForm.docId);
+                            }
+                            if (this.uploadForm.documentName) {
+                                formData.append('documentName', this.uploadForm.documentName);
+                            }
+                            if (this.uploadForm.description) {
+                                formData.append('description', this.uploadForm.description);
+                            }
+
+                            response = await axios.post('/api/documents/upload-file', formData, {
+                                headers: {
+                                    'Content-Type': 'multipart/form-data'
+                                }
+                            });
+                        } else {
+                            // Text upload via JSON
+                            response = await axios.post('/api/documents/upload', this.uploadForm);
+                        }
+
+                        this.uploadResult = response.data;
+
+                        if (response.data.success) {
+                            // Reload categories to update document counts
+                            await this.loadCategories();
+                        }
+                    } catch (error) {
+                        console.error('Upload failed:', error);
+                        this.uploadResult = {
+                            success: false,
+                            errorMessage: error.response?.data?.errorMessage || error.message
+                        };
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+
+                resetUploadForm() {
+                    this.uploadForm = {
+                        categoryId: '',
+                        docId: '',
+                        documentName: '',
+                        description: '',
+                        text: '',
+                        documentType: 'text'
+                    };
+                    this.uploadResult = null;
+                    this.selectedFile = null;
+                    this.uploadMode = 'file';
+                    if (this.$refs.fileInput) {
+                        this.$refs.fileInput.value = '';
                     }
                 }
             }

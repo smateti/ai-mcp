@@ -1,0 +1,361 @@
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --bg-dark: #1a1a2e;
+    --bg-card: #2d2d44;
+    --text-color: #eee;
+    --text-muted: #888;
+    --border-color: #444;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-color);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+}
+
+.navbar {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.sidebar {
+    background-color: var(--bg-card);
+    min-height: calc(100vh - 56px);
+    padding-top: 1rem;
+}
+
+.sidebar .nav-link {
+    color: var(--text-color);
+    padding: 0.75rem 1rem;
+    border-radius: 5px;
+    margin: 0.25rem 0.5rem;
+}
+
+.sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar .nav-link.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+
+.card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table {
+    color: var(--text-color);
+}
+
+.table th {
+    border-color: var(--border-color);
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.table td {
+    border-color: var(--border-color);
+    vertical-align: middle;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+
+.form-control, .form-select {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: var(--bg-dark);
+    border-color: var(--primary-color);
+    color: var(--text-color);
+    box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
+}
+
+.badge-active {
+    background-color: var(--success-color);
+}
+
+.badge-inactive {
+    background-color: var(--text-muted);
+}
+
+.stat-card {
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.stat-card .stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-card .stat-label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.alert {
+    border-radius: 10px;
+}
+
+.breadcrumb {
+    background: transparent;
+    padding: 0;
+}
+
+.breadcrumb-item a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.breadcrumb-item.active {
+    color: var(--text-muted);
+}
+
+.page-header {
+    padding: 1.5rem 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 1.75rem;
+}
+
+.action-buttons .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+textarea.form-control {
+    min-height: 150px;
+}
+
+/* Button group styling for dark theme */
+.btn-group .btn-outline-light {
+    color: var(--text-color);
+    border-color: var(--border-color);
+    background-color: transparent;
+}
+
+.btn-group .btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
+}
+
+.btn-group .btn-outline-light.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+/* Table hover state */
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Badge visibility */
+.badge.bg-warning {
+    color: #000;
+}
+
+/* Card header text */
+.card-header h5 {
+    color: var(--text-color);
+}
+
+/* Status Legend visibility */
+.card-body .row .col-md-4 {
+    color: var(--text-color);
+}
+
+/* Scrollable tables */
+.table-responsive {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Action buttons visibility */
+.action-buttons .btn-outline-light {
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+.action-buttons .btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Links in tables */
+.table a {
+    color: var(--primary-color);
+}
+
+.table a:hover {
+    color: #8fa4ff;
+}
+
+/* Category badge in tables - make it visible */
+.table .badge.bg-secondary {
+    background-color: var(--primary-color) !important;
+    color: #fff !important;
+}
+
+.table .badge.bg-secondary:hover {
+    background-color: var(--secondary-color) !important;
+}
+
+/* All badges should have good contrast */
+.badge {
+    font-weight: 500;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+    color: #fff !important;
+}
+
+/* Card body text visibility */
+.card-body {
+    color: var(--text-color);
+}
+
+.card-body p {
+    color: var(--text-color);
+}
+
+.card-body code {
+    color: var(--primary-color);
+    background-color: rgba(102, 126, 234, 0.1);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+}
+
+/* Override bg-light for dark theme */
+.card.bg-light, .bg-light {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-color) !important;
+}
+
+.bg-light .text-muted, .card.bg-light .text-muted {
+    color: var(--text-muted) !important;
+}
+
+.bg-light small {
+    color: var(--text-muted) !important;
+}
+
+/* Form labels */
+.form-label {
+    color: var(--text-color);
+}
+
+/* Form check/switch labels */
+.form-check-label {
+    color: var(--text-color);
+}
+
+/* Text utilities override for dark theme */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Small text */
+small {
+    color: var(--text-muted);
+}
+
+/* Code blocks */
+code {
+    color: var(--primary-color);
+}
+
+/* All btn-outline-light buttons - high specificity for dark theme */
+.btn.btn-outline-light,
+.btn.btn-sm.btn-outline-light,
+a.btn.btn-outline-light,
+a.btn.btn-sm.btn-outline-light,
+.table .btn.btn-outline-light,
+.action-buttons .btn.btn-outline-light {
+    color: #fff !important;
+    border-color: #888 !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn.btn-outline-light:hover,
+.btn.btn-sm.btn-outline-light:hover,
+a.btn.btn-outline-light:hover,
+a.btn.btn-sm.btn-outline-light:hover {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    color: #fff !important;
+    border-color: #fff !important;
+}
+
+/* Outline danger buttons */
+.btn.btn-outline-danger,
+.btn.btn-sm.btn-outline-danger,
+button.btn.btn-outline-danger {
+    color: #ff6b6b !important;
+    border-color: #ff6b6b !important;
+    background-color: transparent !important;
+}
+
+.btn.btn-outline-danger:hover,
+.btn.btn-sm.btn-outline-danger:hover,
+button.btn.btn-outline-danger:hover {
+    background-color: var(--danger-color) !important;
+    color: #fff !important;
+    border-color: var(--danger-color) !important;
+}
+
+/* Make sure icons in buttons are visible */
+.btn i.bi,
+.btn-outline-light i.bi,
+.btn-outline-danger i.bi {
+    color: inherit !important;
+}

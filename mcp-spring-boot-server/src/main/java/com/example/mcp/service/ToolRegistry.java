@@ -160,7 +160,7 @@ public class ToolRegistry {
         ragQuery.setToolId("rag_query");
         ragQuery.setName("Query Documents");
         ragQuery.setDescription("Query the RAG system with a question");
-        ragQuery.setHumanReadableDescription("Query the RAG knowledge base with a natural language question. This tool searches for relevant document chunks, retrieves context, and generates an AI-powered answer with source citations. Use this after ingesting documents.");
+        ragQuery.setHumanReadableDescription("Query the RAG knowledge base with a natural language question. This tool searches for relevant document chunks, retrieves context, and generates an AI-powered answer with source citations. Use this for any knowledge questions, how-to questions, or documentation lookups.");
         ragQuery.setBaseUrl("http://localhost:8080");
         ragQuery.setPath("/api/rag/query");
         ragQuery.setHttpMethod("POST");
@@ -183,9 +183,18 @@ public class ToolRegistry {
         topKParam.setHumanReadableDescription("Number of most relevant chunks to retrieve (default 5, higher values provide more context)");
         topKParam.setDefaultValue("5");
 
+        RegistryParameterDefinition categoryParam = new RegistryParameterDefinition();
+        categoryParam.setName("category");
+        categoryParam.setType("string");
+        categoryParam.setRequired(false);
+        categoryParam.setIn("body");
+        categoryParam.setDescription("Category to filter documents by (e.g., 'service-dev', 'batch-dev')");
+        categoryParam.setHumanReadableDescription("Optional category to filter documents. Use 'service-dev' for Service Development, 'batch-dev' for Batch Development.");
+
         List<RegistryParameterDefinition> queryParams = new ArrayList<>();
         queryParams.add(questionParam);
         queryParams.add(topKParam);
+        queryParams.add(categoryParam);
         ragQuery.setParameters(queryParams);
 
         JsonNode querySchema = convertRegistryToolToSchema(ragQuery);

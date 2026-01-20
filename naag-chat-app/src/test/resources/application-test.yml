@@ -1,0 +1,46 @@
+server:
+  port: 8087
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  # Disable Elasticsearch for tests
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+
+# NAAG Configuration for tests
+naag:
+  services:
+    orchestrator:
+      url: http://localhost:8086
+    category-admin:
+      url: http://localhost:8085
+    rag:
+      url: http://localhost:8080
+
+  persistence:
+    history:
+      enabled: true
+      type: H2
+    audit:
+      enabled: true
+      type: H2
+      log-prompts: true
+      log-responses: true
+      retention-days: 90
+
+logging:
+  level:
+    com.naag: DEBUG

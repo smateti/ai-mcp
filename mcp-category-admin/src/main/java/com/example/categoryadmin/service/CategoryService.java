@@ -258,6 +258,21 @@ public class CategoryService {
     }
 
     /**
+     * Update tool priority
+     */
+    @Transactional
+    public CategoryToolDto updateToolPriority(String categoryId, String toolId, Integer priority) {
+        CategoryTool tool = categoryToolRepository.findByCategoryIdAndToolId(categoryId, toolId)
+            .orElseThrow(() -> new IllegalArgumentException("Tool not found in category"));
+
+        tool.setPriority(priority);
+        tool = categoryToolRepository.save(tool);
+        log.info("Updated tool {} priority to: {}", toolId, priority);
+
+        return toToolDto(tool);
+    }
+
+    /**
      * Toggle document enabled status
      */
     @Transactional

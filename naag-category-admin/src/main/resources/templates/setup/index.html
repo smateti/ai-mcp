@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <h1><i class="bi bi-gear me-2"></i>Setup Data Initialization</h1>
+        <p class="text-muted">Upload sample documents and register public APIs for development categories</p>
+    </div>
+
+    <!-- Alert Messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${success}">Success</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Setup Overview -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Sample Documents</h5>
+                </div>
+                <div class="card-body">
+                    <p>The following development guides will be uploaded to the RAG service:</p>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-code me-2"></i>Spring Boot Guide</span>
+                            <span class="badge bg-primary">service-development</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-code me-2"></i>Spring Batch Guide</span>
+                            <span class="badge bg-primary">batch-development</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-code me-2"></i>React Development Guide</span>
+                            <span class="badge bg-primary">ui-development</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-code me-2"></i>DevOps Guide</span>
+                            <span class="badge bg-primary">misc-development</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-code me-2"></i>API Integration Guide</span>
+                            <span class="badge bg-primary">data-retrieval</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-plug me-2"></i>Public APIs to Register</h5>
+                </div>
+                <div class="card-body">
+                    <p>The following public APIs will be registered as tools:</p>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>Service Development:</strong> Spring Initializr, Maven Central
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Batch Development:</strong> Cron Expression Parser
+                        </li>
+                        <li class="list-group-item">
+                            <strong>UI Development:</strong> NPM Registry, cdnjs, Color API
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Data Retrieval:</strong> OpenWeatherMap, REST Countries, Exchange Rates, JSONPlaceholder, IP API
+                        </li>
+                        <li class="list-group-item">
+                            <strong>Misc Development:</strong> GitHub API, Docker Hub, Random User, Lorem Ipsum
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initialize Button -->
+    <div class="card mb-4">
+        <div class="card-body text-center py-4">
+            <h5>Ready to Initialize?</h5>
+            <p class="text-muted mb-3">
+                This will upload sample documents to the RAG service and register public APIs as tools.
+                The process runs in the background.
+            </p>
+            <form th:action="@{/setup/initialize}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-primary btn-lg"
+                        onclick="return confirm('Start setup initialization? This will upload documents and register APIs.');">
+                    <i class="bi bi-play-circle me-2"></i>Run Setup Initialization
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Current Status -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-folder me-2"></i>Categories</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="category : ${categories}">
+                                <td><code th:text="${category.id}">id</code></td>
+                                <td th:text="${category.name}">Name</td>
+                                <td>
+                                    <span class="badge" th:classappend="${category.active} ? 'bg-success' : 'bg-secondary'"
+                                          th:text="${category.active} ? 'Active' : 'Inactive'">Status</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Registered Tools</h5>
+                    <span class="badge bg-info" th:text="${#lists.size(tools)} + ' tools'">0 tools</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="tool : ${tools}">
+                                    <td th:text="${tool.name}">Tool Name</td>
+                                    <td><code th:text="${tool.categoryId ?: '-'}">category</code></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(tools)}">
+                                    <td colspan="2" class="text-center text-muted py-3">No tools registered yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+</html>

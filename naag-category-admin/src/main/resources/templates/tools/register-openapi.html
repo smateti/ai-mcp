@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/tools}">Tools</a></li>
+                <li class="breadcrumb-item active">Import from OpenAPI</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-cloud-upload me-2"></i>Import from OpenAPI</h1>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <p class="text-muted mb-4">
+                Import tools automatically from an OpenAPI (Swagger) specification. All endpoints will be registered as individual tools.
+            </p>
+
+            <!-- Tab navigation -->
+            <ul class="nav nav-tabs mb-4" id="importTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-pane"
+                            type="button" role="tab" aria-controls="url-pane" aria-selected="true">
+                        <i class="bi bi-link-45deg me-1"></i>From URL
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-pane"
+                            type="button" role="tab" aria-controls="file-pane" aria-selected="false">
+                        <i class="bi bi-file-earmark-code me-1"></i>From File
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="importTabsContent">
+                <!-- URL Tab -->
+                <div class="tab-pane fade show active" id="url-pane" role="tabpanel" aria-labelledby="url-tab">
+                    <form th:action="@{/tools/register-openapi}" method="post">
+                        <div class="mb-3">
+                            <label for="openApiUrl" class="form-label">OpenAPI Specification URL <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="openApiUrl" name="openApiUrl" required
+                                   placeholder="http://localhost:8083/v3/api-docs">
+                            <small class="text-muted">Enter the URL to the OpenAPI JSON specification</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="categoryId" class="form-label">Assign to Category (Optional)</label>
+                            <select class="form-select" id="categoryId" name="categoryId">
+                                <option value="">-- Auto-assign based on tags --</option>
+                                <option th:each="category : ${categories}"
+                                        th:value="${category.id}"
+                                        th:text="${category.name}">Category</option>
+                            </select>
+                            <small class="text-muted">All imported tools will be assigned to this category</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-cloud-download me-2"></i>Import from URL
+                            </button>
+                            <a th:href="@{/tools}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- File Upload Tab -->
+                <div class="tab-pane fade" id="file-pane" role="tabpanel" aria-labelledby="file-tab">
+                    <form th:action="@{/tools/register-openapi-file}" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="openApiFile" class="form-label">OpenAPI Specification File <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" id="openApiFile" name="openApiFile" required
+                                   accept=".json,.yaml,.yml">
+                            <small class="text-muted">Upload a JSON or YAML OpenAPI specification file</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="baseUrl" class="form-label">Base URL <span class="text-danger">*</span></label>
+                            <input type="url" class="form-control" id="baseUrl" name="baseUrl" required
+                                   placeholder="http://localhost:8083">
+                            <small class="text-muted">The base URL where this API is hosted (required since file doesn't contain server info)</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fileCategoryId" class="form-label">Assign to Category (Optional)</label>
+                            <select class="form-select" id="fileCategoryId" name="categoryId">
+                                <option value="">-- Auto-assign based on tags --</option>
+                                <option th:each="category : ${categories}"
+                                        th:value="${category.id}"
+                                        th:text="${category.name}">Category</option>
+                            </select>
+                            <small class="text-muted">All imported tools will be assigned to this category</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-file-earmark-arrow-up me-2"></i>Import from File
+                            </button>
+                            <a th:href="@{/tools}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Known Services</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Quick links to NAAG service OpenAPI specs:</p>
+            <ul class="list-unstyled">
+                <li class="mb-2">
+                    <code>http://localhost:8083/v3/api-docs</code>
+                    <span class="text-muted">- Utility Tools (echo, calculator, time)</span>
+                </li>
+                <li class="mb-2">
+                    <code>http://localhost:8080/v3/api-docs</code>
+                    <span class="text-muted">- RAG Service (ingest, query)</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</th:block>
+</html>

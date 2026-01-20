@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1><i class="bi bi-clock-history me-2"></i>Audit Trail</h1>
+            <p class="text-muted mb-0">View and search user activity logs</p>
+        </div>
+        <div>
+            <a th:href="@{/audit/export(userId=${filterUserId}, action=${filterAction}, entityType=${filterEntityType}, categoryId=${filterCategoryId})}"
+               class="btn btn-outline-primary" target="_blank">
+                <i class="bi bi-download me-1"></i>Export JSON
+            </a>
+        </div>
+    </div>
+
+    <!-- Source Tabs -->
+    <ul class="nav nav-tabs mb-4" id="auditTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" th:classappend="${currentSource == null or currentSource == 'admin'} ? 'active'"
+               th:href="@{/audit}">
+                <i class="bi bi-gear me-1"></i>Admin Activity
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link" th:classappend="${currentSource == 'chat'} ? 'active'"
+               th:href="@{/audit/chat}">
+                <i class="bi bi-chat-dots me-1"></i>Chat Activity
+                <span th:if="${chatAppAvailable}" class="badge bg-success ms-1">Online</span>
+                <span th:unless="${chatAppAvailable}" class="badge bg-danger ms-1">Offline</span>
+            </a>
+        </li>
+    </ul>
+
+    <!-- Statistics Cards (for Admin view) -->
+    <div class="row mb-4" th:if="${stats24h != null}">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-subtitle mb-1">Total Events (24h)</h6>
+                            <h3 class="card-title mb-0" th:text="${stats24h.totalLogs}">0</h3>
+                        </div>
+                        <i class="bi bi-activity" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-subtitle mb-1">Failures (24h)</h6>
+                            <h3 class="card-title mb-0" th:text="${stats24h.failures}">0</h3>
+                        </div>
+                        <i class="bi bi-exclamation-triangle" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-subtitle mb-1">Active Users (24h)</h6>
+                            <h3 class="card-title mb-0" th:text="${stats24h.userActivity != null ? stats24h.userActivity.size() : 0}">0</h3>
+                        </div>
+                        <i class="bi bi-people" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-subtitle mb-1">Total Records</h6>
+                            <h3 class="card-title mb-0" th:text="${totalItems}">0</h3>
+                        </div>
+                        <i class="bi bi-journal-text" style="font-size: 2rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters (for Admin view) -->
+    <div class="card mb-4" th:if="${currentSource == null or currentSource == 'admin'}">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filters</h5>
+        </div>
+        <div class="card-body">
+            <form th:action="@{/audit}" method="get" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label">User</label>
+                    <select class="form-select" name="userId">
+                        <option value="">All Users</option>
+                        <option th:each="uid : ${userIds}" th:value="${uid}" th:text="${uid}"
+                                th:selected="${uid == filterUserId}">User</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Action</label>
+                    <select class="form-select" name="action">
+                        <option value="">All Actions</option>
+                        <option th:each="act : ${actions}" th:value="${act}" th:text="${act}"
+                                th:selected="${act == filterAction}">Action</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Entity Type</label>
+                    <select class="form-select" name="entityType">
+                        <option value="">All Types</option>
+                        <option th:each="et : ${entityTypes}" th:value="${et}" th:text="${et}"
+                                th:selected="${et == filterEntityType}">Type</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" name="categoryId">
+                        <option value="">All Categories</option>
+                        <option th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}"
+                                th:selected="${cat.id == filterCategoryId}">Category</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="datetime-local" class="form-control" name="startDate"
+                           th:value="${filterStartDate != null ? filterStartDate.toString().substring(0,16) : ''}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="datetime-local" class="form-control" name="endDate"
+                           th:value="${filterEndDate != null ? filterEndDate.toString().substring(0,16) : ''}">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search me-1"></i>Apply Filters
+                    </button>
+                    <a th:href="@{/audit}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg me-1"></i>Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Audit Logs Table -->
+    <div class="card" th:if="${auditLogs != null}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Admin Audit Logs</h5>
+            <span class="text-muted" th:text="'Showing ' + ${auditLogs.numberOfElements} + ' of ' + ${totalItems} + ' records'"></span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 160px;">Timestamp</th>
+                            <th style="width: 100px;">User</th>
+                            <th style="width: 140px;">Action</th>
+                            <th style="width: 100px;">Entity</th>
+                            <th style="width: 120px;">Entity ID</th>
+                            <th>Details</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 100px;">IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="log : ${auditLogs}" th:class="${log.status.name() == 'FAILURE' ? 'table-danger' : ''}">
+                            <td>
+                                <small th:text="${#temporals.format(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}"></small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary" th:text="${log.userId}">user</span>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${log.action.contains('DELETE') ? 'bg-danger' :
+                                                       log.action.contains('CREATE') ? 'bg-success' :
+                                                       log.action.contains('UPDATE') ? 'bg-warning text-dark' :
+                                                       log.action.contains('CHAT') ? 'bg-info' :
+                                                       log.action.contains('TOOL') ? 'bg-primary' : 'bg-secondary'}"
+                                      th:text="${log.action}">ACTION</span>
+                            </td>
+                            <td>
+                                <small th:text="${log.entityType}">TYPE</small>
+                            </td>
+                            <td>
+                                <code th:if="${log.entityId}" th:text="${#strings.abbreviate(log.entityId, 20)}"></code>
+                                <span th:unless="${log.entityId}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <small th:if="${log.details}" th:text="${#strings.abbreviate(log.details, 60)}"></small>
+                                <span th:unless="${log.details}" class="text-muted">-</span>
+                                <small th:if="${log.errorMessage}" class="text-danger d-block">
+                                    Error: <span th:text="${#strings.abbreviate(log.errorMessage, 50)}"></span>
+                                </small>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${log.status.name() == 'SUCCESS' ? 'bg-success' :
+                                                       log.status.name() == 'FAILURE' ? 'bg-danger' : 'bg-warning'}"
+                                      th:text="${log.status}">SUCCESS</span>
+                            </td>
+                            <td>
+                                <small th:text="${log.ipAddress}">127.0.0.1</small>
+                            </td>
+                        </tr>
+                        <tr th:if="${auditLogs.isEmpty()}">
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                <p class="mb-0 mt-2">No audit logs found</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="card-footer" th:if="${totalPages != null and totalPages > 1}">
+            <nav aria-label="Audit log pagination">
+                <ul class="pagination mb-0 justify-content-center">
+                    <li class="page-item" th:classappend="${currentPage == 0 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/audit(page=${currentPage - 1}, userId=${filterUserId}, action=${filterAction}, entityType=${filterEntityType}, categoryId=${filterCategoryId})}">
+                            <i class="bi bi-chevron-left"></i> Previous
+                        </a>
+                    </li>
+
+                    <th:block th:each="i : ${#numbers.sequence(0, totalPages - 1)}">
+                        <li class="page-item" th:if="${i == currentPage or i == 0 or i == totalPages - 1 or (i >= currentPage - 2 and i <= currentPage + 2)}"
+                            th:classappend="${i == currentPage ? 'active' : ''}">
+                            <a class="page-link" th:href="@{/audit(page=${i}, userId=${filterUserId}, action=${filterAction}, entityType=${filterEntityType}, categoryId=${filterCategoryId})}"
+                               th:text="${i + 1}">1</a>
+                        </li>
+                        <li class="page-item disabled" th:if="${(i == 1 and currentPage > 3) or (i == totalPages - 2 and currentPage < totalPages - 4)}">
+                            <span class="page-link">...</span>
+                        </li>
+                    </th:block>
+
+                    <li class="page-item" th:classappend="${currentPage >= totalPages - 1 ? 'disabled' : ''}">
+                        <a class="page-link" th:href="@{/audit(page=${currentPage + 1}, userId=${filterUserId}, action=${filterAction}, entityType=${filterEntityType}, categoryId=${filterCategoryId})}">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Activity Breakdown (for Admin view) -->
+    <div class="row mt-4" th:if="${stats24h != null and stats24h.actionBreakdown != null and !stats24h.actionBreakdown.isEmpty()}">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Activity by Action (24h)</h5>
+                </div>
+                <div class="card-body">
+                    <div th:each="entry : ${stats24h.actionBreakdown}" class="d-flex justify-content-between align-items-center mb-2">
+                        <span th:text="${entry.key}">ACTION</span>
+                        <span class="badge bg-primary" th:text="${entry.value}">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6" th:if="${stats24h.userActivity != null and !stats24h.userActivity.isEmpty()}">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Activity by User (24h)</h5>
+                </div>
+                <div class="card-body">
+                    <div th:each="entry : ${stats24h.userActivity}" class="d-flex justify-content-between align-items-center mb-2">
+                        <span th:text="${entry.key}">user</span>
+                        <span class="badge bg-success" th:text="${entry.value}">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+</html>

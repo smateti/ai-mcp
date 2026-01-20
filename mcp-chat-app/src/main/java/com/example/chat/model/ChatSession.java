@@ -17,6 +17,7 @@ public class ChatSession {
     private final LocalDateTime createdAt;
     private LocalDateTime lastMessageAt;
     private PendingToolExecution pendingExecution;
+    private String categoryId; // Category for filtering enabled tools
 
     public ChatSession(String sessionId) {
         this.sessionId = sessionId;

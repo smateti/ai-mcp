@@ -1,0 +1,16 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: naag-utility-tools
+
+logging:
+  level:
+    com.naag.utilitytools: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

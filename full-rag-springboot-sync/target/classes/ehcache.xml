@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:jsr107="http://www.ehcache.org/v3/jsr107"
+        xmlns="http://www.ehcache.org/v3"
+        xsi:schemaLocation="
+            http://www.ehcache.org/v3 http://www.ehcache.org/schema/ehcache-core-3.0.xsd
+            http://www.ehcache.org/v3/jsr107 http://www.ehcache.org/schema/ehcache-107-ext-3.0.xsd">
+
+  <!-- Chat responses cache - for direct LLM calls -->
+  <cache alias="chatResponses">
+    <key-type>java.lang.String</key-type>
+    <value-type>java.lang.String</value-type>
+    <expiry>
+      <ttl unit="minutes">30</ttl>
+    </expiry>
+    <resources>
+      <heap unit="entries">1000</heap>
+    </resources>
+  </cache>
+
+  <!-- RAG responses cache - for RAG-enhanced queries -->
+  <cache alias="ragResponses">
+    <key-type>java.lang.String</key-type>
+    <value-type>java.lang.String</value-type>
+    <expiry>
+      <ttl unit="minutes">30</ttl>
+    </expiry>
+    <resources>
+      <heap unit="entries">500</heap>
+    </resources>
+  </cache>
+
+  <!-- Embeddings cache - cache embeddings for frequently queried text -->
+  <cache alias="embeddings">
+    <key-type>java.lang.String</key-type>
+    <value-type>java.util.List</value-type>
+    <expiry>
+      <ttl unit="days">7</ttl>
+    </expiry>
+    <resources>
+      <heap unit="entries">2000</heap>
+    </resources>
+  </cache>
+
+</config>

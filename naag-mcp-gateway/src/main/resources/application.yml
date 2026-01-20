@@ -1,0 +1,29 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: naag-mcp-gateway
+
+# NAAG Service Dependencies
+naag:
+  services:
+    tool-registry:
+      url: http://localhost:8081
+    rag-service:
+      url: http://localhost:8080
+
+# Logging
+logging:
+  level:
+    com.naag.mcpgateway: DEBUG
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
