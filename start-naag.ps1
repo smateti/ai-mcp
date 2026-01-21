@@ -17,7 +17,7 @@ $services = @(
     @{ Name = "naag-chat-app";         Port = 8087; Dir = "naag-chat-app" }
 )
 
-$basePath = "d:\apps\ws\ws8"
+$basePath = "d:\apps\git\ai-mcp"
 $logDir = "$basePath\logs"
 $pidFile = "$basePath\.naag-pids.json"
 

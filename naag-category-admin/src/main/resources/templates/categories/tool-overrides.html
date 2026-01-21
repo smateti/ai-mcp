@@ -162,20 +162,20 @@
                     </thead>
                     <tbody>
                         <!-- Root level parameters only -->
-                        <th:block th:each="param : ${tool.get('parameters')}">
-                            <th:block th:if="${param.get('parentParameter') == null || param.get('parentParameter').isNull()}">
+                        <th:block th:each="paramDef : ${tool.get('parameters')}">
+                            <th:block th:if="${paramDef.get('parentParameter') == null || paramDef.get('parentParameter').isNull()}">
                                 <!-- Root Parameter Row -->
-                                <tr th:with="paramPath=${param.get('name').asText()}, override=${overrideMap.get(param.get('name').asText())}">
+                                <tr th:with="paramPath=${paramDef.get('name').asText()}, override=${overrideMap.get(paramDef.get('name').asText())}">
                                     <td>
-                                        <strong th:text="${param.get('name').asText()}">paramName</strong>
-                                        <span class="badge bg-danger ms-1" th:if="${param.get('required')?.asBoolean()}">Required</span>
+                                        <strong th:text="${paramDef.get('name').asText()}">paramName</strong>
+                                        <span class="badge bg-danger ms-1" th:if="${paramDef.get('required')?.asBoolean()}">Required</span>
                                     </td>
-                                    <td><code th:text="${param.get('type')?.asText() ?: 'string'}">string</code></td>
-                                    <td class="text-muted small" th:text="${param.get('description')?.asText() ?: '-'}">Description</td>
+                                    <td><code th:text="${paramDef.get('type')?.asText() ?: 'string'}">string</code></td>
+                                    <td class="text-muted small" th:text="${paramDef.get('description')?.asText() ?: '-'}">Description</td>
                                     <td>
-                                        <code th:if="${param.get('enumValues') != null && !param.get('enumValues').isNull()}"
-                                              th:text="${param.get('enumValues').asText()}" class="small">ENUM</code>
-                                        <span th:unless="${param.get('enumValues') != null && !param.get('enumValues').isNull()}" class="text-muted">-</span>
+                                        <code th:if="${paramDef.get('enumValues') != null && !paramDef.get('enumValues').isNull()}"
+                                              th:text="${paramDef.get('enumValues').asText()}" class="small">ENUM</code>
+                                        <span th:unless="${paramDef.get('enumValues') != null && !paramDef.get('enumValues').isNull()}" class="text-muted">-</span>
                                     </td>
                                     <td>
                                         <span th:if="${override != null && override.lockedValue != null && !override.lockedValue.isBlank()}"
@@ -197,8 +197,8 @@
                                                 data-bs-toggle="modal"
                                                 th:data-bs-target="'#overrideModal'"
                                                 th:data-param-path="${paramPath}"
-                                                th:data-param-name="${param.get('name').asText()}"
-                                                th:data-param-enum="${param.get('enumValues')?.asText()}"
+                                                th:data-param-name="${paramDef.get('name').asText()}"
+                                                th:data-param-enum="${paramDef.get('enumValues')?.asText()}"
                                                 th:data-override-desc="${override?.humanReadableDescription}"
                                                 th:data-override-example="${override?.example}"
                                                 th:data-override-enum="${override?.enumValues}"
@@ -211,9 +211,9 @@
                                 </tr>
 
                                 <!-- Nested Parameters (Level 1) -->
-                                <th:block th:if="${param.get('nestedParameters') != null && param.get('nestedParameters').isArray()}">
-                                    <tr th:each="nested : ${param.get('nestedParameters')}"
-                                        th:with="nestedPath=${param.get('name').asText() + '.' + nested.get('name').asText()}, nestedOverride=${overrideMap.get(param.get('name').asText() + '.' + nested.get('name').asText())}"
+                                <th:block th:if="${paramDef.get('nestedParameters') != null && paramDef.get('nestedParameters').isArray()}">
+                                    <tr th:each="nested : ${paramDef.get('nestedParameters')}"
+                                        th:with="nestedPath=${paramDef.get('name').asText() + '.' + nested.get('name').asText()}, nestedOverride=${overrideMap.get(paramDef.get('name').asText() + '.' + nested.get('name').asText())}"
                                         class="table-light">
                                         <td class="ps-4">
                                             <i class="bi bi-arrow-return-right text-muted me-1"></i>
