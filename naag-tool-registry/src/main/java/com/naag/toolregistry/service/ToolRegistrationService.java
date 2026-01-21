@@ -3,6 +3,7 @@ package com.naag.toolregistry.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.naag.toolregistry.controller.ToolApiController.SimpleToolRequest;
 import com.naag.toolregistry.controller.ToolApiController.ToolUpdateRequest;
+import com.naag.toolregistry.dto.ParameterUpdateRequest;
 import com.naag.toolregistry.dto.ParsedToolInfo;
 import com.naag.toolregistry.dto.ToolRegistrationRequest;
 import com.naag.toolregistry.entity.ParameterDefinition;
@@ -379,6 +380,298 @@ public class ToolRegistrationService {
         log.info("Updated tool: {} (id={})", tool.getToolId(), tool.getId());
         metrics.recordToolUpdated();
         return toolDefinitionRepository.save(tool);
+    }
+
+    /**
+     * Update a tool by toolId (string identifier).
+     */
+    @Transactional
+    public ToolDefinition updateToolByToolId(String toolId, ToolUpdateRequest request) {
+        ToolDefinition tool = toolDefinitionRepository.findByToolId(toolId)
+                .orElseThrow(() -> new IllegalArgumentException("Tool not found with toolId: " + toolId));
+
+        if (request.description() != null && !request.description().isBlank()) {
+            tool.setDescription(request.description());
+        }
+        if (request.humanReadableDescription() != null && !request.humanReadableDescription().isBlank()) {
+            tool.setHumanReadableDescription(request.humanReadableDescription());
+        }
+        if (request.categoryId() != null) {
+            tool.setCategoryId(request.categoryId().isBlank() ? null : request.categoryId());
+        }
+
+        log.info("Updated tool by toolId: {} (id={})", tool.getToolId(), tool.getId());
+        metrics.recordToolUpdated();
+        return toolDefinitionRepository.save(tool);
+    }
+
+    /**
+     * Update a parameter's human-readable description (works for nested parameters too).
+     */
+    @Transactional
+    public void updateParameterHumanDescription(Long parameterId, String humanDescription) {
+        ToolDefinition tool = toolDefinitionRepository.findAll().stream()
+                .filter(t -> containsParameterId(t.getParameters(), parameterId) ||
+                             t.getResponses().stream().anyMatch(r -> containsParameterId(r.getParameters(), parameterId)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Parameter not found with id: " + parameterId));
+
+        // Update in input parameters
+        updateParameterHumanDescriptionRecursive(tool.getParameters(), parameterId, humanDescription);
+
+        // Update in response parameters
+        for (ResponseDefinition response : tool.getResponses()) {
+            updateParameterHumanDescriptionRecursive(response.getParameters(), parameterId, humanDescription);
+        }
+
+        toolDefinitionRepository.save(tool);
+        log.info("Updated parameter {} human description", parameterId);
+    }
+
+    /**
+     * Update a parameter's example value (works for nested parameters too).
+     */
+    @Transactional
+    public void updateParameterExample(Long parameterId, String example) {
+        ToolDefinition tool = toolDefinitionRepository.findAll().stream()
+                .filter(t -> containsParameterId(t.getParameters(), parameterId) ||
+                             t.getResponses().stream().anyMatch(r -> containsParameterId(r.getParameters(), parameterId)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Parameter not found with id: " + parameterId));
+
+        // Update in input parameters
+        updateParameterExampleRecursive(tool.getParameters(), parameterId, example);
+
+        // Update in response parameters
+        for (ResponseDefinition response : tool.getResponses()) {
+            updateParameterExampleRecursive(response.getParameters(), parameterId, example);
+        }
+
+        toolDefinitionRepository.save(tool);
+        log.info("Updated parameter {} example", parameterId);
+    }
+
+    /**
+     * Update a parameter's enum values (works for nested parameters too).
+     */
+    @Transactional
+    public void updateParameterEnumValues(Long parameterId, List<String> enumValues) {
+        ToolDefinition tool = toolDefinitionRepository.findAll().stream()
+                .filter(t -> containsParameterId(t.getParameters(), parameterId) ||
+                             t.getResponses().stream().anyMatch(r -> containsParameterId(r.getParameters(), parameterId)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Parameter not found with id: " + parameterId));
+
+        // Update in input parameters
+        updateParameterEnumValuesRecursive(tool.getParameters(), parameterId, enumValues);
+
+        // Update in response parameters
+        for (ResponseDefinition response : tool.getResponses()) {
+            updateParameterEnumValuesRecursive(response.getParameters(), parameterId, enumValues);
+        }
+
+        toolDefinitionRepository.save(tool);
+        log.info("Updated parameter {} enum values", parameterId);
+    }
+
+    /**
+     * Full parameter update - description, example, and enum values.
+     */
+    @Transactional
+    public void updateParameter(Long parameterId, ParameterUpdateRequest request) {
+        ToolDefinition tool = toolDefinitionRepository.findAll().stream()
+                .filter(t -> containsParameterId(t.getParameters(), parameterId) ||
+                             t.getResponses().stream().anyMatch(r -> containsParameterId(r.getParameters(), parameterId)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Parameter not found with id: " + parameterId));
+
+        // Update in input parameters
+        updateParameterFullRecursive(tool.getParameters(), parameterId, request);
+
+        // Update in response parameters
+        for (ResponseDefinition response : tool.getResponses()) {
+            updateParameterFullRecursive(response.getParameters(), parameterId, request);
+        }
+
+        toolDefinitionRepository.save(tool);
+        log.info("Updated parameter {} with full update", parameterId);
+    }
+
+    /**
+     * Update a response's human-readable description.
+     */
+    @Transactional
+    public void updateResponseHumanDescription(Long responseId, String humanDescription) {
+        ToolDefinition tool = toolDefinitionRepository.findAll().stream()
+                .filter(t -> t.getResponses().stream().anyMatch(r -> r.getId().equals(responseId)))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Response not found with id: " + responseId));
+
+        for (ResponseDefinition response : tool.getResponses()) {
+            if (response.getId().equals(responseId)) {
+                response.setHumanReadableDescription(humanDescription);
+                break;
+            }
+        }
+
+        toolDefinitionRepository.save(tool);
+        log.info("Updated response {} human description", responseId);
+    }
+
+    /**
+     * Add test response parameters to a response for testing nested display.
+     */
+    @Transactional
+    public void addTestResponseParameters(String toolId) {
+        ToolDefinition tool = toolDefinitionRepository.findByToolId(toolId)
+                .orElseThrow(() -> new IllegalArgumentException("Tool not found: " + toolId));
+
+        // Find the first response (usually 200 OK)
+        ResponseDefinition response = tool.getResponses().stream()
+                .filter(r -> "200".equals(r.getStatusCode()))
+                .findFirst()
+                .orElseGet(() -> tool.getResponses().isEmpty() ? null : tool.getResponses().get(0));
+
+        if (response == null) {
+            throw new IllegalArgumentException("No response found for tool: " + toolId);
+        }
+
+        // Clear existing parameters
+        response.getParameters().clear();
+
+        // Create root parameter
+        ParameterDefinition rootParam = new ParameterDefinition();
+        rootParam.setResponseDefinition(response);
+        rootParam.setName("data");
+        rootParam.setDescription("Response data object");
+        rootParam.setHumanReadableDescription("Contains the main response data");
+        rootParam.setType("object");
+        rootParam.setRequired(false);
+        rootParam.setNestingLevel(0);
+        rootParam.setNestedParameters(new java.util.ArrayList<>());
+
+        // Create nested parameters
+        ParameterDefinition nested1 = new ParameterDefinition();
+        nested1.setResponseDefinition(response);
+        nested1.setParentParameter(rootParam);
+        nested1.setName("incomeLimit");
+        nested1.setDescription("Income limit value");
+        nested1.setHumanReadableDescription("Maximum income allowed");
+        nested1.setType("number");
+        nested1.setRequired(false);
+        nested1.setNestingLevel(1);
+        nested1.setExample("85000");
+        nested1.setNestedParameters(new java.util.ArrayList<>());
+
+        ParameterDefinition nested2 = new ParameterDefinition();
+        nested2.setResponseDefinition(response);
+        nested2.setParentParameter(rootParam);
+        nested2.setName("isRural");
+        nested2.setDescription("Rural area indicator");
+        nested2.setHumanReadableDescription("Whether location is rural");
+        nested2.setType("boolean");
+        nested2.setRequired(false);
+        nested2.setNestingLevel(1);
+        nested2.setExample("true");
+        nested2.setNestedParameters(new java.util.ArrayList<>());
+
+        ParameterDefinition nested3 = new ParameterDefinition();
+        nested3.setResponseDefinition(response);
+        nested3.setParentParameter(rootParam);
+        nested3.setName("status");
+        nested3.setDescription("Status code");
+        nested3.setHumanReadableDescription("Response status");
+        nested3.setType("string");
+        nested3.setRequired(false);
+        nested3.setNestingLevel(1);
+        nested3.setExample("SUCCESS");
+        nested3.setEnumValues("SUCCESS,FAILURE,PENDING");
+        nested3.setNestedParameters(new java.util.ArrayList<>());
+
+        rootParam.getNestedParameters().add(nested1);
+        rootParam.getNestedParameters().add(nested2);
+        rootParam.getNestedParameters().add(nested3);
+
+        response.getParameters().add(rootParam);
+
+        toolDefinitionRepository.save(tool);
+        log.info("Added test response parameters to tool {}", toolId);
+    }
+
+    // Helper methods for recursive parameter updates
+
+    private boolean containsParameterId(List<ParameterDefinition> parameters, Long parameterId) {
+        for (ParameterDefinition param : parameters) {
+            if (param.getId() != null && param.getId().equals(parameterId)) {
+                return true;
+            }
+            if (!param.getNestedParameters().isEmpty() && containsParameterId(param.getNestedParameters(), parameterId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateParameterHumanDescriptionRecursive(List<ParameterDefinition> parameters, Long parameterId, String humanDescription) {
+        for (ParameterDefinition param : parameters) {
+            if (param.getId() != null && param.getId().equals(parameterId)) {
+                param.setHumanReadableDescription(humanDescription);
+                return;
+            }
+            if (!param.getNestedParameters().isEmpty()) {
+                updateParameterHumanDescriptionRecursive(param.getNestedParameters(), parameterId, humanDescription);
+            }
+        }
+    }
+
+    private void updateParameterExampleRecursive(List<ParameterDefinition> parameters, Long parameterId, String example) {
+        for (ParameterDefinition param : parameters) {
+            if (param.getId() != null && param.getId().equals(parameterId)) {
+                param.setExample(example);
+                return;
+            }
+            if (!param.getNestedParameters().isEmpty()) {
+                updateParameterExampleRecursive(param.getNestedParameters(), parameterId, example);
+            }
+        }
+    }
+
+    private void updateParameterEnumValuesRecursive(List<ParameterDefinition> parameters, Long parameterId, List<String> enumValues) {
+        for (ParameterDefinition param : parameters) {
+            if (param.getId() != null && param.getId().equals(parameterId)) {
+                // Convert List<String> to comma-separated String for storage
+                param.setEnumValues(enumValues != null && !enumValues.isEmpty()
+                        ? String.join(",", enumValues)
+                        : null);
+                return;
+            }
+            if (!param.getNestedParameters().isEmpty()) {
+                updateParameterEnumValuesRecursive(param.getNestedParameters(), parameterId, enumValues);
+            }
+        }
+    }
+
+    private void updateParameterFullRecursive(List<ParameterDefinition> parameters, Long parameterId, ParameterUpdateRequest request) {
+        for (ParameterDefinition param : parameters) {
+            if (param.getId() != null && param.getId().equals(parameterId)) {
+                if (request.humanReadableDescription() != null && !request.humanReadableDescription().isBlank()) {
+                    param.setHumanReadableDescription(request.humanReadableDescription());
+                }
+                if (request.example() != null && !request.example().isBlank()) {
+                    param.setExample(request.example());
+                }
+                if (request.enumValues() != null) {
+                    // Convert List<String> to comma-separated String for storage
+                    param.setEnumValues(!request.enumValues().isEmpty()
+                            ? String.join(",", request.enumValues())
+                            : null);
+                }
+                return;
+            }
+            if (!param.getNestedParameters().isEmpty()) {
+                updateParameterFullRecursive(param.getNestedParameters(), parameterId, request);
+            }
+        }
     }
 
     public ParsedToolInfo previewTool(ToolRegistrationRequest request) {

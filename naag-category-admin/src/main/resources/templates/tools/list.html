@@ -51,7 +51,10 @@
                             <span th:unless="${tool.categoryId != null}" class="text-muted">-</span>
                         </td>
                         <td class="text-end action-buttons">
-                            <a th:href="@{/tools/{id}/edit(id=${tool.id})}" class="btn btn-sm btn-info" title="Edit">
+                            <a th:href="@{/tools/{id}/details(id=${tool.id})}" class="btn btn-sm btn-primary" title="Edit Details">
+                                <i class="bi bi-sliders"></i>
+                            </a>
+                            <a th:href="@{/tools/{id}/edit(id=${tool.id})}" class="btn btn-sm btn-info" title="Edit Basic">
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form th:action="@{/tools/{id}/delete(id=${tool.id})}" method="post" class="d-inline"

@@ -126,7 +126,7 @@ public class ToolRegistryClient {
     public Tool updateTool(String toolId, Tool tool) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/tools/" + toolId))
+                    .uri(URI.create(baseUrl + "/api/tools/by-tool-id/" + toolId))
                     .timeout(Duration.ofSeconds(30))
                     .header("Content-Type", "application/json")
                     .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(tool)))
@@ -163,6 +163,118 @@ public class ToolRegistryClient {
         } catch (Exception e) {
             log.error("Error deleting tool {} from registry", toolId, e);
             throw new RuntimeException("Error deleting tool", e);
+        }
+    }
+
+    /**
+     * Get full tool details including parameters and responses.
+     */
+    public Optional<com.fasterxml.jackson.databind.JsonNode> getToolDetails(String toolId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/tools/by-tool-id/" + toolId))
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return Optional.of(objectMapper.readTree(response.body()));
+            } else if (response.statusCode() == 404) {
+                return Optional.empty();
+            } else {
+                log.error("Failed to get tool details {}: HTTP {}", toolId, response.statusCode());
+                return Optional.empty();
+            }
+        } catch (Exception e) {
+            log.error("Error fetching tool details {} from registry", toolId, e);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Update tool basic details (description, humanReadableDescription, categoryId).
+     */
+    public void updateToolDetails(String toolId, String description, String humanReadableDescription, String categoryId) {
+        try {
+            Map<String, String> requestBody = new java.util.HashMap<>();
+            if (description != null) requestBody.put("description", description);
+            if (humanReadableDescription != null) requestBody.put("humanReadableDescription", humanReadableDescription);
+            if (categoryId != null) requestBody.put("categoryId", categoryId);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/tools/by-tool-id/" + toolId))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                log.error("Failed to update tool details {}: HTTP {} - {}", toolId, response.statusCode(), response.body());
+                throw new RuntimeException("Failed to update tool details: " + response.body());
+            }
+        } catch (Exception e) {
+            log.error("Error updating tool details {} in registry", toolId, e);
+            throw new RuntimeException("Error updating tool details", e);
+        }
+    }
+
+    /**
+     * Update a parameter (description, example, enum values).
+     */
+    public void updateParameter(String toolId, Long parameterId, String humanReadableDescription, String example, List<String> enumValues) {
+        try {
+            Map<String, Object> requestBody = new java.util.HashMap<>();
+            if (humanReadableDescription != null) requestBody.put("humanReadableDescription", humanReadableDescription);
+            if (example != null) requestBody.put("example", example);
+            if (enumValues != null) requestBody.put("enumValues", enumValues);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/tools/" + toolId + "/parameters/" + parameterId))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                log.error("Failed to update parameter {}: HTTP {} - {}", parameterId, response.statusCode(), response.body());
+                throw new RuntimeException("Failed to update parameter: " + response.body());
+            }
+        } catch (Exception e) {
+            log.error("Error updating parameter {} in registry", parameterId, e);
+            throw new RuntimeException("Error updating parameter", e);
+        }
+    }
+
+    /**
+     * Update a response description.
+     */
+    public void updateResponse(String toolId, Long responseId, String humanReadableDescription) {
+        try {
+            Map<String, String> requestBody = new java.util.HashMap<>();
+            if (humanReadableDescription != null) requestBody.put("humanReadableDescription", humanReadableDescription);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/tools/" + toolId + "/responses/" + responseId + "/description"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                log.error("Failed to update response {}: HTTP {} - {}", responseId, response.statusCode(), response.body());
+                throw new RuntimeException("Failed to update response: " + response.body());
+            }
+        } catch (Exception e) {
+            log.error("Error updating response {} in registry", responseId, e);
+            throw new RuntimeException("Error updating response", e);
         }
     }
 

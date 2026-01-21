@@ -6,8 +6,10 @@ import com.naag.categoryadmin.client.RagServiceClient;
 import com.naag.categoryadmin.client.ToolRegistryClient;
 import com.naag.categoryadmin.model.AuditLog;
 import com.naag.categoryadmin.model.Category;
+import com.naag.categoryadmin.model.CategoryParameterOverride;
 import com.naag.categoryadmin.model.Tool;
 import com.naag.categoryadmin.service.AuditLogService;
+import com.naag.categoryadmin.service.CategoryParameterOverrideService;
 import com.naag.categoryadmin.service.CategoryService;
 import com.naag.categoryadmin.service.DocumentParserService;
 import com.naag.categoryadmin.service.SetupDataInitializer;
@@ -31,6 +33,7 @@ import java.util.Map;
 public class AdminController {
 
     private final CategoryService categoryService;
+    private final CategoryParameterOverrideService overrideService;
     private final ToolRegistryClient toolRegistryClient;
     private final RagServiceClient ragServiceClient;
     private final DocumentParserService documentParserService;
@@ -177,6 +180,138 @@ public class AdminController {
         return "redirect:/categories/" + id;
     }
 
+    // Tool Parameter Overrides
+    @GetMapping("/categories/{categoryId}/tools/{toolId}/overrides")
+    public String toolParameterOverrides(@PathVariable String categoryId,
+                                          @PathVariable String toolId,
+                                          Model model) {
+        model.addAttribute("activePage", "categories");
+
+        categoryService.getCategory(categoryId).ifPresentOrElse(
+                category -> {
+                    model.addAttribute("category", category);
+
+                    // Get tool details
+                    toolRegistryClient.getToolDetails(toolId).ifPresentOrElse(
+                            toolDetails -> {
+                                model.addAttribute("tool", toolDetails);
+
+                                // Get existing parameter overrides for this tool
+                                List<CategoryParameterOverride> overrides =
+                                        overrideService.getOverridesForTool(categoryId, toolId);
+                                model.addAttribute("overrides", overrides);
+
+                                // Create a map for easy lookup in template
+                                java.util.Map<String, CategoryParameterOverride> overrideMap = new java.util.HashMap<>();
+                                for (CategoryParameterOverride o : overrides) {
+                                    overrideMap.put(o.getParameterPath(), o);
+                                }
+                                model.addAttribute("overrideMap", overrideMap);
+
+                                // Get tool-level override
+                                overrideService.getToolOverride(categoryId, toolId)
+                                        .ifPresent(toolOverride -> model.addAttribute("toolOverride", toolOverride));
+                            },
+                            () -> model.addAttribute("error", "Tool not found")
+                    );
+                },
+                () -> model.addAttribute("error", "Category not found")
+        );
+
+        return "categories/tool-overrides";
+    }
+
+    @PostMapping("/categories/{categoryId}/tools/{toolId}/overrides")
+    public String saveToolParameterOverride(@PathVariable String categoryId,
+                                             @PathVariable String toolId,
+                                             @RequestParam String parameterPath,
+                                             @RequestParam(required = false) String humanReadableDescription,
+                                             @RequestParam(required = false) String example,
+                                             @RequestParam(required = false) String enumValues,
+                                             @RequestParam(required = false) String lockedValue,
+                                             RedirectAttributes redirectAttributes) {
+        try {
+            CategoryParameterOverride override = CategoryParameterOverride.builder()
+                    .categoryId(categoryId)
+                    .toolId(toolId)
+                    .parameterPath(parameterPath)
+                    .humanReadableDescription(humanReadableDescription)
+                    .example(example)
+                    .enumValues(enumValues)
+                    .lockedValue(lockedValue)
+                    .active(true)
+                    .build();
+
+            overrideService.createOrUpdateOverride(override);
+            redirectAttributes.addFlashAttribute("success", "Override saved for parameter: " + parameterPath);
+        } catch (Exception e) {
+            log.error("Error saving override", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to save override: " + e.getMessage());
+        }
+        return "redirect:/categories/" + categoryId + "/tools/" + toolId + "/overrides";
+    }
+
+    @PostMapping("/categories/{categoryId}/tools/{toolId}/overrides/{overrideId}/delete")
+    public String deleteToolParameterOverride(@PathVariable String categoryId,
+                                               @PathVariable String toolId,
+                                               @PathVariable Long overrideId,
+                                               RedirectAttributes redirectAttributes) {
+        try {
+            overrideService.deleteOverride(overrideId);
+            redirectAttributes.addFlashAttribute("success", "Override deleted");
+        } catch (Exception e) {
+            log.error("Error deleting override", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to delete override: " + e.getMessage());
+        }
+        return "redirect:/categories/" + categoryId + "/tools/" + toolId + "/overrides";
+    }
+
+    // Tool-Level Override (when to use, when not to use, etc.)
+    @PostMapping("/categories/{categoryId}/tools/{toolId}/tool-override")
+    public String saveToolOverride(@PathVariable String categoryId,
+                                   @PathVariable String toolId,
+                                   @RequestParam(required = false) String whenToUse,
+                                   @RequestParam(required = false) String whenNotToUse,
+                                   @RequestParam(required = false) String humanReadableDescription,
+                                   @RequestParam(required = false) String usageExamples,
+                                   @RequestParam(required = false) Integer priorityScore,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            com.naag.categoryadmin.model.CategoryToolOverride override =
+                    com.naag.categoryadmin.model.CategoryToolOverride.builder()
+                            .categoryId(categoryId)
+                            .toolId(toolId)
+                            .whenToUse(whenToUse)
+                            .whenNotToUse(whenNotToUse)
+                            .humanReadableDescription(humanReadableDescription)
+                            .usageExamples(usageExamples)
+                            .priorityScore(priorityScore)
+                            .active(true)
+                            .build();
+
+            overrideService.createOrUpdateToolOverride(override);
+            redirectAttributes.addFlashAttribute("success", "Tool selection guidance saved");
+        } catch (Exception e) {
+            log.error("Error saving tool override", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to save tool guidance: " + e.getMessage());
+        }
+        return "redirect:/categories/" + categoryId + "/tools/" + toolId + "/overrides";
+    }
+
+    @PostMapping("/categories/{categoryId}/tools/{toolId}/tool-override/delete")
+    public String deleteToolOverride(@PathVariable String categoryId,
+                                     @PathVariable String toolId,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            overrideService.deleteToolOverride(categoryId, toolId);
+            redirectAttributes.addFlashAttribute("success", "Tool selection guidance cleared");
+        } catch (Exception e) {
+            log.error("Error deleting tool override", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to clear tool guidance: " + e.getMessage());
+        }
+        return "redirect:/categories/" + categoryId + "/tools/" + toolId + "/overrides";
+    }
+
     @GetMapping("/categories/new")
     public String newCategoryForm(Model model) {
         model.addAttribute("activePage", "categories");
@@ -288,6 +423,171 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("error", "Failed to delete tool: " + e.getMessage());
         }
         return "redirect:/tools";
+    }
+
+    // Detailed Tool Edit with Parameters
+    @GetMapping("/tools/{id}/details")
+    public String editToolDetailsForm(@PathVariable String id, Model model) {
+        model.addAttribute("activePage", "tools");
+        try {
+            toolRegistryClient.getToolDetails(id).ifPresentOrElse(
+                tool -> {
+                    // Convert JsonNode to Map for Thymeleaf compatibility
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> toolMap = new com.fasterxml.jackson.databind.ObjectMapper()
+                                .convertValue(tool, Map.class);
+                        model.addAttribute("tool", toolMap);
+                        log.info("Loaded tool details for {} with {} parameters",
+                                toolMap.get("toolId"),
+                                ((java.util.List<?>) toolMap.get("parameters")).size());
+                    } catch (Exception e) {
+                        log.error("Error converting tool to map", e);
+                        model.addAttribute("tool", tool);
+                    }
+                },
+                () -> {
+                    log.warn("Tool not found: {}", id);
+                    model.addAttribute("error", "Tool not found: " + id);
+                }
+            );
+        } catch (Exception e) {
+            log.error("Error loading tool details for {}", id, e);
+            model.addAttribute("error", "Error loading tool: " + e.getMessage());
+        }
+        model.addAttribute("categories", categoryService.getAllCategories());
+        return "tools/edit-details";
+    }
+
+    @PostMapping("/tools/{id}/details")
+    public String updateToolDetails(@PathVariable String id,
+                                    @RequestParam(required = false) String description,
+                                    @RequestParam(required = false) String humanReadableDescription,
+                                    @RequestParam(required = false) String categoryId,
+                                    RedirectAttributes redirectAttributes) {
+        try {
+            toolRegistryClient.updateToolDetails(id, description, humanReadableDescription, categoryId);
+            redirectAttributes.addFlashAttribute("success", "Tool details updated successfully");
+        } catch (Exception e) {
+            log.error("Error updating tool details", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update tool details: " + e.getMessage());
+        }
+        return "redirect:/tools/" + id + "/details";
+    }
+
+    @PostMapping("/tools/{id}/parameters")
+    public String updateParameter(@PathVariable String id,
+                                  @RequestParam Long parameterId,
+                                  @RequestParam(required = false) String humanReadableDescription,
+                                  @RequestParam(required = false) String example,
+                                  @RequestParam(required = false) String enumValues,
+                                  RedirectAttributes redirectAttributes) {
+        try {
+            java.util.List<String> enumList = null;
+            if (enumValues != null && !enumValues.isBlank()) {
+                enumList = java.util.Arrays.asList(enumValues.split(","));
+            }
+            toolRegistryClient.updateParameter(id, parameterId, humanReadableDescription, example, enumList);
+            redirectAttributes.addFlashAttribute("success", "Parameter updated successfully");
+        } catch (Exception e) {
+            log.error("Error updating parameter", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update parameter: " + e.getMessage());
+        }
+        return "redirect:/tools/" + id + "/details";
+    }
+
+    @PostMapping("/tools/{id}/responses")
+    public String updateResponse(@PathVariable String id,
+                                 @RequestParam Long responseId,
+                                 @RequestParam(required = false) String humanReadableDescription,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            toolRegistryClient.updateResponse(id, responseId, humanReadableDescription);
+            redirectAttributes.addFlashAttribute("success", "Response updated successfully");
+        } catch (Exception e) {
+            log.error("Error updating response", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update response: " + e.getMessage());
+        }
+        return "redirect:/tools/" + id + "/details";
+    }
+
+    // Bulk Edit Parameters
+    @GetMapping("/tools/{id}/bulk-edit")
+    public String bulkEditParametersForm(@PathVariable String id, Model model) {
+        model.addAttribute("activePage", "tools");
+        try {
+            toolRegistryClient.getToolDetails(id).ifPresentOrElse(
+                tool -> {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> toolMap = new com.fasterxml.jackson.databind.ObjectMapper()
+                                .convertValue(tool, Map.class);
+                        model.addAttribute("tool", toolMap);
+                    } catch (Exception e) {
+                        log.error("Error converting tool to map", e);
+                        model.addAttribute("tool", tool);
+                    }
+                },
+                () -> {
+                    model.addAttribute("error", "Tool not found: " + id);
+                }
+            );
+        } catch (Exception e) {
+            log.error("Error loading tool for bulk edit", e);
+            model.addAttribute("error", "Failed to load tool: " + e.getMessage());
+        }
+        return "tools/bulk-edit-params";
+    }
+
+    @PostMapping("/tools/{id}/bulk-edit")
+    public String bulkEditParameters(@PathVariable String id,
+                                     @RequestParam Map<String, String> allParams,
+                                     RedirectAttributes redirectAttributes) {
+        try {
+            int updatedCount = 0;
+
+            // Process all parameters from the form
+            for (Map.Entry<String, String> entry : allParams.entrySet()) {
+                String key = entry.getKey();
+
+                // Extract parameter updates - format: inputParams[0].id, inputParams[0].humanReadableDescription, etc.
+                if (key.contains("].id")) {
+                    String prefix = key.substring(0, key.indexOf("].id") + 1);
+                    String idStr = entry.getValue();
+
+                    if (idStr != null && !idStr.isBlank()) {
+                        Long paramId = Long.parseLong(idStr);
+                        String humanDesc = allParams.get(prefix + ".humanReadableDescription");
+                        String example = allParams.get(prefix + ".example");
+                        String enumValues = allParams.get(prefix + ".enumValues");
+
+                        // Only update if at least one field has a non-blank value
+                        boolean hasHumanDesc = humanDesc != null && !humanDesc.isBlank();
+                        boolean hasExample = example != null && !example.isBlank();
+                        boolean hasEnumValues = enumValues != null && !enumValues.isBlank();
+
+                        if (hasHumanDesc || hasExample || hasEnumValues) {
+                            java.util.List<String> enumList = hasEnumValues
+                                    ? java.util.Arrays.asList(enumValues.split(","))
+                                    : null;
+
+                            toolRegistryClient.updateParameter(id, paramId,
+                                    hasHumanDesc ? humanDesc : "",
+                                    hasExample ? example : "",
+                                    enumList);
+                            updatedCount++;
+                        }
+                    }
+                }
+            }
+
+            redirectAttributes.addFlashAttribute("success",
+                    "Bulk update completed. " + updatedCount + " parameters updated.");
+        } catch (Exception e) {
+            log.error("Error in bulk parameter update", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update parameters: " + e.getMessage());
+        }
+        return "redirect:/tools/" + id + "/bulk-edit";
     }
 
     // OpenAPI Registration

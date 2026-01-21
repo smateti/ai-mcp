@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/tools}">Tools</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/tools/{id}/details(id=${tool.toolId})}">Edit Details</a></li>
+                <li class="breadcrumb-item active">Bulk Edit Parameters</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-table me-2"></i>Bulk Edit Parameters</h1>
+    </div>
+
+    <!-- Error Message -->
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}">Error message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Success Message -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${success}">Success message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Tool Info -->
+    <div class="card mb-4" th:if="${tool != null}">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">
+                        <code th:text="${tool.toolId}">tool-id</code>
+                        <span class="text-muted ms-2" th:text="${tool.name}">Tool Name</span>
+                    </h5>
+                </div>
+                <div>
+                    <span class="badge" th:classappend="${tool.httpMethod == 'GET'} ? 'bg-success' : 'bg-primary'"
+                          th:text="${tool.httpMethod}">GET</span>
+                    <code class="ms-2" th:text="${tool.path}">/api/endpoint</code>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Instructions:</strong> Edit the Human Description, Example, and Enum Values columns directly.
+        Press <kbd>Tab</kbd> to move between cells. Click <strong>Save All Changes</strong> when done.
+    </div>
+
+    <form th:action="@{/tools/{id}/bulk-edit(id=${tool.toolId})}" method="post" id="bulkEditForm">
+        <!-- Input Parameters Section -->
+        <div class="card mb-4" th:if="${tool != null and tool.parameters != null and !tool.parameters.isEmpty()}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-arrow-right-circle me-2"></i>Input Parameters</h5>
+                <span class="badge bg-secondary" th:text="${#lists.size(tool.parameters)} + ' parameters'">0 parameters</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover mb-0 spreadsheet-table">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th style="width: 180px;">Name</th>
+                                <th style="width: 100px;">Type</th>
+                                <th style="width: 60px;">Req</th>
+                                <th style="width: 200px;">OpenAPI Description</th>
+                                <th style="width: 250px;" class="editable-header">Human Description</th>
+                                <th style="width: 150px;" class="editable-header">Example</th>
+                                <th style="width: 200px;" class="editable-header">Enum Values</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <th:block th:each="prm, prmStat : ${tool.parameters}" th:if="${prm != null}">
+                                <tr class="param-row">
+                                    <td class="align-middle">
+                                        <span th:style="'margin-left: ' + ${(prm.nestingLevel ?: 0) * 15} + 'px;'">
+                                            <i class="bi bi-arrow-return-right text-muted me-1" th:if="${prm.nestingLevel != null and prm.nestingLevel > 0}"></i>
+                                            <code th:text="${prm.name}">name</code>
+                                        </span>
+                                        <input type="hidden" th:name="'inputParams[' + ${prmStat.index} + '].id'" th:value="${prm.id}">
+                                        <input type="hidden" th:name="'inputParams[' + ${prmStat.index} + '].name'" th:value="${prm.name}">
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <span class="badge bg-secondary" th:text="${prm.type}">string</span>
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <i class="bi bi-check-circle text-success" th:if="${prm.required}"></i>
+                                        <i class="bi bi-dash text-muted" th:unless="${prm.required}"></i>
+                                    </td>
+                                    <td class="align-middle small text-muted" th:text="${prm.description != null ? #strings.abbreviate(prm.description, 50) : '-'}">desc</td>
+                                    <td class="editable-cell">
+                                        <textarea class="form-control form-control-sm" rows="2"
+                                                  th:name="'inputParams[' + ${prmStat.index} + '].humanReadableDescription'"
+                                                  th:text="${prm.humanReadableDescription}"
+                                                  placeholder="Human-readable description..."></textarea>
+                                    </td>
+                                    <td class="editable-cell">
+                                        <input type="text" class="form-control form-control-sm"
+                                               th:name="'inputParams[' + ${prmStat.index} + '].example'"
+                                               th:value="${prm.example}"
+                                               placeholder="Example value...">
+                                    </td>
+                                    <td class="editable-cell">
+                                        <input type="text" class="form-control form-control-sm"
+                                               th:name="'inputParams[' + ${prmStat.index} + '].enumValues'"
+                                               th:value="${prm.enumValues}"
+                                               placeholder="val1,val2,val3">
+                                    </td>
+                                </tr>
+                                <!-- Nested parameters -->
+                                <th:block th:if="${prm.nestedParameters != null and !prm.nestedParameters.isEmpty()}">
+                                    <tr th:each="nested, nestedStat : ${prm.nestedParameters}" th:if="${nested != null}" class="param-row nested-row">
+                                        <td class="align-middle">
+                                            <span th:style="'margin-left: ' + ${(nested.nestingLevel ?: 1) * 15} + 'px;'">
+                                                <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                <code th:text="${nested.name}">name</code>
+                                            </span>
+                                            <input type="hidden" th:name="'nestedInputParams[' + ${prmStat.index} + '_' + ${nestedStat.index} + '].id'" th:value="${nested.id}">
+                                            <input type="hidden" th:name="'nestedInputParams[' + ${prmStat.index} + '_' + ${nestedStat.index} + '].name'" th:value="${nested.name}">
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <span class="badge bg-secondary" th:text="${nested.type}">string</span>
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <i class="bi bi-check-circle text-success" th:if="${nested.required}"></i>
+                                            <i class="bi bi-dash text-muted" th:unless="${nested.required}"></i>
+                                        </td>
+                                        <td class="align-middle small text-muted" th:text="${nested.description != null ? #strings.abbreviate(nested.description, 50) : '-'}">desc</td>
+                                        <td class="editable-cell">
+                                            <textarea class="form-control form-control-sm" rows="2"
+                                                      th:name="'nestedInputParams[' + ${prmStat.index} + '_' + ${nestedStat.index} + '].humanReadableDescription'"
+                                                      th:text="${nested.humanReadableDescription}"
+                                                      placeholder="Human-readable description..."></textarea>
+                                        </td>
+                                        <td class="editable-cell">
+                                            <input type="text" class="form-control form-control-sm"
+                                                   th:name="'nestedInputParams[' + ${prmStat.index} + '_' + ${nestedStat.index} + '].example'"
+                                                   th:value="${nested.example}"
+                                                   placeholder="Example value...">
+                                        </td>
+                                        <td class="editable-cell">
+                                            <input type="text" class="form-control form-control-sm"
+                                                   th:name="'nestedInputParams[' + ${prmStat.index} + '_' + ${nestedStat.index} + '].enumValues'"
+                                                   th:value="${nested.enumValues}"
+                                                   placeholder="val1,val2,val3">
+                                        </td>
+                                    </tr>
+                                </th:block>
+                            </th:block>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Parameters Section -->
+        <th:block th:if="${tool != null and tool.responses != null and !tool.responses.isEmpty()}">
+            <th:block th:each="resp, respStat : ${tool.responses}" th:if="${resp.parameters != null and !resp.parameters.isEmpty()}">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-arrow-left-circle me-2"></i>Response Parameters
+                            <span class="badge ms-2" th:classappend="${resp.statusCode != null and resp.statusCode.startsWith('2')} ? 'bg-success' : 'bg-warning'"
+                                  th:text="${resp.statusCode}">200</span>
+                        </h5>
+                        <span class="badge bg-secondary" th:text="${#lists.size(resp.parameters)} + ' fields'">0 fields</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0 spreadsheet-table">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th style="width: 180px;">Field</th>
+                                        <th style="width: 100px;">Type</th>
+                                        <th style="width: 200px;">OpenAPI Description</th>
+                                        <th style="width: 250px;" class="editable-header">Human Description</th>
+                                        <th style="width: 150px;" class="editable-header">Example</th>
+                                        <th style="width: 200px;" class="editable-header">Enum Values</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <th:block th:each="respPrm, respPrmStat : ${resp.parameters}" th:if="${respPrm != null}">
+                                        <tr class="param-row">
+                                            <td class="align-middle">
+                                                <span th:style="'margin-left: ' + ${(respPrm.nestingLevel ?: 0) * 15} + 'px;'">
+                                                    <i class="bi bi-arrow-return-right text-muted me-1" th:if="${respPrm.nestingLevel != null and respPrm.nestingLevel > 0}"></i>
+                                                    <code th:text="${respPrm.name}">field</code>
+                                                </span>
+                                                <input type="hidden" th:name="'responseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '].id'" th:value="${respPrm.id}">
+                                                <input type="hidden" th:name="'responseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '].name'" th:value="${respPrm.name}">
+                                            </td>
+                                            <td class="align-middle text-center">
+                                                <span class="badge bg-secondary" th:text="${respPrm.type ?: 'unknown'}">string</span>
+                                            </td>
+                                            <td class="align-middle small text-muted" th:text="${respPrm.description != null ? #strings.abbreviate(respPrm.description, 50) : '-'}">desc</td>
+                                            <td class="editable-cell">
+                                                <textarea class="form-control form-control-sm" rows="2"
+                                                          th:name="'responseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '].humanReadableDescription'"
+                                                          th:text="${respPrm.humanReadableDescription}"
+                                                          placeholder="Human-readable description..."></textarea>
+                                            </td>
+                                            <td class="editable-cell">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       th:name="'responseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '].example'"
+                                                       th:value="${respPrm.example}"
+                                                       placeholder="Example value...">
+                                            </td>
+                                            <td class="editable-cell">
+                                                <input type="text" class="form-control form-control-sm"
+                                                       th:name="'responseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '].enumValues'"
+                                                       th:value="${respPrm.enumValues}"
+                                                       placeholder="val1,val2,val3">
+                                            </td>
+                                        </tr>
+                                        <!-- Nested response parameters -->
+                                        <th:block th:if="${respPrm.nestedParameters != null and !respPrm.nestedParameters.isEmpty()}">
+                                            <tr th:each="nestedResp, nestedRespStat : ${respPrm.nestedParameters}" th:if="${nestedResp != null}" class="param-row nested-row">
+                                                <td class="align-middle">
+                                                    <span th:style="'margin-left: ' + ${(nestedResp.nestingLevel ?: 1) * 15} + 'px;'">
+                                                        <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                        <code th:text="${nestedResp.name}">field</code>
+                                                    </span>
+                                                    <input type="hidden" th:name="'nestedResponseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '_' + ${nestedRespStat.index} + '].id'" th:value="${nestedResp.id}">
+                                                    <input type="hidden" th:name="'nestedResponseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '_' + ${nestedRespStat.index} + '].name'" th:value="${nestedResp.name}">
+                                                </td>
+                                                <td class="align-middle text-center">
+                                                    <span class="badge bg-secondary" th:text="${nestedResp.type}">string</span>
+                                                </td>
+                                                <td class="align-middle small text-muted" th:text="${nestedResp.description != null ? #strings.abbreviate(nestedResp.description, 50) : '-'}">desc</td>
+                                                <td class="editable-cell">
+                                                    <textarea class="form-control form-control-sm" rows="2"
+                                                              th:name="'nestedResponseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '_' + ${nestedRespStat.index} + '].humanReadableDescription'"
+                                                              th:text="${nestedResp.humanReadableDescription}"
+                                                              placeholder="Human-readable description..."></textarea>
+                                                </td>
+                                                <td class="editable-cell">
+                                                    <input type="text" class="form-control form-control-sm"
+                                                           th:name="'nestedResponseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '_' + ${nestedRespStat.index} + '].example'"
+                                                           th:value="${nestedResp.example}"
+                                                           placeholder="Example value...">
+                                                </td>
+                                                <td class="editable-cell">
+                                                    <input type="text" class="form-control form-control-sm"
+                                                           th:name="'nestedResponseParams[' + ${respStat.index} + '_' + ${respPrmStat.index} + '_' + ${nestedRespStat.index} + '].enumValues'"
+                                                           th:value="${nestedResp.enumValues}"
+                                                           placeholder="val1,val2,val3">
+                                                </td>
+                                            </tr>
+                                        </th:block>
+                                    </th:block>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </th:block>
+        </th:block>
+
+        <!-- Action Buttons -->
+        <div class="d-flex gap-2 mb-4 sticky-bottom bg-white py-3 border-top">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-lg me-2"></i>Save All Changes
+            </button>
+            <a th:href="@{/tools/{id}/details(id=${tool.toolId})}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-x-lg me-2"></i>Cancel
+            </a>
+            <button type="button" class="btn btn-outline-info btn-lg ms-auto" onclick="copyToClipboard()">
+                <i class="bi bi-clipboard me-2"></i>Copy as TSV
+            </button>
+        </div>
+    </form>
+
+    <style>
+        .spreadsheet-table {
+            font-size: 0.9rem;
+        }
+        .spreadsheet-table th {
+            white-space: nowrap;
+        }
+        .spreadsheet-table .editable-header {
+            background-color: #e8f4f8 !important;
+        }
+        .spreadsheet-table .editable-cell {
+            background-color: #f8f9fa;
+            padding: 4px !important;
+        }
+        .spreadsheet-table .editable-cell:focus-within {
+            background-color: #fff3cd;
+        }
+        .spreadsheet-table textarea,
+        .spreadsheet-table input[type="text"] {
+            border: 1px solid #dee2e6;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .spreadsheet-table textarea:focus,
+        .spreadsheet-table input[type="text"]:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        .nested-row {
+            background-color: #f8f9fa;
+        }
+        .sticky-bottom {
+            position: sticky;
+            bottom: 0;
+            z-index: 100;
+        }
+        .table-responsive {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
+
+    <script>
+        // Track changes
+        let hasChanges = false;
+        document.querySelectorAll('.spreadsheet-table input, .spreadsheet-table textarea').forEach(function(el) {
+            el.addEventListener('change', function() {
+                hasChanges = true;
+            });
+        });
+
+        // Warn before leaving with unsaved changes
+        window.addEventListener('beforeunload', function(e) {
+            if (hasChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Clear warning when form is submitted
+        document.getElementById('bulkEditForm').addEventListener('submit', function() {
+            hasChanges = false;
+        });
+
+        // Copy to clipboard as TSV
+        function copyToClipboard() {
+            let tsv = "Name\tType\tHuman Description\tExample\tEnum Values\n";
+            document.querySelectorAll('.param-row').forEach(function(row) {
+                const name = row.querySelector('code')?.textContent || '';
+                const type = row.querySelector('.badge')?.textContent || '';
+                const humanDesc = row.querySelector('textarea')?.value || '';
+                const example = row.querySelectorAll('input[type="text"]')[0]?.value || '';
+                const enumVals = row.querySelectorAll('input[type="text"]')[1]?.value || '';
+                tsv += `${name}\t${type}\t${humanDesc}\t${example}\t${enumVals}\n`;
+            });
+
+            navigator.clipboard.writeText(tsv).then(function() {
+                alert('Copied to clipboard as TSV! You can paste into Excel.');
+            }).catch(function(err) {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
+        // Keyboard navigation - Tab moves between cells
+        document.querySelectorAll('.spreadsheet-table input, .spreadsheet-table textarea').forEach(function(el, index, elements) {
+            el.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey && el.tagName === 'INPUT') {
+                    e.preventDefault();
+                    // Move to next row's same type of field
+                    const nextEl = elements[index + 3]; // Skip to next row (3 editable fields per row)
+                    if (nextEl) nextEl.focus();
+                }
+            });
+        });
+    </script>
+</th:block>
+</html>

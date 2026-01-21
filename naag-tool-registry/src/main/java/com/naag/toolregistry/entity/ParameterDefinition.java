@@ -1,5 +1,6 @@
 package com.naag.toolregistry.entity;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -66,4 +67,31 @@ public class ParameterDefinition {
 
     @Column(length = 2000)
     private String enumValues;
+
+    /**
+     * Returns the effective description for AI model consumption.
+     * If humanReadableDescription is set, uses that; otherwise uses the original description.
+     * If enum values are present, appends them as "Allowed values: X, Y, Z".
+     */
+    @JsonGetter("effectiveDescription")
+    public String getEffectiveDescription() {
+        String baseDesc = (humanReadableDescription != null && !humanReadableDescription.isBlank())
+                ? humanReadableDescription
+                : description;
+
+        if (baseDesc == null) {
+            baseDesc = "";
+        }
+
+        if (enumValues != null && !enumValues.isBlank()) {
+            String formattedEnums = enumValues.replace(",", ", ");
+            if (!baseDesc.isBlank()) {
+                return baseDesc + ". Allowed values: " + formattedEnums;
+            } else {
+                return "Allowed values: " + formattedEnums;
+            }
+        }
+
+        return baseDesc;
+    }
 }

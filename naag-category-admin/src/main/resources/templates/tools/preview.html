@@ -172,6 +172,101 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Nested Parameters (Level 1) -->
+                        <th:block th:if="${parameter.get('nestedParameters') != null and parameter.get('nestedParameters').size() > 0}">
+                            <th:block th:each="nested1 : ${parameter.get('nestedParameters')}">
+                                <th:block th:with="n1Level=${nested1.get('nestingLevel') != null ? nested1.get('nestingLevel').asInt() : 1},
+                                                   n1Name=${nested1.get('name') != null ? nested1.get('name').asText() : ''},
+                                                   n1Type=${nested1.get('type') != null ? nested1.get('type').asText() : 'string'},
+                                                   n1Required=${nested1.get('required') != null and nested1.get('required').asBoolean()},
+                                                   n1In=${nested1.get('in') != null ? nested1.get('in').asText() : ''},
+                                                   n1Desc=${nested1.get('description') != null and !nested1.get('description').isNull() ? nested1.get('description').asText() : ''},
+                                                   n1Example=${nested1.get('example') != null and !nested1.get('example').isNull() ? nested1.get('example').asText() : ''},
+                                                   n1Enum=${nested1.get('enumValues') != null and !nested1.get('enumValues').isNull() ? nested1.get('enumValues').asText() : ''}">
+                                    <div class="parameter-card mb-3 p-3 border rounded border-start border-primary border-3"
+                                         th:style="'margin-left: ' + (${n1Level} * 20) + 'px;'">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                <strong th:text="${n1Name}">nestedName</strong>
+                                                <span class="badge bg-secondary ms-2" th:text="${n1Type}">string</span>
+                                                <span class="badge" th:classappend="${n1Required ? 'bg-danger' : 'bg-info'}"
+                                                      th:text="${n1Required ? 'required' : 'optional'}">optional</span>
+                                            </div>
+                                        </div>
+                                        <div class="bg-light p-2 rounded mb-3">
+                                            <small>
+                                                <strong>Description:</strong>
+                                                <span th:text="${n1Desc != '' ? n1Desc : '(no description)'}"></span>
+                                            </small>
+                                            <br th:if="${n1Example != ''}"/>
+                                            <small th:if="${n1Example != ''}"><strong>Example:</strong> <code th:text="${n1Example}"></code></small>
+                                            <br th:if="${n1Enum != ''}"/>
+                                            <small th:if="${n1Enum != ''}"><strong>Allowed:</strong> <code th:text="${n1Enum}"></code></small>
+                                        </div>
+                                        <input type="hidden" name="paramNames" th:value="${n1Name}">
+                                        <input type="hidden" name="paramTypes" th:value="${n1Type}">
+                                        <input type="hidden" name="paramRequired" th:value="${n1Required}">
+                                        <input type="hidden" name="paramIn" th:value="${n1In}">
+                                        <input type="hidden" name="paramDescriptions" th:value="${n1Desc}">
+                                        <input type="hidden" name="paramNestingLevels" th:value="${n1Level}">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <label class="form-label"><small>Human-Readable Description:</small></label>
+                                                <textarea class="form-control form-control-sm" name="paramHumanDescriptions" rows="2" th:text="${n1Desc}"></textarea>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label"><small>Example:</small></label>
+                                                <input class="form-control form-control-sm" name="paramExamples" type="text" th:value="${n1Example}">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Nested Parameters (Level 2) -->
+                                    <th:block th:if="${nested1.get('nestedParameters') != null and nested1.get('nestedParameters').size() > 0}">
+                                        <th:block th:each="nested2 : ${nested1.get('nestedParameters')}">
+                                            <th:block th:with="n2Level=${nested2.get('nestingLevel') != null ? nested2.get('nestingLevel').asInt() : 2},
+                                                               n2Name=${nested2.get('name') != null ? nested2.get('name').asText() : ''},
+                                                               n2Type=${nested2.get('type') != null ? nested2.get('type').asText() : 'string'},
+                                                               n2Required=${nested2.get('required') != null and nested2.get('required').asBoolean()},
+                                                               n2In=${nested2.get('in') != null ? nested2.get('in').asText() : ''},
+                                                               n2Desc=${nested2.get('description') != null and !nested2.get('description').isNull() ? nested2.get('description').asText() : ''},
+                                                               n2Example=${nested2.get('example') != null and !nested2.get('example').isNull() ? nested2.get('example').asText() : ''},
+                                                               n2Enum=${nested2.get('enumValues') != null and !nested2.get('enumValues').isNull() ? nested2.get('enumValues').asText() : ''}">
+                                                <div class="parameter-card mb-3 p-2 border rounded border-start border-info border-2"
+                                                     th:style="'margin-left: ' + (${n2Level} * 20) + 'px;'">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                        <strong th:text="${n2Name}">nestedName</strong>
+                                                        <span class="badge bg-secondary ms-2" th:text="${n2Type}">string</span>
+                                                    </div>
+                                                    <div class="bg-light p-2 rounded mb-2" th:if="${n2Desc != '' or n2Example != '' or n2Enum != ''}">
+                                                        <small th:if="${n2Desc != ''}" th:text="${n2Desc}"></small>
+                                                        <small th:if="${n2Example != ''}"> | Example: <code th:text="${n2Example}"></code></small>
+                                                        <small th:if="${n2Enum != ''}"> | Enum: <code th:text="${n2Enum}"></code></small>
+                                                    </div>
+                                                    <input type="hidden" name="paramNames" th:value="${n2Name}">
+                                                    <input type="hidden" name="paramTypes" th:value="${n2Type}">
+                                                    <input type="hidden" name="paramRequired" th:value="${n2Required}">
+                                                    <input type="hidden" name="paramIn" th:value="${n2In}">
+                                                    <input type="hidden" name="paramDescriptions" th:value="${n2Desc}">
+                                                    <input type="hidden" name="paramNestingLevels" th:value="${n2Level}">
+                                                    <div class="row">
+                                                        <div class="col-md-8">
+                                                            <textarea class="form-control form-control-sm" name="paramHumanDescriptions" rows="1" th:text="${n2Desc}" placeholder="Description..."></textarea>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <input class="form-control form-control-sm" name="paramExamples" type="text" th:value="${n2Example}" placeholder="Example...">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </th:block>
+                                        </th:block>
+                                    </th:block>
+                                </th:block>
+                            </th:block>
+                        </th:block>
                     </th:block>
                 </th:block>
             </div>
@@ -277,6 +372,112 @@
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <!-- Nested Response Parameters (Level 1) -->
+                                        <th:block th:if="${respParam.get('nestedParameters') != null and respParam.get('nestedParameters').size() > 0}">
+                                            <th:block th:each="rn1 : ${respParam.get('nestedParameters')}">
+                                                <th:block th:with="rn1Level=${rn1.get('nestingLevel') != null ? rn1.get('nestingLevel').asInt() : 1},
+                                                                   rn1Name=${rn1.get('name') != null ? rn1.get('name').asText() : ''},
+                                                                   rn1Type=${rn1.get('type') != null ? rn1.get('type').asText() : 'string'},
+                                                                   rn1Desc=${rn1.get('description') != null and !rn1.get('description').isNull() ? rn1.get('description').asText() : ''},
+                                                                   rn1Example=${rn1.get('example') != null and !rn1.get('example').isNull() ? rn1.get('example').asText() : ''},
+                                                                   rn1Enum=${rn1.get('enumValues') != null and !rn1.get('enumValues').isNull() ? rn1.get('enumValues').asText() : ''}">
+                                                    <div class="response-param-card mb-2 p-2 border rounded border-start border-primary border-3"
+                                                         th:style="'margin-left: ' + (${rn1Level} * 20) + 'px;'">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                            <strong th:text="${rn1Name}">nestedProp</strong>
+                                                            <span class="badge bg-secondary ms-2" th:text="${rn1Type}">string</span>
+                                                        </div>
+                                                        <div class="bg-white p-2 rounded mb-2" th:if="${rn1Desc != '' or rn1Example != '' or rn1Enum != ''}">
+                                                            <small th:if="${rn1Desc != ''}" th:text="${rn1Desc}"></small>
+                                                            <small th:if="${rn1Example != ''}"> | Example: <code th:text="${rn1Example}"></code></small>
+                                                            <small th:if="${rn1Enum != ''}"> | Enum: <code th:text="${rn1Enum}"></code></small>
+                                                        </div>
+                                                        <input type="hidden" name="responseParamNames" th:value="${rn1Name}">
+                                                        <input type="hidden" name="responseParamTypes" th:value="${rn1Type}">
+                                                        <input type="hidden" name="responseParamDescriptions" th:value="${rn1Desc}">
+                                                        <input type="hidden" name="responseParamNestingLevels" th:value="${rn1Level}">
+                                                        <input type="hidden" name="responseParamStatusCodes" th:value="${statusCode}">
+                                                        <div class="row">
+                                                            <div class="col-md-8">
+                                                                <textarea class="form-control form-control-sm" name="responseParamHumanDescriptions" rows="1" th:text="${rn1Desc}" placeholder="Description..."></textarea>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <input class="form-control form-control-sm" name="responseParamExamples" type="text" th:value="${rn1Example}" placeholder="Example...">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Nested Response Parameters (Level 2) -->
+                                                    <th:block th:if="${rn1.get('nestedParameters') != null and rn1.get('nestedParameters').size() > 0}">
+                                                        <th:block th:each="rn2 : ${rn1.get('nestedParameters')}">
+                                                            <th:block th:with="rn2Level=${rn2.get('nestingLevel') != null ? rn2.get('nestingLevel').asInt() : 2},
+                                                                               rn2Name=${rn2.get('name') != null ? rn2.get('name').asText() : ''},
+                                                                               rn2Type=${rn2.get('type') != null ? rn2.get('type').asText() : 'string'},
+                                                                               rn2Desc=${rn2.get('description') != null and !rn2.get('description').isNull() ? rn2.get('description').asText() : ''},
+                                                                               rn2Example=${rn2.get('example') != null and !rn2.get('example').isNull() ? rn2.get('example').asText() : ''},
+                                                                               rn2Enum=${rn2.get('enumValues') != null and !rn2.get('enumValues').isNull() ? rn2.get('enumValues').asText() : ''}">
+                                                                <div class="response-param-card mb-2 p-2 border rounded border-start border-info border-2"
+                                                                     th:style="'margin-left: ' + (${rn2Level} * 20) + 'px;'">
+                                                                    <div class="d-flex align-items-center mb-1">
+                                                                        <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                                        <strong th:text="${rn2Name}">nestedProp</strong>
+                                                                        <span class="badge bg-secondary ms-2" th:text="${rn2Type}">string</span>
+                                                                    </div>
+                                                                    <div class="bg-white p-1 rounded mb-1" th:if="${rn2Desc != '' or rn2Example != '' or rn2Enum != ''}">
+                                                                        <small th:if="${rn2Desc != ''}" th:text="${rn2Desc}"></small>
+                                                                        <small th:if="${rn2Example != ''}"> | <code th:text="${rn2Example}"></code></small>
+                                                                        <small th:if="${rn2Enum != ''}"> | <code th:text="${rn2Enum}"></code></small>
+                                                                    </div>
+                                                                    <input type="hidden" name="responseParamNames" th:value="${rn2Name}">
+                                                                    <input type="hidden" name="responseParamTypes" th:value="${rn2Type}">
+                                                                    <input type="hidden" name="responseParamDescriptions" th:value="${rn2Desc}">
+                                                                    <input type="hidden" name="responseParamNestingLevels" th:value="${rn2Level}">
+                                                                    <input type="hidden" name="responseParamStatusCodes" th:value="${statusCode}">
+                                                                    <div class="row">
+                                                                        <div class="col-md-8">
+                                                                            <textarea class="form-control form-control-sm" name="responseParamHumanDescriptions" rows="1" th:text="${rn2Desc}" placeholder="Description..."></textarea>
+                                                                        </div>
+                                                                        <div class="col-md-4">
+                                                                            <input class="form-control form-control-sm" name="responseParamExamples" type="text" th:value="${rn2Example}" placeholder="Example...">
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Nested Response Parameters (Level 3) -->
+                                                                <th:block th:if="${rn2.get('nestedParameters') != null and rn2.get('nestedParameters').size() > 0}">
+                                                                    <th:block th:each="rn3 : ${rn2.get('nestedParameters')}">
+                                                                        <th:block th:with="rn3Level=${rn3.get('nestingLevel') != null ? rn3.get('nestingLevel').asInt() : 3},
+                                                                                           rn3Name=${rn3.get('name') != null ? rn3.get('name').asText() : ''},
+                                                                                           rn3Type=${rn3.get('type') != null ? rn3.get('type').asText() : 'string'},
+                                                                                           rn3Desc=${rn3.get('description') != null and !rn3.get('description').isNull() ? rn3.get('description').asText() : ''},
+                                                                                           rn3Example=${rn3.get('example') != null and !rn3.get('example').isNull() ? rn3.get('example').asText() : ''}">
+                                                                            <div class="response-param-card mb-1 p-1 border rounded border-start border-secondary border-1"
+                                                                                 th:style="'margin-left: ' + (${rn3Level} * 20) + 'px;'">
+                                                                                <div class="d-flex align-items-center">
+                                                                                    <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                                                                    <code th:text="${rn3Name}">prop</code>
+                                                                                    <span class="badge bg-light text-dark ms-1" th:text="${rn3Type}">string</span>
+                                                                                    <small th:if="${rn3Desc != ''}" class="text-muted ms-2" th:text="${#strings.abbreviate(rn3Desc, 40)}"></small>
+                                                                                </div>
+                                                                                <input type="hidden" name="responseParamNames" th:value="${rn3Name}">
+                                                                                <input type="hidden" name="responseParamTypes" th:value="${rn3Type}">
+                                                                                <input type="hidden" name="responseParamDescriptions" th:value="${rn3Desc}">
+                                                                                <input type="hidden" name="responseParamNestingLevels" th:value="${rn3Level}">
+                                                                                <input type="hidden" name="responseParamStatusCodes" th:value="${statusCode}">
+                                                                                <input type="hidden" name="responseParamHumanDescriptions" th:value="${rn3Desc}">
+                                                                                <input type="hidden" name="responseParamExamples" th:value="${rn3Example}">
+                                                                            </div>
+                                                                        </th:block>
+                                                                    </th:block>
+                                                                </th:block>
+                                                            </th:block>
+                                                        </th:block>
+                                                    </th:block>
+                                                </th:block>
+                                            </th:block>
+                                        </th:block>
                                     </th:block>
                                 </th:block>
                             </div>

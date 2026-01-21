@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/categories}">Categories</a></li>
+                <li class="breadcrumb-item"><a th:href="@{/categories/{id}(id=${category?.id})}" th:text="${category?.name}">Category</a></li>
+                <li class="breadcrumb-item active">Parameter Overrides</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="bi bi-sliders me-2"></i>
+                Parameter Overrides
+            </h1>
+            <a th:href="@{/categories/{id}(id=${category.id})}" class="btn btn-outline-light">
+                <i class="bi bi-arrow-left me-2"></i>Back to Category
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${success}">Success</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Tool Info -->
+    <div class="card mb-4" th:if="${tool != null}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5 th:text="${tool.get('name')?.asText() ?: tool.get('toolId')?.asText()}">Tool Name</h5>
+                    <p th:if="${tool.get('description')}" th:text="${tool.get('description').asText()}" class="text-muted mb-2">Description</p>
+                    <small class="text-muted">
+                        Tool ID: <code th:text="${tool.get('toolId')?.asText()}">id</code>
+                        | Method: <code th:text="${tool.get('httpMethod')?.asText()}">GET</code>
+                        | Path: <code th:text="${tool.get('path')?.asText()}">/path</code>
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="badge bg-info fs-6" th:text="'Category: ' + ${category.name}">Category</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tool-Level Override Section -->
+    <div class="card mb-4" th:if="${tool != null}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Tool Selection Guidance</h5>
+            <span class="badge bg-success" th:if="${toolOverride != null && toolOverride.hasAnyOverride()}">Configured</span>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-3">
+                Help the AI model understand <strong>when</strong> to use this tool in the <span th:text="${category.name}">category</span> context.
+                This guidance appears in the tool description sent to the AI.
+            </p>
+            <form th:action="@{/categories/{catId}/tools/{toolId}/tool-override(catId=${category.id}, toolId=${tool.get('toolId').asText()})}" method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-check-circle text-success me-1"></i>When to Use
+                        </label>
+                        <textarea name="whenToUse" class="form-control" rows="3"
+                                  th:text="${toolOverride?.whenToUse}"
+                                  placeholder="Example: Use this for batch job queries in this category. Best for retrieving job history and configuration."></textarea>
+                        <small class="text-muted">Describe scenarios where this tool is the right choice.</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-x-circle text-danger me-1"></i>When NOT to Use
+                        </label>
+                        <textarea name="whenNotToUse" class="form-control" rows="3"
+                                  th:text="${toolOverride?.whenNotToUse}"
+                                  placeholder="Example: Do not use for real-time status checks - use getAppStatus instead (faster)."></textarea>
+                        <small class="text-muted">Describe scenarios where another tool should be used instead.</small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-chat-text me-1"></i>Description Override
+                        </label>
+                        <textarea name="humanReadableDescription" class="form-control" rows="2"
+                                  th:text="${toolOverride?.humanReadableDescription}"
+                                  placeholder="Category-specific description of what this tool does"></textarea>
+                        <small class="text-muted">Override the default tool description for this category.</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-code-square me-1"></i>Usage Examples
+                        </label>
+                        <textarea name="usageExamples" class="form-control" rows="2"
+                                  th:text="${toolOverride?.usageExamples}"
+                                  placeholder="Example: getAppInfo(appId='batch-job-123', appType='BATCH')"></textarea>
+                        <small class="text-muted">Show concrete examples with realistic parameter values.</small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="bi bi-sort-numeric-up me-1"></i>Priority Score
+                        </label>
+                        <input type="number" name="priorityScore" class="form-control"
+                               th:value="${toolOverride?.priorityScore}"
+                               placeholder="0-100" min="0" max="100">
+                        <small class="text-muted">Higher = more preferred when multiple tools match.</small>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>Save Tool Guidance
+                    </button>
+                    <button type="button" class="btn btn-outline-danger"
+                            th:if="${toolOverride != null && toolOverride.hasAnyOverride()}"
+                            onclick="if(confirm('Clear all tool-level guidance?')) { document.getElementById('clearToolOverrideForm').submit(); }">
+                        <i class="bi bi-trash me-1"></i>Clear Guidance
+                    </button>
+                </div>
+            </form>
+            <form th:action="@{/categories/{catId}/tools/{toolId}/tool-override/delete(catId=${category.id}, toolId=${tool.get('toolId').asText()})}"
+                  method="post" id="clearToolOverrideForm" class="d-none"></form>
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Override Parameters for this Category:</strong>
+        Configure how this tool's parameters behave when used in the <strong th:text="${category.name}">category</strong> category.
+        <ul class="mb-0 mt-2">
+            <li><strong>Locked Value:</strong> Pre-fill the parameter with a fixed value that users cannot change</li>
+            <li><strong>Enum Override:</strong> Restrict the allowed values to a subset (comma-separated)</li>
+            <li><strong>Description Override:</strong> Provide a category-specific description</li>
+            <li><strong>Example Override:</strong> Provide a category-specific example value</li>
+        </ul>
+    </div>
+
+    <!-- Parameters List -->
+    <div class="card mb-4" th:if="${tool != null && tool.get('parameters') != null}">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Input Parameters</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Type</th>
+                            <th>Original Description</th>
+                            <th>Original Enum</th>
+                            <th>Override Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Root level parameters only -->
+                        <th:block th:each="param : ${tool.get('parameters')}">
+                            <th:block th:if="${param.get('parentParameter') == null || param.get('parentParameter').isNull()}">
+                                <!-- Root Parameter Row -->
+                                <tr th:with="paramPath=${param.get('name').asText()}, override=${overrideMap.get(param.get('name').asText())}">
+                                    <td>
+                                        <strong th:text="${param.get('name').asText()}">paramName</strong>
+                                        <span class="badge bg-danger ms-1" th:if="${param.get('required')?.asBoolean()}">Required</span>
+                                    </td>
+                                    <td><code th:text="${param.get('type')?.asText() ?: 'string'}">string</code></td>
+                                    <td class="text-muted small" th:text="${param.get('description')?.asText() ?: '-'}">Description</td>
+                                    <td>
+                                        <code th:if="${param.get('enumValues') != null && !param.get('enumValues').isNull()}"
+                                              th:text="${param.get('enumValues').asText()}" class="small">ENUM</code>
+                                        <span th:unless="${param.get('enumValues') != null && !param.get('enumValues').isNull()}" class="text-muted">-</span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${override != null && override.lockedValue != null && !override.lockedValue.isBlank()}"
+                                              class="badge bg-warning text-dark">
+                                            <i class="bi bi-lock-fill me-1"></i>Locked: <span th:text="${override.lockedValue}">value</span>
+                                        </span>
+                                        <span th:if="${override != null && (override.lockedValue == null || override.lockedValue.isBlank()) && override.enumValues != null && !override.enumValues.isBlank()}"
+                                              class="badge bg-info">
+                                            <i class="bi bi-list-check me-1"></i>Enum Override
+                                        </span>
+                                        <span th:if="${override != null && (override.lockedValue == null || override.lockedValue.isBlank()) && (override.enumValues == null || override.enumValues.isBlank()) && override.hasAnyOverride()}"
+                                              class="badge bg-secondary">
+                                            <i class="bi bi-pencil me-1"></i>Modified
+                                        </span>
+                                        <span th:unless="${override != null && override.hasAnyOverride()}" class="text-muted">-</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-primary"
+                                                data-bs-toggle="modal"
+                                                th:data-bs-target="'#overrideModal'"
+                                                th:data-param-path="${paramPath}"
+                                                th:data-param-name="${param.get('name').asText()}"
+                                                th:data-param-enum="${param.get('enumValues')?.asText()}"
+                                                th:data-override-desc="${override?.humanReadableDescription}"
+                                                th:data-override-example="${override?.example}"
+                                                th:data-override-enum="${override?.enumValues}"
+                                                th:data-override-locked="${override?.lockedValue}"
+                                                th:data-override-id="${override?.id}"
+                                                onclick="openOverrideModal(this)">
+                                            <i class="bi bi-sliders"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <!-- Nested Parameters (Level 1) -->
+                                <th:block th:if="${param.get('nestedParameters') != null && param.get('nestedParameters').isArray()}">
+                                    <tr th:each="nested : ${param.get('nestedParameters')}"
+                                        th:with="nestedPath=${param.get('name').asText() + '.' + nested.get('name').asText()}, nestedOverride=${overrideMap.get(param.get('name').asText() + '.' + nested.get('name').asText())}"
+                                        class="table-light">
+                                        <td class="ps-4">
+                                            <i class="bi bi-arrow-return-right text-muted me-1"></i>
+                                            <span th:text="${nested.get('name').asText()}">nestedParam</span>
+                                            <span class="badge bg-danger ms-1" th:if="${nested.get('required')?.asBoolean()}">Required</span>
+                                        </td>
+                                        <td><code th:text="${nested.get('type')?.asText() ?: 'string'}">string</code></td>
+                                        <td class="text-muted small" th:text="${nested.get('description')?.asText() ?: '-'}">Description</td>
+                                        <td>
+                                            <code th:if="${nested.get('enumValues') != null && !nested.get('enumValues').isNull()}"
+                                                  th:text="${nested.get('enumValues').asText()}" class="small">ENUM</code>
+                                            <span th:unless="${nested.get('enumValues') != null && !nested.get('enumValues').isNull()}" class="text-muted">-</span>
+                                        </td>
+                                        <td>
+                                            <span th:if="${nestedOverride != null && nestedOverride.lockedValue != null && !nestedOverride.lockedValue.isBlank()}"
+                                                  class="badge bg-warning text-dark">
+                                                <i class="bi bi-lock-fill me-1"></i>Locked
+                                            </span>
+                                            <span th:if="${nestedOverride != null && nestedOverride.hasAnyOverride() && (nestedOverride.lockedValue == null || nestedOverride.lockedValue.isBlank())}"
+                                                  class="badge bg-secondary">Modified</span>
+                                            <span th:unless="${nestedOverride != null && nestedOverride.hasAnyOverride()}" class="text-muted">-</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    data-bs-toggle="modal"
+                                                    th:data-bs-target="'#overrideModal'"
+                                                    th:data-param-path="${nestedPath}"
+                                                    th:data-param-name="${nested.get('name').asText()}"
+                                                    th:data-param-enum="${nested.get('enumValues')?.asText()}"
+                                                    th:data-override-desc="${nestedOverride?.humanReadableDescription}"
+                                                    th:data-override-example="${nestedOverride?.example}"
+                                                    th:data-override-enum="${nestedOverride?.enumValues}"
+                                                    th:data-override-locked="${nestedOverride?.lockedValue}"
+                                                    th:data-override-id="${nestedOverride?.id}"
+                                                    onclick="openOverrideModal(this)">
+                                                <i class="bi bi-sliders"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </th:block>
+                            </th:block>
+                        </th:block>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Overrides Summary -->
+    <div class="card" th:if="${overrides != null && !overrides.isEmpty()}">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Active Overrides</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Parameter Path</th>
+                            <th>Locked Value</th>
+                            <th>Enum Override</th>
+                            <th>Description Override</th>
+                            <th>Example Override</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="override : ${overrides}">
+                            <td><code th:text="${override.parameterPath}">path</code></td>
+                            <td>
+                                <span th:if="${override.lockedValue != null && !override.lockedValue.isBlank()}"
+                                      class="badge bg-warning text-dark" th:text="${override.lockedValue}">value</span>
+                                <span th:unless="${override.lockedValue != null && !override.lockedValue.isBlank()}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <code th:if="${override.enumValues != null && !override.enumValues.isBlank()}"
+                                      th:text="${override.enumValues}" class="small">values</code>
+                                <span th:unless="${override.enumValues != null && !override.enumValues.isBlank()}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <span th:if="${override.humanReadableDescription != null && !override.humanReadableDescription.isBlank()}"
+                                      class="small" th:text="${#strings.abbreviate(override.humanReadableDescription, 50)}">desc</span>
+                                <span th:unless="${override.humanReadableDescription != null && !override.humanReadableDescription.isBlank()}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <code th:if="${override.example != null && !override.example.isBlank()}"
+                                      th:text="${override.example}" class="small">example</code>
+                                <span th:unless="${override.example != null && !override.example.isBlank()}" class="text-muted">-</span>
+                            </td>
+                            <td class="text-end">
+                                <form th:action="@{/categories/{catId}/tools/{toolId}/overrides/{overrideId}/delete(catId=${category.id}, toolId=${tool.get('toolId').asText()}, overrideId=${override.id})}"
+                                      method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Delete this override?');">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Override Modal -->
+    <div class="modal fade" id="overrideModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form th:action="@{/categories/{catId}/tools/{toolId}/overrides(catId=${category.id}, toolId=${tool?.get('toolId')?.asText()})}" method="post">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-sliders me-2"></i>Configure Override for: <span id="modalParamName">parameter</span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="parameterPath" id="modalParamPath">
+
+                        <div class="mb-3">
+                            <label class="form-label">Parameter Path</label>
+                            <input type="text" class="form-control" id="displayParamPath" disabled>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted">Original Enum Values</label>
+                            <input type="text" class="form-control" id="displayOriginalEnum" disabled>
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-lock me-1"></i>Locked Value
+                            </label>
+                            <input type="text" name="lockedValue" id="modalLockedValue" class="form-control"
+                                   placeholder="If set, parameter will be locked to this value">
+                            <small class="text-muted">When locked, users cannot change this parameter's value.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-list-check me-1"></i>Allowed Values Override
+                            </label>
+                            <!-- Checkbox container for enum values (shown when original has enum) -->
+                            <div id="enumCheckboxContainer" class="d-none">
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="selectAllEnums()">Select All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAllEnums()">Clear All</button>
+                                </div>
+                                <div id="enumCheckboxes" class="d-flex flex-wrap gap-2">
+                                    <!-- Checkboxes will be populated by JavaScript -->
+                                </div>
+                                <small class="text-muted d-block mt-2">Select which values are allowed for this category.</small>
+                            </div>
+                            <!-- Text input for manual entry (shown when no original enum) -->
+                            <div id="enumTextContainer">
+                                <input type="text" id="modalEnumValuesText" class="form-control"
+                                       placeholder="Comma-separated values (e.g., BATCH,SERVICE)">
+                                <small class="text-muted">Enter allowed values separated by commas.</small>
+                            </div>
+                            <!-- Hidden field to hold the final comma-separated value -->
+                            <input type="hidden" name="enumValues" id="modalEnumValues">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-chat-text me-1"></i>Description Override
+                            </label>
+                            <textarea name="humanReadableDescription" id="modalDescription" class="form-control" rows="2"
+                                      placeholder="Category-specific description for this parameter"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-code me-1"></i>Example Override
+                            </label>
+                            <input type="text" name="example" id="modalExample" class="form-control"
+                                   placeholder="Category-specific example value">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Save Override
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentEnumValues = [];
+
+        function openOverrideModal(button) {
+            const paramPath = button.dataset.paramPath;
+            const paramName = button.dataset.paramName;
+            const paramEnum = button.dataset.paramEnum || '';
+            const overrideDesc = button.dataset.overrideDesc || '';
+            const overrideExample = button.dataset.overrideExample || '';
+            const overrideEnum = button.dataset.overrideEnum || '';
+            const overrideLocked = button.dataset.overrideLocked || '';
+
+            document.getElementById('modalParamName').textContent = paramName;
+            document.getElementById('modalParamPath').value = paramPath;
+            document.getElementById('displayParamPath').value = paramPath;
+            document.getElementById('displayOriginalEnum').value = paramEnum || '(no enum defined)';
+            document.getElementById('modalLockedValue').value = overrideLocked;
+            document.getElementById('modalDescription').value = overrideDesc;
+            document.getElementById('modalExample').value = overrideExample;
+
+            // Handle enum values display
+            const enumCheckboxContainer = document.getElementById('enumCheckboxContainer');
+            const enumTextContainer = document.getElementById('enumTextContainer');
+            const enumCheckboxes = document.getElementById('enumCheckboxes');
+            const enumValuesText = document.getElementById('modalEnumValuesText');
+
+            if (paramEnum && paramEnum.trim() !== '') {
+                // Has original enum values - show checkboxes
+                currentEnumValues = paramEnum.split(',').map(v => v.trim());
+                const selectedValues = overrideEnum ? overrideEnum.split(',').map(v => v.trim()) : [];
+
+                enumCheckboxes.innerHTML = '';
+                currentEnumValues.forEach(value => {
+                    const isChecked = selectedValues.length === 0 || selectedValues.includes(value);
+                    const checkboxHtml = `
+                        <div class="form-check">
+                            <input class="form-check-input enum-checkbox" type="checkbox" value="${value}"
+                                   id="enum_${value}" ${isChecked ? 'checked' : ''} onchange="updateEnumHiddenField()">
+                            <label class="form-check-label" for="enum_${value}">
+                                <code>${value}</code>
+                            </label>
+                        </div>
+                    `;
+                    enumCheckboxes.innerHTML += checkboxHtml;
+                });
+
+                enumCheckboxContainer.classList.remove('d-none');
+                enumTextContainer.classList.add('d-none');
+                updateEnumHiddenField();
+            } else {
+                // No original enum - show text input
+                enumCheckboxContainer.classList.add('d-none');
+                enumTextContainer.classList.remove('d-none');
+                enumValuesText.value = overrideEnum;
+                currentEnumValues = [];
+            }
+        }
+
+        function updateEnumHiddenField() {
+            const checkboxes = document.querySelectorAll('.enum-checkbox:checked');
+            const values = Array.from(checkboxes).map(cb => cb.value);
+            document.getElementById('modalEnumValues').value = values.join(',');
+        }
+
+        function selectAllEnums() {
+            document.querySelectorAll('.enum-checkbox').forEach(cb => cb.checked = true);
+            updateEnumHiddenField();
+        }
+
+        function clearAllEnums() {
+            document.querySelectorAll('.enum-checkbox').forEach(cb => cb.checked = false);
+            updateEnumHiddenField();
+        }
+
+        // Update hidden field from text input before form submission
+        document.getElementById('overrideModal').addEventListener('shown.bs.modal', function() {
+            // Reset form state when modal opens
+        });
+
+        // Handle form submission to sync text input to hidden field if needed
+        document.querySelector('#overrideModal form').addEventListener('submit', function(e) {
+            const enumTextContainer = document.getElementById('enumTextContainer');
+            if (!enumTextContainer.classList.contains('d-none')) {
+                // Text input mode - copy value to hidden field
+                document.getElementById('modalEnumValues').value = document.getElementById('modalEnumValuesText').value;
+            }
+        });
+    </script>
+</th:block>
+</html>

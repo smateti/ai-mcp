@@ -15,7 +15,7 @@ spring:
       file-size-threshold: 2MB
   # H2 Database Configuration
   datasource:
-    url: jdbc:h2:file:d:/apps/ws/ws8/data/naag-admin-db;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:./data/naag-admin-db;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -51,7 +51,7 @@ naag:
   # Setup data initialization
   setup:
     enabled: false  # Set to true to auto-upload documents and register APIs on startup
-    documents-path: d:/apps/ws/ws8/setup-data/documents
+    documents-path: ./setup-data/documents
   # Elasticsearch Audit Trail Configuration
   #
   # When enabled, category-admin syncs audit data from H2 to Elasticsearch:

@@ -111,6 +111,10 @@
                                 <code th:text="${tool.serviceUrl}" class="text-muted small">URL</code>
                             </td>
                             <td class="text-end">
+                                <a th:href="@{/categories/{catId}/tools/{toolId}/overrides(catId=${category.id}, toolId=${tool.id})}"
+                                   class="btn btn-sm btn-outline-primary me-1" title="Parameter Overrides">
+                                    <i class="bi bi-sliders"></i>
+                                </a>
                                 <form th:action="@{/categories/{catId}/tools/{toolId}/remove(catId=${category.id}, toolId=${tool.id})}"
                                       method="post" class="d-inline">
                                     <button type="submit" class="btn btn-sm btn-outline-danger"

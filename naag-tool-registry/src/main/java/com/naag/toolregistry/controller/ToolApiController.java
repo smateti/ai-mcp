@@ -1,6 +1,8 @@
 package com.naag.toolregistry.controller;
 
+import com.naag.toolregistry.dto.ParameterUpdateRequest;
 import com.naag.toolregistry.dto.ParsedToolInfo;
+import com.naag.toolregistry.dto.ResponseUpdateRequest;
 import com.naag.toolregistry.dto.ToolRegistrationRequest;
 import com.naag.toolregistry.entity.ToolDefinition;
 import com.naag.toolregistry.service.ToolRegistrationService;
@@ -218,6 +220,126 @@ public class ToolApiController {
             String humanReadableDescription,
             String categoryId
     ) {}
+
+    /**
+     * Update a tool by toolId (string identifier).
+     */
+    @PutMapping("/by-tool-id/{toolId}")
+    public ResponseEntity<?> updateToolByToolId(@PathVariable String toolId, @RequestBody ToolUpdateRequest request) {
+        try {
+            ToolDefinition tool = toolRegistrationService.updateToolByToolId(toolId, request);
+            return ResponseEntity.ok(tool);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Update a parameter's human-readable description.
+     */
+    @PutMapping("/{toolId}/parameters/{parameterId}/description")
+    public ResponseEntity<?> updateParameterDescription(
+            @PathVariable String toolId,
+            @PathVariable Long parameterId,
+            @RequestBody ParameterUpdateRequest request) {
+        try {
+            toolRegistrationService.updateParameterHumanDescription(parameterId, request.humanReadableDescription());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Update a parameter's example value.
+     */
+    @PutMapping("/{toolId}/parameters/{parameterId}/example")
+    public ResponseEntity<?> updateParameterExample(
+            @PathVariable String toolId,
+            @PathVariable Long parameterId,
+            @RequestBody ParameterUpdateRequest request) {
+        try {
+            toolRegistrationService.updateParameterExample(parameterId, request.example());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Update a parameter's enum values.
+     */
+    @PutMapping("/{toolId}/parameters/{parameterId}/enum")
+    public ResponseEntity<?> updateParameterEnumValues(
+            @PathVariable String toolId,
+            @PathVariable Long parameterId,
+            @RequestBody ParameterUpdateRequest request) {
+        try {
+            toolRegistrationService.updateParameterEnumValues(parameterId, request.enumValues());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Full parameter update - description, example, and enum values.
+     */
+    @PutMapping("/{toolId}/parameters/{parameterId}")
+    public ResponseEntity<?> updateParameter(
+            @PathVariable String toolId,
+            @PathVariable Long parameterId,
+            @RequestBody ParameterUpdateRequest request) {
+        try {
+            toolRegistrationService.updateParameter(parameterId, request);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Update a response's human-readable description.
+     */
+    @PutMapping("/{toolId}/responses/{responseId}/description")
+    public ResponseEntity<?> updateResponseDescription(
+            @PathVariable String toolId,
+            @PathVariable Long responseId,
+            @RequestBody ResponseUpdateRequest request) {
+        try {
+            toolRegistrationService.updateResponseHumanDescription(responseId, request.humanReadableDescription());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Add test response parameters to a tool for testing nested display.
+     */
+    @PostMapping("/{toolId}/test-response-params")
+    public ResponseEntity<?> addTestResponseParams(@PathVariable String toolId) {
+        try {
+            toolRegistrationService.addTestResponseParameters(toolId);
+            return ResponseEntity.ok(Map.of("message", "Test response parameters added to " + toolId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     @GetMapping("/openapi/paths")
     public ResponseEntity<Map<String, Object>> getOpenApiPaths(@RequestParam String openApiUrl) {
