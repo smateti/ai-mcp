@@ -27,6 +27,14 @@ public class RagMetrics {
     private final Counter documentIngestCounter;
     private final Counter chunkCreatedCounter;
 
+    // CRAG Metrics
+    private final Timer cragQueryTimer;
+    private final Counter cragCorrectCounter;
+    private final Counter cragAmbiguousCounter;
+    private final Counter cragIncorrectCounter;
+    private final Counter cragQueryExpansionCounter;
+    private final Counter cragRetryCounter;
+
     // Gauges (tracked separately)
     private volatile long lastEmbeddingTimeMs = 0;
     private volatile long lastVectorSearchTimeMs = 0;
@@ -91,6 +99,37 @@ public class RagMetrics {
                 .tags("operation", "ingest")
                 .register(registry);
 
+        // CRAG Metrics
+        this.cragQueryTimer = Timer.builder("rag.crag.query.duration")
+                .description("Time for CRAG query processing")
+                .tags("operation", "crag")
+                .register(registry);
+
+        this.cragCorrectCounter = Counter.builder("rag.crag.confidence.total")
+                .description("Number of CRAG queries with CORRECT confidence")
+                .tags("category", "correct")
+                .register(registry);
+
+        this.cragAmbiguousCounter = Counter.builder("rag.crag.confidence.total")
+                .description("Number of CRAG queries with AMBIGUOUS confidence")
+                .tags("category", "ambiguous")
+                .register(registry);
+
+        this.cragIncorrectCounter = Counter.builder("rag.crag.confidence.total")
+                .description("Number of CRAG queries with INCORRECT confidence")
+                .tags("category", "incorrect")
+                .register(registry);
+
+        this.cragQueryExpansionCounter = Counter.builder("rag.crag.query.expansion")
+                .description("Number of query expansions performed")
+                .tags("strategy", "expansion")
+                .register(registry);
+
+        this.cragRetryCounter = Counter.builder("rag.crag.retries")
+                .description("Number of CRAG retrieval retries")
+                .tags("operation", "retry")
+                .register(registry);
+
         // Gauges for last operation times (for real-time monitoring)
         Gauge.builder("rag.last.embedding.time.ms", this, RagMetrics::getLastEmbeddingTimeMs)
                 .description("Last embedding generation time in milliseconds")
@@ -150,6 +189,25 @@ public class RagMetrics {
 
     public void recordIngestTime(long durationMs) {
         documentIngestTimer.record(durationMs, TimeUnit.MILLISECONDS);
+    }
+
+    // CRAG metrics recording
+    public void recordCragQuery(long durationMs, String category, int retries, boolean usedExpansion) {
+        cragQueryTimer.record(durationMs, TimeUnit.MILLISECONDS);
+
+        switch (category) {
+            case "CORRECT" -> cragCorrectCounter.increment();
+            case "AMBIGUOUS" -> cragAmbiguousCounter.increment();
+            case "INCORRECT" -> cragIncorrectCounter.increment();
+        }
+
+        if (retries > 0) {
+            cragRetryCounter.increment(retries);
+        }
+
+        if (usedExpansion) {
+            cragQueryExpansionCounter.increment();
+        }
     }
 
     // Getters for gauges

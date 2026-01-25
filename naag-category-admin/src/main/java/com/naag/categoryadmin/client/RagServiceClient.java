@@ -241,6 +241,45 @@ public class RagServiceClient {
         }
     }
 
+    public String findUploadIdByDocId(String docId) {
+        try {
+            JsonNode uploads = getDocumentUploads(null);
+            if (uploads != null && uploads.isArray()) {
+                for (JsonNode upload : uploads) {
+                    if (upload.has("docId") && docId.equals(upload.get("docId").asText())) {
+                        return upload.get("id").asText();
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("Error finding upload by docId {}", docId, e);
+            return null;
+        }
+    }
+
+    public JsonNode getDocumentInfo(String docId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/rag/documents/" + docId))
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to get document info for {}: HTTP {}", docId, response.statusCode());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("Error fetching document info for {}", docId, e);
+            return null;
+        }
+    }
+
     public JsonNode getUploadQAPairs(String uploadId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -428,6 +467,235 @@ public class RagServiceClient {
             log.warn("Could not get upload counts by status", e);
         }
         return counts;
+    }
+
+    /**
+     * Get all documents from RAG (Qdrant), including those not tracked in uploads.
+     * Returns a list of document info with docId, chunkCount, and title.
+     */
+    public JsonNode getAllRagDocuments() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/rag/documents"))
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            }
+        } catch (Exception e) {
+            log.warn("Could not get RAG documents", e);
+        }
+        return objectMapper.createArrayNode();
+    }
+
+    /**
+     * Get all documents merged: RAG documents + upload metadata.
+     * This provides a complete view of all documents in the knowledge base.
+     */
+    public JsonNode getMergedDocuments(String categoryFilter) {
+        try {
+            // Get all RAG documents
+            JsonNode ragDocs = getAllRagDocuments();
+
+            // Get all uploads for metadata
+            JsonNode uploads = getDocumentUploads(null);
+
+            // Build a map of docId -> upload info
+            java.util.Map<String, JsonNode> uploadMap = new java.util.HashMap<>();
+            if (uploads != null && uploads.isArray()) {
+                for (JsonNode upload : uploads) {
+                    if (upload.has("docId")) {
+                        uploadMap.put(upload.get("docId").asText(), upload);
+                    }
+                }
+            }
+
+            // Merge: for each RAG doc, add upload metadata if available
+            var arrayNode = objectMapper.createArrayNode();
+            if (ragDocs != null && ragDocs.isArray()) {
+                for (JsonNode ragDoc : ragDocs) {
+                    String docId = ragDoc.has("docId") ? ragDoc.get("docId").asText() : "";
+
+                    var merged = objectMapper.createObjectNode();
+                    merged.put("docId", docId);
+                    merged.put("chunkCount", ragDoc.has("chunkCount") ? ragDoc.get("chunkCount").asInt() : 0);
+                    merged.put("title", ragDoc.has("title") ? ragDoc.get("title").asText() : docId);
+                    merged.put("inRag", true);
+
+                    // Add upload metadata if exists
+                    JsonNode upload = uploadMap.get(docId);
+                    if (upload != null) {
+                        merged.put("hasUploadRecord", true);
+                        merged.put("uploadId", upload.has("id") ? upload.get("id").asText() : "");
+                        merged.put("categoryId", upload.has("categoryId") ? upload.get("categoryId").asText() : "");
+                        merged.put("status", upload.has("status") ? upload.get("status").asText() : "MOVED_TO_RAG");
+                        merged.put("createdAt", upload.has("createdAt") ? upload.get("createdAt").asText() : "");
+                        merged.put("questionsGenerated", upload.has("questionsGenerated") ? upload.get("questionsGenerated").asInt() : 0);
+                        merged.put("questionsValidated", upload.has("questionsValidated") ? upload.get("questionsValidated").asInt() : 0);
+                    } else {
+                        merged.put("hasUploadRecord", false);
+                        merged.put("uploadId", "");
+                        merged.put("categoryId", "");
+                        merged.put("status", "DIRECT_INGEST");
+                        merged.put("createdAt", "");
+                        merged.put("questionsGenerated", 0);
+                        merged.put("questionsValidated", 0);
+                    }
+
+                    // Apply category filter if specified
+                    if (categoryFilter == null || categoryFilter.isBlank()) {
+                        arrayNode.add(merged);
+                    } else {
+                        String docCategoryId = merged.get("categoryId").asText();
+                        if (categoryFilter.equals(docCategoryId)) {
+                            arrayNode.add(merged);
+                        }
+                    }
+                }
+            }
+
+            return arrayNode;
+        } catch (Exception e) {
+            log.warn("Could not get merged documents", e);
+            return objectMapper.createArrayNode();
+        }
+    }
+
+    /**
+     * Generate additional Q&A pairs for an existing document.
+     */
+    public JsonNode generateMoreQA(String uploadId, int fineGrainCount, int summaryCount) {
+        try {
+            Map<String, Object> body = Map.of(
+                    "fineGrainCount", fineGrainCount,
+                    "summaryCount", summaryCount
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/documents/uploads/" + uploadId + "/generate-more-qa"))
+                    .timeout(Duration.ofSeconds(120))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to generate more Q&A: HTTP {} - {}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to generate Q&A: " + extractErrorMessage(response.body()));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error generating more Q&A for upload {}", uploadId, e);
+            throw new RuntimeException("Error generating Q&A: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Document-scoped chat - ask questions about a specific document.
+     */
+    public JsonNode documentChat(String uploadId, String question) {
+        try {
+            Map<String, Object> body = Map.of("question", question);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/documents/uploads/" + uploadId + "/chat"))
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to chat: HTTP {} - {}", response.statusCode(), response.body());
+                throw new RuntimeException("Chat failed: " + extractErrorMessage(response.body()));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error in document chat for upload {}", uploadId, e);
+            throw new RuntimeException("Chat error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get the streaming chat endpoint URL for a document.
+     */
+    public String getDocumentChatStreamEndpoint(String uploadId) {
+        return baseUrl + "/api/documents/uploads/" + uploadId + "/chat/stream";
+    }
+
+    /**
+     * Add a Q&A pair to FAQ.
+     */
+    public JsonNode addQAToFaq(String uploadId, Long qaId) {
+        try {
+            Map<String, Object> body = Map.of(
+                    "qaIds", List.of(qaId),
+                    "selected", true
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/faq/review/" + uploadId + "/select"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to add Q&A to FAQ: HTTP {} - {}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to add to FAQ: " + extractErrorMessage(response.body()));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error adding Q&A {} to FAQ", qaId, e);
+            throw new RuntimeException("Error adding to FAQ: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Approve selected FAQs and push to Qdrant.
+     */
+    public JsonNode approveSelectedFaqs(String uploadId, String approvedBy) {
+        try {
+            Map<String, Object> body = Map.of("approvedBy", approvedBy != null ? approvedBy : "admin");
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/faq/review/" + uploadId + "/approve"))
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to approve FAQs: HTTP {} - {}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to approve FAQs: " + extractErrorMessage(response.body()));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error approving FAQs for upload {}", uploadId, e);
+            throw new RuntimeException("Error approving FAQs: " + e.getMessage(), e);
+        }
     }
 
     /**

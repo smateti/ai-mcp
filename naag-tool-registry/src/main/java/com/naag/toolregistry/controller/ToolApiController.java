@@ -197,6 +197,16 @@ public class ToolApiController {
         }
     }
 
+    @DeleteMapping("/by-tool-id/{toolId}")
+    public ResponseEntity<Void> deleteToolByToolId(@PathVariable String toolId) {
+        try {
+            toolRegistrationService.deleteToolByToolId(toolId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     /**
      * Update a tool's description and/or category.
      */

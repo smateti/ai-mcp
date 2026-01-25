@@ -73,7 +73,7 @@ public class SetupDataInitializer {
     }
 
     private void uploadDocuments() {
-        log.info("Uploading sample documents...");
+        log.info("Ingesting sample documents directly to RAG...");
 
         Map<String, String> documentMappings = Map.of(
             "service-development-spring-boot-guide.md", CategoryService.CATEGORY_SERVICE_DEV,
@@ -105,15 +105,20 @@ public class SetupDataInitializer {
                     String docId = fileName.replace(".md", "");
                     String title = formatTitle(fileName);
 
-                    log.info("Uploading document: {} ({} chars) to category: {}", docId, content.length(), categoryId);
+                    log.info("Ingesting document directly: {} ({} chars) to category: {}", docId, content.length(), categoryId);
 
-                    JsonNode result = ragServiceClient.uploadDocumentWithPreview(docId, title, content, categoryId);
-                    log.info("Document upload initiated: {} -> {}", docId, result);
+                    // Use direct ingest endpoint instead of preview flow - documents go directly to RAG
+                    Map<String, Object> metadata = new HashMap<>();
+                    metadata.put("title", title);
+                    metadata.put("source", "setup-initializer");
+
+                    JsonNode result = ragServiceClient.ingestDocument(docId, content, categoryId, metadata);
+                    log.info("Document ingested to RAG: {} -> {}", docId, result);
                 } else {
                     log.warn("Document file not found: {}", filePath);
                 }
             } catch (Exception e) {
-                log.error("Failed to upload document: {}", fileName, e);
+                log.error("Failed to ingest document: {}", fileName, e);
             }
         }
     }

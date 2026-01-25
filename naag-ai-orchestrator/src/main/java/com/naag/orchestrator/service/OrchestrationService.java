@@ -167,6 +167,11 @@ public class OrchestrationService {
                 log.info("Injected category={} into RAG query parameters", request.getCategoryId());
             }
 
+            // Apply locked parameter values from category overrides
+            if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
+                applyLockedParameters(request.getCategoryId(), toolName, parameters);
+            }
+
             // Execute the tool via MCP gateway
             JsonNode toolResult = mcpGatewayClient.executeTool(
                     toolName,
@@ -488,5 +493,68 @@ public class OrchestrationService {
             }
         }
         return sb.toString().trim();
+    }
+
+    /**
+     * Apply locked parameter values from category overrides.
+     * If a parameter is locked in the category, its value is forced regardless of user input.
+     */
+    private void applyLockedParameters(String categoryId, String toolName, Map<String, Object> parameters) {
+        try {
+            JsonNode mergedTool = toolRegistryClient.getMergedToolByName(categoryId, toolName);
+            if (mergedTool == null) {
+                return;
+            }
+
+            JsonNode params = mergedTool.get("parameters");
+            if (params == null || !params.isArray()) {
+                return;
+            }
+
+            for (JsonNode param : params) {
+                if (param.has("locked") && param.get("locked").asBoolean()) {
+                    String paramName = param.get("name").asText();
+                    String lockedValue = param.has("lockedValue") ? param.get("lockedValue").asText() : null;
+
+                    if (lockedValue != null && !lockedValue.isEmpty()) {
+                        Object previousValue = parameters.get(paramName);
+                        parameters.put(paramName, lockedValue);
+                        log.info("Applied locked parameter: {}={} (was: {}) for tool {} in category {}",
+                                paramName, lockedValue, previousValue, toolName, categoryId);
+                    }
+                }
+
+                // Also check nested parameters
+                applyLockedNestedParameters(param, parameters);
+            }
+        } catch (Exception e) {
+            log.warn("Could not apply locked parameters for tool {} in category {}: {}",
+                    toolName, categoryId, e.getMessage());
+        }
+    }
+
+    /**
+     * Recursively apply locked values for nested parameters.
+     */
+    private void applyLockedNestedParameters(JsonNode param, Map<String, Object> parameters) {
+        JsonNode nestedParams = param.get("nestedParameters");
+        if (nestedParams == null || !nestedParams.isArray()) {
+            return;
+        }
+
+        for (JsonNode nested : nestedParams) {
+            if (nested.has("locked") && nested.get("locked").asBoolean()) {
+                String paramName = nested.get("name").asText();
+                String lockedValue = nested.has("lockedValue") ? nested.get("lockedValue").asText() : null;
+
+                if (lockedValue != null && !lockedValue.isEmpty()) {
+                    parameters.put(paramName, lockedValue);
+                    log.info("Applied locked nested parameter: {}={}", paramName, lockedValue);
+                }
+            }
+
+            // Recurse for deeper nesting
+            applyLockedNestedParameters(nested, parameters);
+        }
     }
 }

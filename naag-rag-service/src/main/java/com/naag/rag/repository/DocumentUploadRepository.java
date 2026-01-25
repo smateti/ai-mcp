@@ -19,5 +19,11 @@ public interface DocumentUploadRepository extends JpaRepository<DocumentUpload, 
 
     Optional<DocumentUpload> findByDocId(String docId);
 
+    Optional<DocumentUpload> findByDocIdAndStatusNot(String docId, ProcessingStatus status);
+
     List<DocumentUpload> findAllByOrderByCreatedAtDesc();
+
+    List<DocumentUpload> findAllByStatusNotOrderByCreatedAtDesc(ProcessingStatus status);
+
+    List<DocumentUpload> findAllByStatus(ProcessingStatus status);
 }

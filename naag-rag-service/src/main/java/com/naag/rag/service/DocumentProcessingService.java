@@ -45,6 +45,8 @@ public class DocumentProcessingService {
     private final SseNotificationService sseService;
     private final ObjectMapper objectMapper;
     private final FaqCacheService faqCacheService;
+    private final LinkExtractionService linkExtractionService;
+    private final RagService ragService;
 
     @Value("${naag.rag.chunking.maxChars:1200}")
     private int maxChars;
@@ -88,6 +90,12 @@ public class DocumentProcessingService {
 
             upload.setStatus(ProcessingStatus.GENERATING_QA);
             upload.setProcessingStartedAt(LocalDateTime.now());
+
+            // Extract links from document content
+            String extractedLinks = linkExtractionService.extractLinksAsJson(upload.getOriginalContent());
+            upload.setExtractedLinks(extractedLinks);
+            log.info("Extracted links from document {}: {}", uploadId, extractedLinks);
+
             uploadRepository.save(upload);
 
             sseService.notifyUploadProgress(uploadId, UploadEvent.processing(
@@ -150,16 +158,18 @@ public class DocumentProcessingService {
         } catch (Exception e) {
             log.error("Error processing document upload: {}", uploadId, e);
 
+            String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+
             DocumentUpload upload = uploadRepository.findById(uploadId).orElse(null);
             if (upload != null) {
                 upload.setStatus(ProcessingStatus.FAILED);
-                upload.setErrorMessage(e.getMessage());
+                upload.setErrorMessage(errorMsg);
                 upload.setProcessingCompletedAt(LocalDateTime.now());
                 uploadRepository.save(upload);
             }
 
             sseService.notifyUploadProgress(uploadId, UploadEvent.error(
-                    uploadId, "Processing failed: " + e.getMessage()));
+                    uploadId, "Processing failed: " + errorMsg));
         }
 
         return CompletableFuture.completedFuture(null);
@@ -234,6 +244,60 @@ public class DocumentProcessingService {
                 [{"question": "What is the main purpose?", "answer": "The purpose is..."},{"question": "What are the key themes?", "answer": "The themes are..."}]
 
                 Generate exactly %d pairs now:""".formatted(count, truncateForContext(content), count);
+    }
+
+    private String buildAdditionalFineGrainPrompt(String content, int count, List<String> existingQuestions) {
+        String existingList = existingQuestions.isEmpty() ? "None" :
+                existingQuestions.stream()
+                        .limit(20) // Limit to avoid prompt being too long
+                        .map(q -> "- " + q)
+                        .collect(Collectors.joining("\n"));
+
+        return """
+                Generate %d NEW detailed Q&A pairs from this document. Each Q&A should test specific facts, numbers, or details.
+
+                CRITICAL: You MUST generate DIFFERENT questions from these existing ones:
+                %s
+
+                Document:
+                %s
+
+                IMPORTANT RULES:
+                1. Do NOT repeat or rephrase any existing question above
+                2. Focus on different aspects, facts, or details not yet covered
+                3. Respond with ONLY a JSON array. No explanation, no markdown, just the array starting with [ and ending with ].
+
+                Example format:
+                [{"question": "What is X?", "answer": "X is..."},{"question": "How many Y?", "answer": "There are..."}]
+
+                Generate exactly %d NEW and UNIQUE pairs now:""".formatted(count, existingList, truncateForContext(content), count);
+    }
+
+    private String buildAdditionalSummaryPrompt(String content, int count, List<String> existingQuestions) {
+        String existingList = existingQuestions.isEmpty() ? "None" :
+                existingQuestions.stream()
+                        .limit(20) // Limit to avoid prompt being too long
+                        .map(q -> "- " + q)
+                        .collect(Collectors.joining("\n"));
+
+        return """
+                Generate %d NEW high-level Q&A pairs from this document. Each Q&A should test understanding of main concepts and themes.
+
+                CRITICAL: You MUST generate DIFFERENT questions from these existing ones:
+                %s
+
+                Document:
+                %s
+
+                IMPORTANT RULES:
+                1. Do NOT repeat or rephrase any existing question above
+                2. Focus on different concepts, themes, or perspectives not yet covered
+                3. Respond with ONLY a JSON array. No explanation, no markdown, just the array starting with [ and ending with ].
+
+                Example format:
+                [{"question": "What is the main purpose?", "answer": "The purpose is..."},{"question": "What are the key themes?", "answer": "The themes are..."}]
+
+                Generate exactly %d NEW and UNIQUE pairs now:""".formatted(count, existingList, truncateForContext(content), count);
     }
 
     private String truncateForContext(String content) {
@@ -469,12 +533,13 @@ public class DocumentProcessingService {
 
         } catch (Exception e) {
             log.error("Failed to move document to RAG: {}", uploadId, e);
+            String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             upload.setStatus(ProcessingStatus.FAILED);
-            upload.setErrorMessage("Failed to move to RAG: " + e.getMessage());
+            upload.setErrorMessage("Failed to move to RAG: " + errorMsg);
             uploadRepository.save(upload);
 
             sseService.notifyUploadProgress(uploadId, UploadEvent.error(
-                    uploadId, "Failed to move to RAG: " + e.getMessage()));
+                    uploadId, "Failed to move to RAG: " + errorMsg));
 
             throw new RuntimeException("Failed to move to RAG", e);
         }
@@ -491,11 +556,10 @@ public class DocumentProcessingService {
             // Delete temp collection
             tempCollectionService.deleteTempCollection(uploadId);
 
-            // Mark as deleted
-            upload.setStatus(ProcessingStatus.DELETED);
-            uploadRepository.save(upload);
+            // Hard delete the upload record
+            uploadRepository.delete(upload);
 
-            log.info("Deleted upload and associated data: {}", uploadId);
+            log.info("Hard deleted upload and associated data: {}", uploadId);
         }
     }
 
@@ -520,5 +584,170 @@ public class DocumentProcessingService {
 
         // Start processing again
         processDocumentAsync(uploadId);
+    }
+
+    /**
+     * Generate additional Q&A pairs for an existing document.
+     * Can be called even after the document has been moved to RAG.
+     * Excludes existing questions to avoid duplicates.
+     */
+    @Transactional
+    public List<GeneratedQA> generateAdditionalQA(String uploadId, int fineGrainCount, int summaryCount) {
+        DocumentUpload upload = uploadRepository.findById(uploadId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload not found: " + uploadId));
+
+        List<GeneratedQA> newQA = new ArrayList<>();
+        String content = upload.getOriginalContent();
+
+        // Get existing questions to avoid duplicates
+        List<GeneratedQA> existingQA = qaRepository.findByUploadIdOrderByIdAsc(uploadId);
+        List<String> existingQuestions = existingQA.stream()
+                .map(GeneratedQA::getQuestion)
+                .toList();
+
+        // Generate fine-grain questions
+        if (fineGrainCount > 0) {
+            log.info("Generating {} additional fine-grain Q&A pairs for upload {}", fineGrainCount, uploadId);
+            String prompt = buildAdditionalFineGrainPrompt(content, fineGrainCount, existingQuestions);
+            try {
+                String response = chatClient.chatOnce(prompt, 0.5, 2048); // Higher temperature for variety
+                List<GeneratedQA> fineGrainQA = parseQAFromLLM(response, uploadId, QuestionType.FINE_GRAIN);
+                newQA.addAll(fineGrainQA);
+            } catch (Exception e) {
+                log.error("Failed to generate additional fine-grain Q&A: {}", e.getMessage());
+            }
+        }
+
+        // Generate summary questions
+        if (summaryCount > 0) {
+            log.info("Generating {} additional summary Q&A pairs for upload {}", summaryCount, uploadId);
+            String prompt = buildAdditionalSummaryPrompt(content, summaryCount, existingQuestions);
+            try {
+                String response = chatClient.chatOnce(prompt, 0.5, 2048); // Higher temperature for variety
+                List<GeneratedQA> summaryQA = parseQAFromLLM(response, uploadId, QuestionType.SUMMARY);
+                newQA.addAll(summaryQA);
+            } catch (Exception e) {
+                log.error("Failed to generate additional summary Q&A: {}", e.getMessage());
+            }
+        }
+
+        // Save new Q&A pairs first
+        for (GeneratedQA qa : newQA) {
+            qa.setGeneratedAt(LocalDateTime.now());
+            qa.setValidationStatus(ValidationStatus.PENDING);
+            qaRepository.save(qa);
+        }
+
+        // Validate against appropriate collection based on document status
+        if (upload.getStatus() == ProcessingStatus.MOVED_TO_RAG) {
+            // Document is in main RAG - validate against main collection
+            validateQAPairsAgainstRag(newQA, upload.getCategoryId());
+        } else if (upload.getStatus() == ProcessingStatus.READY_FOR_REVIEW) {
+            // Document is still in temp collection - validate against temp
+            validateQAPairs(upload, newQA);
+        }
+        // For other statuses, leave as PENDING (no validation possible)
+
+        // Update upload counts
+        int validatedCount = (int) newQA.stream()
+                .filter(qa -> qa.getValidationStatus() != ValidationStatus.PENDING)
+                .count();
+        upload.setQuestionsGenerated(upload.getQuestionsGenerated() + newQA.size());
+        upload.setQuestionsValidated(upload.getQuestionsValidated() + validatedCount);
+        uploadRepository.save(upload);
+
+        log.info("Generated {} additional Q&A pairs for upload {}, validated {}", newQA.size(), uploadId, validatedCount);
+        return newQA;
+    }
+
+    /**
+     * Validate Q&A pairs against the main RAG collection.
+     * Used when generating additional Q&A for documents already moved to RAG.
+     */
+    private void validateQAPairsAgainstRag(List<GeneratedQA> qaList, String categoryId) {
+        for (GeneratedQA qa : qaList) {
+            try {
+                // Query the main RAG collection
+                String ragAnswer = ragService.ask(qa.getQuestion(), categoryId);
+                qa.setRagAnswer(ragAnswer);
+
+                // Calculate similarity score
+                double similarity = calculateAnswerSimilarity(qa.getExpectedAnswer(), ragAnswer);
+                qa.setSimilarityScore(similarity);
+
+                // Determine validation status
+                if (similarity >= 0.7) {
+                    qa.setValidationStatus(ValidationStatus.PASSED);
+                } else if (similarity >= 0.4) {
+                    qa.setValidationStatus(ValidationStatus.PENDING);
+                } else {
+                    qa.setValidationStatus(ValidationStatus.FAILED);
+                }
+
+                qa.setValidatedAt(LocalDateTime.now());
+                qaRepository.save(qa);
+
+                log.debug("Validated additional Q&A {}: score={}, status={}",
+                        qa.getId(), similarity, qa.getValidationStatus());
+
+            } catch (Exception e) {
+                log.error("Failed to validate additional Q&A {}: {}", qa.getId(), e.getMessage());
+                qa.setValidationStatus(ValidationStatus.FAILED);
+                qa.setValidatedAt(LocalDateTime.now());
+                qaRepository.save(qa);
+            }
+        }
+    }
+
+    /**
+     * Document-scoped chat - ask questions about a specific document only.
+     * Uses the document's original content as context.
+     */
+    public String documentScopedChat(String uploadId, String question) {
+        DocumentUpload upload = uploadRepository.findById(uploadId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload not found: " + uploadId));
+
+        String content = upload.getOriginalContent();
+        String truncatedContent = truncateForContext(content);
+
+        String prompt = buildDocumentChatPrompt(truncatedContent, question);
+
+        log.info("Document-scoped chat for upload {}: {}", uploadId, question);
+        return chatClient.chatOnce(prompt, 0.3, 1024);
+    }
+
+    /**
+     * Document-scoped streaming chat - ask questions about a specific document only.
+     * Streams the response token by token.
+     */
+    public void documentScopedChatStream(String uploadId, String question, java.util.function.Consumer<String> onToken) {
+        DocumentUpload upload = uploadRepository.findById(uploadId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload not found: " + uploadId));
+
+        String content = upload.getOriginalContent();
+        String truncatedContent = truncateForContext(content);
+
+        String prompt = buildDocumentChatPrompt(truncatedContent, question);
+
+        log.info("Document-scoped streaming chat for upload {}: {}", uploadId, question);
+        chatClient.chatStream(prompt, 0.3, 1024, onToken);
+    }
+
+    private String buildDocumentChatPrompt(String content, String question) {
+        return """
+                You are a helpful assistant answering questions based ONLY on the provided document content.
+
+                RULES:
+                1. ONLY use information that is EXPLICITLY stated in the document below.
+                2. Do NOT make up, infer, or extrapolate information that is not directly in the document.
+                3. If the document does not contain information to answer the question, say "I don't have information about that in this document."
+                4. Be concise and direct in your answers.
+
+                Document:
+                %s
+
+                Question: %s
+
+                Answer:""".formatted(content, question);
     }
 }

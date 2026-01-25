@@ -53,6 +53,12 @@ public class DocumentUpload {
 
     private LocalDateTime movedToRagAt;
 
+    @Lob
+    @Column(columnDefinition = "CLOB")
+    private String extractedLinks; // JSON array of extracted URLs from the document
+
+    private String sourceUrl; // Original URL if document was fetched from web
+
     public enum ProcessingStatus {
         PENDING,
         GENERATING_QA,

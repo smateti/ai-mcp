@@ -1,0 +1,16 @@
+com\example\servicedep\dto\ServiceDto.class
+com\example\servicedep\service\ApplicationService.class
+com\example\servicedep\ServiceDependencyApiApplication.class
+com\example\servicedep\dto\ApplicationServicesDto.class
+com\example\servicedep\repository\OperationRepository.class
+com\example\servicedep\entity\Service.class
+com\example\servicedep\dto\OperationDto.class
+com\example\servicedep\entity\Application.class
+com\example\servicedep\repository\ServiceRepository.class
+com\example\servicedep\controller\ApplicationController.class
+com\example\servicedep\entity\OperationDependency.class
+com\example\servicedep\entity\Operation.class
+com\example\servicedep\dto\ApplicationDto.class
+com\example\servicedep\repository\ApplicationRepository.class
+com\example\servicedep\dto\OperationDependencyDto.class
+com\example\servicedep\service\MappingService.class

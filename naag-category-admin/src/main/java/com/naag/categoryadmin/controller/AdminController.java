@@ -892,9 +892,12 @@ public class AdminController {
 
     // RAG Document Management
     @GetMapping("/documents")
-    public String listDocuments(@RequestParam(required = false) String status, Model model) {
+    public String listDocuments(@RequestParam(required = false) String status,
+                                @RequestParam(required = false) String category,
+                                Model model) {
         model.addAttribute("activePage", "documents");
         model.addAttribute("currentStatus", status);
+        model.addAttribute("currentCategory", category);
 
         // Build category lookup map for displaying names
         List<Category> categories = categoryService.getAllCategories();
@@ -904,10 +907,27 @@ public class AdminController {
 
         try {
             model.addAttribute("stats", ragServiceClient.getStats());
-            model.addAttribute("uploads", ragServiceClient.getDocumentUploads(status));
+            // Use merged documents to show all RAG docs including directly ingested ones
+            var allDocs = ragServiceClient.getMergedDocuments(category);
+            // Convert JsonNode array to List for Thymeleaf compatibility
+            var docsList = new java.util.ArrayList<com.fasterxml.jackson.databind.JsonNode>();
+            if (allDocs != null && allDocs.isArray()) {
+                for (var doc : allDocs) {
+                    docsList.add(doc);
+                }
+            }
+            // Filter by status if specified
+            if (status != null && !status.isBlank()) {
+                docsList.removeIf(doc -> {
+                    String docStatus = doc.has("status") ? doc.get("status").asText() : "";
+                    return !status.equals(docStatus);
+                });
+            }
+            model.addAttribute("documents", docsList);
             model.addAttribute("sseEndpoint", ragServiceClient.getSseEndpoint());
         } catch (Exception e) {
             log.warn("Could not fetch RAG stats", e);
+            model.addAttribute("documents", java.util.Collections.emptyList());
         }
         return "documents/list";
     }
@@ -998,11 +1018,12 @@ public class AdminController {
     }
 
     @GetMapping("/documents/uploads/{uploadId}")
-    public String viewUploadDetails(@PathVariable String uploadId, Model model) {
+    public String viewUploadDetails(@PathVariable String uploadId, Model model, RedirectAttributes redirectAttributes) {
         model.addAttribute("activePage", "documents");
         try {
             var details = ragServiceClient.getUploadDetails(uploadId);
             if (details == null) {
+                redirectAttributes.addFlashAttribute("error", "Upload not found: " + uploadId);
                 return "redirect:/documents";
             }
             model.addAttribute("details", details);
@@ -1010,10 +1031,38 @@ public class AdminController {
             model.addAttribute("sseEndpoint", ragServiceClient.getUploadSseEndpoint(uploadId));
             model.addAttribute("categories", categoryService.getAllCategories());
         } catch (Exception e) {
-            log.error("Error fetching upload details", e);
-            model.addAttribute("error", "Failed to load upload details");
+            log.error("Error fetching upload details for {}", uploadId, e);
+            redirectAttributes.addFlashAttribute("error", "Failed to load upload details: " + e.getMessage());
+            return "redirect:/documents";
         }
         return "documents/preview";
+    }
+
+    @GetMapping("/documents/view/{docId}")
+    public String viewDocumentByDocId(@PathVariable String docId, Model model, RedirectAttributes redirectAttributes) {
+        model.addAttribute("activePage", "documents");
+
+        // First try to find the upload by docId
+        String uploadId = ragServiceClient.findUploadIdByDocId(docId);
+        if (uploadId != null) {
+            return "redirect:/documents/uploads/" + uploadId;
+        }
+
+        // If no upload found, show the RAG document info
+        try {
+            var docInfo = ragServiceClient.getDocumentInfo(docId);
+            if (docInfo != null) {
+                model.addAttribute("document", docInfo);
+                model.addAttribute("docId", docId);
+                model.addAttribute("categories", categoryService.getAllCategories());
+                return "documents/view";
+            }
+        } catch (Exception e) {
+            log.error("Error fetching document info for {}", docId, e);
+        }
+
+        redirectAttributes.addFlashAttribute("error", "Document not found: " + docId);
+        return "redirect:/documents";
     }
 
     @PostMapping("/documents/uploads/{uploadId}/approve")
@@ -1053,6 +1102,18 @@ public class AdminController {
         } catch (Exception e) {
             log.error("Error deleting upload", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete upload: " + e.getMessage());
+        }
+        return "redirect:/documents";
+    }
+
+    @PostMapping("/documents/delete/{docId}")
+    public String deleteRagDocument(@PathVariable String docId, RedirectAttributes redirectAttributes) {
+        try {
+            ragServiceClient.deleteDocument(docId);
+            redirectAttributes.addFlashAttribute("success", "Document '" + docId + "' deleted from RAG");
+        } catch (Exception e) {
+            log.error("Error deleting document from RAG: {}", docId, e);
+            redirectAttributes.addFlashAttribute("error", "Failed to delete document: " + e.getMessage());
         }
         return "redirect:/documents";
     }
@@ -1464,6 +1525,107 @@ public class AdminController {
         model.addAttribute("categoryAdminUrl", "http://localhost:8085");
         model.addAttribute("chatAppUrl", chatAppClient.getBaseUrl());
         return "user-questions";
+    }
+
+    // ==================== Document Features (Generate More Q&A, Chat, FAQ) ====================
+
+    /**
+     * Generate more Q&A pairs for a document.
+     */
+    @PostMapping("/documents/uploads/{uploadId}/generate-qa")
+    @ResponseBody
+    public Map<String, Object> generateMoreQA(
+            @PathVariable String uploadId,
+            @RequestParam(defaultValue = "3") int fineGrainCount,
+            @RequestParam(defaultValue = "2") int summaryCount) {
+        try {
+            var result = ragServiceClient.generateMoreQA(uploadId, fineGrainCount, summaryCount);
+            return Map.of(
+                    "success", true,
+                    "message", "Generated Q&A pairs",
+                    "result", result
+            );
+        } catch (Exception e) {
+            log.error("Error generating more Q&A for upload: {}", uploadId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Document-scoped chat API endpoint.
+     */
+    @PostMapping("/documents/uploads/{uploadId}/chat")
+    @ResponseBody
+    public Map<String, Object> documentChat(
+            @PathVariable String uploadId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String question = request.get("question");
+            if (question == null || question.isBlank()) {
+                return Map.of("success", false, "error", "Question is required");
+            }
+            var result = ragServiceClient.documentChat(uploadId, question);
+            return Map.of(
+                    "success", true,
+                    "answer", result.has("answer") ? result.get("answer").asText() : ""
+            );
+        } catch (Exception e) {
+            log.error("Error in document chat for upload: {}", uploadId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Add a Q&A pair to FAQ selection.
+     */
+    @PostMapping("/documents/uploads/{uploadId}/qa/{qaId}/select-faq")
+    @ResponseBody
+    public Map<String, Object> selectQAForFaq(
+            @PathVariable String uploadId,
+            @PathVariable Long qaId) {
+        try {
+            var result = ragServiceClient.addQAToFaq(uploadId, qaId);
+            return Map.of(
+                    "success", true,
+                    "message", "Q&A selected for FAQ"
+            );
+        } catch (Exception e) {
+            log.error("Error selecting Q&A {} for FAQ", qaId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Approve selected FAQs for a document.
+     */
+    @PostMapping("/documents/uploads/{uploadId}/approve-faqs")
+    @ResponseBody
+    public Map<String, Object> approveSelectedFaqs(
+            @PathVariable String uploadId,
+            @RequestParam(required = false) String approvedBy) {
+        try {
+            var result = ragServiceClient.approveSelectedFaqs(uploadId, approvedBy);
+            return Map.of(
+                    "success", true,
+                    "message", "FAQs approved",
+                    "result", result
+            );
+        } catch (Exception e) {
+            log.error("Error approving FAQs for upload: {}", uploadId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
     }
 
 }

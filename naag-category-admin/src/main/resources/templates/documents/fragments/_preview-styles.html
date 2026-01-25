@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Preview Page Styles -->
+<th:block th:fragment="previewStyles">
+    <style>
+        .spinning {
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            max-width: 85%;
+            line-height: 1.5;
+        }
+        .chat-message.user {
+            background: var(--primary-color, #2C4667);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-message.assistant {
+            background: var(--bg-light, #f1f4f6);
+            color: var(--text-primary, #212529);
+            margin-right: auto;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-bottom-left-radius: 4px;
+        }
+        .chat-message.assistant.text-danger {
+            background: var(--danger-light, #f8d7da);
+            border-color: #f5c6cb;
+            color: #842029;
+        }
+        #chatMessages {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Q&A Table row coloring */
+        .qa-passed {
+            border-left: 3px solid var(--success-color, #198754);
+        }
+        .qa-failed {
+            border-left: 3px solid var(--danger-color, #dc3545);
+        }
+        .qa-pending {
+            border-left: 3px solid var(--warning-color, #ffc107);
+        }
+
+        /* Similarity score coloring */
+        .score-high {
+            color: var(--success-color, #198754);
+            font-weight: 600;
+        }
+        .score-medium {
+            color: var(--warning-color, #e5a020);
+            font-weight: 600;
+        }
+        .score-low {
+            color: var(--danger-color, #dc3545);
+            font-weight: 600;
+        }
+
+        /* Document info card styling */
+        .info-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary, #6c757d);
+            margin-bottom: 0.25rem;
+        }
+        .info-value {
+            font-weight: 500;
+            color: var(--text-primary, #212529);
+        }
+    </style>
+</th:block>
+
+</html>

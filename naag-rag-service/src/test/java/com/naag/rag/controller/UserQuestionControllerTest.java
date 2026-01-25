@@ -221,7 +221,7 @@ class UserQuestionControllerTest {
                     .frequency(5)
                     .build();
 
-            when(analyticsService.getFrequentlyAskedQuestions(any(), any(), any(), any()))
+            when(analyticsService.getFrequentlyAskedQuestions(any(), any(), any(), any(), any(), any()))
                     .thenReturn(new PageImpl<>(List.of(q1, q2)));
 
             // When/Then

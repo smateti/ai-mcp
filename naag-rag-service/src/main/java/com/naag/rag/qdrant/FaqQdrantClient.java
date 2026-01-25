@@ -261,6 +261,46 @@ public final class FaqQdrantClient {
     }
 
     /**
+     * Delete FAQ points by faqId (from payload).
+     * This is a fallback for FAQs that don't have qdrantPointId stored.
+     */
+    public void deleteFaqsByFaqId(String faqId) {
+        ensureCollectionExists();
+
+        try {
+            // Use scroll with filter to find points with this faqId
+            ObjectNode matchVal = Json.MAPPER.createObjectNode();
+            matchVal.put("value", faqId);
+
+            ObjectNode keyFilter = Json.MAPPER.createObjectNode();
+            keyFilter.put("key", "faqId");
+            keyFilter.set("match", matchVal);
+
+            ObjectNode filter = Json.MAPPER.createObjectNode();
+            filter.set("must", Json.MAPPER.createArrayNode().add(keyFilter));
+
+            ObjectNode body = Json.MAPPER.createObjectNode();
+            body.set("filter", filter);
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/collections/" + collection + "/points/delete?wait=true"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(Json.MAPPER.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> resp = Http.CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() / 100 != 2) {
+                throw new RuntimeException("Qdrant FAQ delete by faqId HTTP " + resp.statusCode() + ": " + resp.body());
+            }
+
+            log.info("Deleted FAQ points with faqId '{}' from collection '{}'", faqId, collection);
+        } catch (Exception e) {
+            throw new RuntimeException("Qdrant FAQ delete by faqId failed", e);
+        }
+    }
+
+    /**
      * Get collection statistics
      */
     public Map<String, Object> getCollectionStats() {

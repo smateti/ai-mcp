@@ -116,7 +116,7 @@
                             <td th:text="${upload.has('createdAt') && !upload.get('createdAt').isNull()} ? ${#strings.substring(upload.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
                             <td class="text-end">
                                 <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}"
-                                   class="btn btn-sm btn-outline-light">
+                                   class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-eye"></i>
                                 </a>
                             </td>

@@ -1,0 +1,16 @@
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\repository\ServiceRepository.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\entity\Service.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\entity\Operation.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\controller\ApplicationController.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\repository\ApplicationRepository.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\service\MappingService.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\repository\OperationRepository.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\dto\ApplicationDto.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\dto\ApplicationServicesDto.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\dto\ServiceDto.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\dto\OperationDto.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\entity\Application.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\dto\OperationDependencyDto.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\entity\OperationDependency.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\service\ApplicationService.java
+D:\apps\ws\ws8\service-dependency-api\src\main\java\com\example\servicedep\ServiceDependencyApiApplication.java

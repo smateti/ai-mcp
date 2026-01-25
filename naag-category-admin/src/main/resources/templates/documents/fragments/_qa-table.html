@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Q&A Pairs Table with FAQ Selection -->
+<th:block th:fragment="qaTable(qaPairs, status)">
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>Generated Q&A Pairs</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary" th:text="${qaPairs?.size() ?: 0} + ' pairs'">0 pairs</span>
+                <!-- Generate More Q&A Button -->
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#generateQAModal"
+                        th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
+                    <i class="bi bi-plus-circle me-1"></i>Generate More
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" th:if="${qaPairs != null && qaPairs.size() > 0}">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;" th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
+                                <input type="checkbox" id="selectAllFaq" class="form-check-input" title="Select all for FAQ">
+                            </th>
+                            <th style="width: 70px;">Type</th>
+                            <th style="width: 28%;">Question</th>
+                            <th style="width: 23%;">Expected Answer</th>
+                            <th style="width: 23%;">RAG Answer</th>
+                            <th style="width: 70px;">Score</th>
+                            <th style="width: 70px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="qa : ${qaPairs}">
+                            <td th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
+                                <input type="checkbox" class="form-check-input faq-checkbox"
+                                       th:data-qa-id="${qa.get('id')?.asLong()}"
+                                       th:checked="${qa.get('selectedForFaq')?.asBoolean() ?: false}">
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${qa.get('questionType')?.asText() == 'FINE_GRAIN'} ? 'bg-primary' : 'bg-info'"
+                                      th:text="${qa.get('questionType')?.asText() == 'FINE_GRAIN'} ? 'Detail' : 'Summary'">Type</span>
+                            </td>
+                            <td class="small" th:text="${#strings.abbreviate(qa.get('question')?.asText() ?: '', 100)}">Question</td>
+                            <td class="small text-muted" th:text="${#strings.abbreviate(qa.get('expectedAnswer')?.asText() ?: '', 80)}">Expected</td>
+                            <td class="small" th:text="${qa.get('ragAnswer') != null && !qa.get('ragAnswer').isNull()} ? ${#strings.abbreviate(qa.get('ragAnswer').asText(), 80)} : '-'">RAG Answer</td>
+                            <td>
+                                <th:block th:if="${qa.get('similarityScore') != null && !qa.get('similarityScore').isNull()}">
+                                    <span th:with="score=${qa.get('similarityScore').asDouble()}"
+                                          th:text="${#numbers.formatDecimal(score * 100, 1, 0)} + '%'"
+                                          th:classappend="${score >= 0.7} ? 'text-success' : (${score >= 0.4} ? 'text-warning' : 'text-danger')">0%</span>
+                                </th:block>
+                                <span th:if="${qa.get('similarityScore') == null || qa.get('similarityScore').isNull()}">-</span>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:with="valStatus=${qa.get('validationStatus')?.asText()}"
+                                      th:classappend="${valStatus == 'PASSED'} ? 'bg-success' :
+                                                      (${valStatus == 'FAILED'} ? 'bg-danger' : 'bg-warning')"
+                                      th:text="${valStatus ?: 'PENDING'}">Status</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="text-center py-4 text-muted" th:if="${qaPairs == null || qaPairs.size() == 0}">
+                    <i class="bi bi-hourglass-split fs-1"></i>
+                    <p>Q&A pairs will appear here once processing completes</p>
+                </div>
+            </div>
+        </div>
+        <!-- FAQ Actions Footer -->
+        <div class="card-footer" th:if="${(status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG') && qaPairs != null && qaPairs.size() > 0}">
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small"><span id="selectedCount">0</span> Q&A pairs selected for FAQ</span>
+                <button type="button" id="addToFaqBtn" class="btn btn-sm btn-success" disabled>
+                    <i class="bi bi-bookmark-plus me-1"></i>Add Selected to FAQ
+                </button>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+</html>

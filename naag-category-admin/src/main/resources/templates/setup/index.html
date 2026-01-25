@@ -24,7 +24,7 @@
                     <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Sample Documents</h5>
                 </div>
                 <div class="card-body">
-                    <p>The following development guides will be uploaded to the RAG service:</p>
+                    <p>The following development guides will be ingested directly into the RAG knowledge base:</p>
                     <ul class="list-group list-group-flush">
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-file-code me-2"></i>Spring Boot Guide</span>
@@ -84,8 +84,8 @@
         <div class="card-body text-center py-4">
             <h5>Ready to Initialize?</h5>
             <p class="text-muted mb-3">
-                This will upload sample documents to the RAG service and register public APIs as tools.
-                The process runs in the background.
+                This will ingest sample documents directly into the RAG knowledge base and register public APIs as tools.
+                Documents are immediately available for queries (no approval needed). The process runs in the background.
             </p>
             <form th:action="@{/setup/initialize}" method="post" class="d-inline">
                 <button type="submit" class="btn btn-primary btn-lg"

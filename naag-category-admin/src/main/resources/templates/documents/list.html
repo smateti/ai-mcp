@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
 <th:block th:fragment="content">
+    <!-- Error/Success Messages -->
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <span th:text="${error}">Error message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        <span th:text="${success}">Success message</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
     <div class="page-header d-flex justify-content-between align-items-center">
         <h1><i class="bi bi-file-earmark-text me-2"></i>Documents</h1>
         <div>
@@ -35,19 +47,19 @@
         </div>
     </div>
 
-    <!-- Document Uploads -->
+    <!-- All Documents (merged RAG + uploads) -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-inbox me-2"></i>Document Uploads</h5>
+            <h5 class="mb-0"><i class="bi bi-database me-2"></i>All Documents in Knowledge Base</h5>
             <div class="btn-group btn-group-sm">
-                <a th:href="@{/documents}" class="btn btn-outline-light" th:classappend="${currentStatus == null} ? 'active' : ''">All</a>
-                <a th:href="@{/documents(status='READY_FOR_REVIEW')}" class="btn btn-outline-light" th:classappend="${currentStatus == 'READY_FOR_REVIEW'} ? 'active' : ''">Ready for Review</a>
-                <a th:href="@{/documents(status='MOVED_TO_RAG')}" class="btn btn-outline-light" th:classappend="${currentStatus == 'MOVED_TO_RAG'} ? 'active' : ''">In RAG</a>
-                <a th:href="@{/documents(status='FAILED')}" class="btn btn-outline-light" th:classappend="${currentStatus == 'FAILED'} ? 'active' : ''">Failed</a>
+                <a th:href="@{/documents}" class="btn btn-outline-secondary" th:classappend="${currentStatus == null && currentCategory == null} ? 'active' : ''">All</a>
+                <a th:href="@{/documents(status='MOVED_TO_RAG')}" class="btn btn-outline-secondary" th:classappend="${currentStatus == 'MOVED_TO_RAG'} ? 'active' : ''">Tracked</a>
+                <a th:href="@{/documents(status='DIRECT_INGEST')}" class="btn btn-outline-secondary" th:classappend="${currentStatus == 'DIRECT_INGEST'} ? 'active' : ''">Direct Ingest</a>
+                <a th:href="@{/documents(status='READY_FOR_REVIEW')}" class="btn btn-outline-secondary" th:classappend="${currentStatus == 'READY_FOR_REVIEW'} ? 'active' : ''">Pending Review</a>
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive" th:if="${uploads != null && uploads.size() > 0}">
+            <div class="table-responsive" th:if="${documents != null && !documents.isEmpty()}">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
@@ -62,64 +74,94 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="upload : ${uploads}">
+                        <tr th:each="doc : ${documents}">
                             <td>
-                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}" class="text-decoration-none">
-                                    <code th:text="${upload.get('docId').asText()}">doc-id</code>
-                                </a>
+                                <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                    <a th:href="@{/documents/uploads/{id}(id=${doc.get('uploadId').asText()})}" class="text-decoration-none">
+                                        <code th:text="${doc.get('docId').asText()}">doc-id</code>
+                                    </a>
+                                </th:block>
+                                <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                    <a th:href="@{/documents/view/{id}(id=${doc.get('docId').asText()})}" class="text-decoration-none">
+                                        <code th:text="${doc.get('docId').asText()}">doc-id</code>
+                                    </a>
+                                </th:block>
                             </td>
-                            <td th:text="${upload.has('title') && !upload.get('title').isNull()} ? ${upload.get('title').asText()} : '(No title)'" class="text-muted">Title</td>
-                            <td th:with="catId=${upload.has('categoryId') && !upload.get('categoryId').isNull() ? upload.get('categoryId').asText() : ''}">
+                            <td th:text="${doc.has('title') && !doc.get('title').isNull() && doc.get('title').asText() != ''} ? ${doc.get('title').asText()} : '(No title)'" class="text-muted">Title</td>
+                            <td th:with="catId=${doc.has('categoryId') && !doc.get('categoryId').isNull() ? doc.get('categoryId').asText() : ''}">
                                 <th:block th:if="${catId != ''}">
-                                    <a th:href="@{/documents/category/{id}(id=${catId})}"
+                                    <a th:href="@{/documents(category=${catId})}"
                                        class="badge bg-secondary text-decoration-none"
                                        th:text="${categoryMap.containsKey(catId)} ? ${categoryMap.get(catId)} : ${catId}">Category</a>
                                 </th:block>
                                 <span th:if="${catId == ''}" class="text-muted">-</span>
                             </td>
-                            <td th:text="${upload.has('totalChunks')} ? ${upload.get('totalChunks').asInt()} : 0">0</td>
+                            <td th:text="${doc.has('chunkCount')} ? ${doc.get('chunkCount').asInt()} : 0">0</td>
                             <td>
-                                <span th:text="${upload.has('questionsGenerated')} ? ${upload.get('questionsGenerated').asInt()} : 0">0</span>
-                                <span class="text-muted">/</span>
-                                <span th:text="${upload.has('questionsValidated')} ? ${upload.get('questionsValidated').asInt()} : 0">0</span>
+                                <span th:text="${doc.has('questionsGenerated')} ? ${doc.get('questionsGenerated').asInt()} : '-'">0</span>
+                                <span class="text-muted" th:if="${doc.has('questionsGenerated') && doc.get('questionsGenerated').asInt() > 0}">/</span>
+                                <span th:if="${doc.has('questionsValidated') && doc.get('questionsGenerated').asInt() > 0}" th:text="${doc.get('questionsValidated').asInt()}">0</span>
                             </td>
                             <td>
                                 <span class="badge"
-                                      th:classappend="${upload.get('status').asText() == 'READY_FOR_REVIEW'} ? 'bg-success' :
-                                                      (${upload.get('status').asText() == 'FAILED'} ? 'bg-danger' :
-                                                      (${upload.get('status').asText() == 'MOVED_TO_RAG'} ? 'bg-info' :
-                                                      (${upload.get('status').asText() == 'DELETED'} ? 'bg-dark' : 'bg-warning')))"
-                                      th:text="${upload.get('status').asText()}">STATUS</span>
+                                      th:classappend="${doc.get('status').asText() == 'READY_FOR_REVIEW'} ? 'bg-success' :
+                                                      (${doc.get('status').asText() == 'FAILED'} ? 'bg-danger' :
+                                                      (${doc.get('status').asText() == 'MOVED_TO_RAG'} ? 'bg-info' :
+                                                      (${doc.get('status').asText() == 'DIRECT_INGEST'} ? 'bg-primary' :
+                                                      (${doc.get('status').asText() == 'DELETED'} ? 'bg-dark' : 'bg-warning'))))"
+                                      th:text="${doc.get('status').asText()}">STATUS</span>
                             </td>
-                            <td th:text="${upload.has('createdAt') && !upload.get('createdAt').isNull()} ? ${#strings.substring(upload.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
+                            <td th:text="${doc.has('createdAt') && !doc.get('createdAt').isNull() && doc.get('createdAt').asText() != ''} ? ${#strings.substring(doc.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
                             <td class="text-end action-buttons">
-                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}"
-                                   class="btn btn-sm btn-primary" title="View">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <form th:if="${upload.get('status').asText() == 'READY_FOR_REVIEW'}"
-                                      th:action="@{/documents/uploads/{id}/approve(id=${upload.get('id').asText()})}"
+                                <!-- View button -->
+                                <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                    <a th:href="@{/documents/uploads/{id}(id=${doc.get('uploadId').asText()})}"
+                                       class="btn btn-sm btn-primary" title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </th:block>
+                                <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                    <a th:href="@{/documents/view/{id}(id=${doc.get('docId').asText()})}"
+                                       class="btn btn-sm btn-primary" title="View">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </th:block>
+                                <!-- Approve button for ready for review -->
+                                <form th:if="${doc.get('status').asText() == 'READY_FOR_REVIEW' && doc.has('uploadId') && doc.get('uploadId').asText() != ''}"
+                                      th:action="@{/documents/uploads/{id}/approve(id=${doc.get('uploadId').asText()})}"
                                       method="post" class="d-inline">
                                     <button type="submit" class="btn btn-sm btn-success"
                                             onclick="return confirm('Approve and add to RAG?');">
                                         <i class="bi bi-check-lg"></i>
                                     </button>
                                 </form>
-                                <form th:action="@{/documents/uploads/{id}/delete(id=${upload.get('id').asText()})}"
-                                      method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete"
-                                            onclick="return confirm('Delete this upload?');">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <!-- Delete button -->
+                                <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                    <form th:action="@{/documents/uploads/{id}/delete(id=${doc.get('uploadId').asText()})}"
+                                          method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete"
+                                                onclick="return confirm('Delete this document?');">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </th:block>
+                                <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean()}">
+                                    <form th:action="@{/documents/delete/{id}(id=${doc.get('docId').asText()})}"
+                                          method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete from RAG"
+                                                onclick="return confirm('Delete this document from RAG? This cannot be undone.');">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </th:block>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <div class="empty-state" th:if="${uploads == null || uploads.size() == 0}">
+            <div class="empty-state" th:if="${documents == null || documents.isEmpty()}">
                 <i class="bi bi-cloud-upload"></i>
-                <p>No document uploads yet</p>
+                <p>No documents in the knowledge base</p>
                 <div class="d-flex gap-2 justify-content-center">
                     <a th:href="@{/documents/upload}" class="btn btn-primary">Upload with Preview</a>
                     <a th:href="@{/documents/ingest}" class="btn btn-secondary">Quick Ingest</a>
@@ -135,17 +177,19 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <span class="badge bg-primary">DIRECT_INGEST</span> - Added directly to RAG<br>
+                    <span class="badge bg-info">MOVED_TO_RAG</span> - In knowledge base (tracked)
+                </div>
+                <div class="col-md-3">
                     <span class="badge bg-warning">PENDING</span> - Waiting to process<br>
-                    <span class="badge bg-warning">GENERATING_QA</span> - AI generating Q&A pairs<br>
-                    <span class="badge bg-warning">CHUNKING_TEMP</span> - Creating temp chunks
+                    <span class="badge bg-warning">GENERATING_QA</span> - AI generating Q&A pairs
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <span class="badge bg-warning">VALIDATING_QA</span> - Testing RAG answers<br>
-                    <span class="badge bg-success">READY_FOR_REVIEW</span> - Ready to approve<br>
-                    <span class="badge bg-info">MOVED_TO_RAG</span> - In knowledge base
+                    <span class="badge bg-success">READY_FOR_REVIEW</span> - Ready to approve
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <span class="badge bg-danger">FAILED</span> - Processing failed<br>
                     <span class="badge bg-dark">DELETED</span> - Removed
                 </div>

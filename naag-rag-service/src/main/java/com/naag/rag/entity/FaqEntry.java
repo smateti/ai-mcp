@@ -43,6 +43,9 @@ public class FaqEntry {
 
     private Double similarityScore;
 
+    // Qdrant point ID for this FAQ (for deletion/update)
+    private String qdrantPointId;
+
     @Builder.Default
     private boolean active = true;
 

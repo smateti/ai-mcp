@@ -359,6 +359,15 @@ public class ToolRegistrationService {
         updateToolCount();
     }
 
+    @Transactional
+    public void deleteToolByToolId(String toolId) {
+        ToolDefinition tool = toolDefinitionRepository.findByToolId(toolId)
+                .orElseThrow(() -> new IllegalArgumentException("Tool not found with toolId: " + toolId));
+        toolDefinitionRepository.delete(tool);
+        metrics.recordToolDeleted();
+        updateToolCount();
+    }
+
     /**
      * Update a tool's description and/or category.
      */

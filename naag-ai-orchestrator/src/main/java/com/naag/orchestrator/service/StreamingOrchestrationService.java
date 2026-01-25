@@ -120,6 +120,7 @@ public class StreamingOrchestrationService {
     private void executeAndStream(OrchestrationRequest request, ToolSelectionResult selection, SseEmitter emitter) {
         String toolName = selection.getSelectedTool();
         Map<String, Object> parameters = new HashMap<>(selection.getExtractedParameters());
+        Map<String, String> lockedParams = new HashMap<>();
 
         // For RAG queries, use streaming endpoint
         if (toolName != null && toolName.startsWith("rag_query")) {
@@ -128,8 +129,12 @@ public class StreamingOrchestrationService {
             }
             streamRagQuery(parameters, emitter);
         } else {
+            // Apply locked parameter values from category overrides
+            if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
+                lockedParams = applyLockedParameters(request.getCategoryId(), toolName, parameters);
+            }
             // For other tools, execute and stream result
-            executeToolAndStream(request.getMessage(), toolName, parameters, emitter);
+            executeToolAndStream(request.getMessage(), toolName, parameters, lockedParams, emitter);
         }
     }
 
@@ -230,7 +235,9 @@ public class StreamingOrchestrationService {
      * Execute a non-RAG tool and stream the response
      */
     private void executeToolAndStream(String userQuestion, String toolName,
-                                       Map<String, Object> parameters, SseEmitter emitter) {
+                                       Map<String, Object> parameters,
+                                       Map<String, String> lockedParams,
+                                       SseEmitter emitter) {
         try {
             long executionStart = System.currentTimeMillis();
 
@@ -241,8 +248,26 @@ public class StreamingOrchestrationService {
             metrics.recordToolExecutionTime(executionTime);
             log.info("[TIMING] Tool execution ({}): {}ms", toolName, executionTime);
 
+            // Check if tool execution failed (null result or error) with locked parameters
             if (toolResult == null) {
-                sendError(emitter, "Tool execution failed - no result returned.");
+                if (!lockedParams.isEmpty()) {
+                    // Tool failed likely due to constraint - show user-friendly message
+                    String constraintMessage = buildConstraintMessage(userQuestion, lockedParams);
+                    sendTextTokens(emitter, constraintMessage);
+                    sendDone(emitter);
+                } else {
+                    sendError(emitter, "Tool execution failed - no result returned.");
+                }
+                return;
+            }
+
+            // Check if result is empty/404 and we have locked parameters
+            String jsonData = extractToolData(toolResult);
+            if (isEmptyOrNotFound(jsonData) && !lockedParams.isEmpty()) {
+                // Generate user-friendly message explaining the constraint
+                String constraintMessage = buildConstraintMessage(userQuestion, lockedParams);
+                sendTextTokens(emitter, constraintMessage);
+                sendDone(emitter);
                 return;
             }
 
@@ -256,8 +281,56 @@ public class StreamingOrchestrationService {
         } catch (Exception e) {
             log.error("Tool execution error", e);
             metrics.recordToolExecutionError();
-            sendError(emitter, "Tool execution failed: " + e.getMessage());
+            // Check if error might be due to locked parameters
+            if (!lockedParams.isEmpty()) {
+                String constraintMessage = buildConstraintMessage(userQuestion, lockedParams);
+                sendTextTokens(emitter, constraintMessage);
+                sendDone(emitter);
+            } else {
+                sendError(emitter, "Tool execution failed: " + e.getMessage());
+            }
         }
+    }
+
+    /**
+     * Check if the tool result is empty or a 404 response
+     */
+    private boolean isEmptyOrNotFound(String jsonData) {
+        if (jsonData == null || jsonData.isBlank()) {
+            return true;
+        }
+        String lower = jsonData.toLowerCase();
+        return lower.contains("404") ||
+               lower.contains("not found") ||
+               lower.equals("{}") ||
+               lower.equals("[]") ||
+               lower.equals("null");
+    }
+
+    /**
+     * Build a user-friendly message explaining why results are empty due to category constraints
+     */
+    private String buildConstraintMessage(String userQuestion, Map<String, String> lockedParams) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("I couldn't find any results for your query.\n\n");
+        sb.append("**Note:** This category has the following constraints:\n");
+        for (Map.Entry<String, String> entry : lockedParams.entrySet()) {
+            sb.append("- **").append(formatParamName(entry.getKey())).append("** is set to **")
+              .append(entry.getValue()).append("**\n");
+        }
+        sb.append("\nThe application or resource you're looking for may not match these criteria. ");
+        sb.append("Try asking about a different application, or switch to a different category if you need to query other types.");
+        return sb.toString();
+    }
+
+    /**
+     * Format parameter name for display (e.g., appType -> App Type)
+     */
+    private String formatParamName(String paramName) {
+        if (paramName == null) return "";
+        // Split camelCase and capitalize
+        String result = paramName.replaceAll("([a-z])([A-Z])", "$1 $2");
+        return result.substring(0, 1).toUpperCase() + result.substring(1);
     }
 
     private String formatToolResult(String userQuestion, String toolName, JsonNode toolResult) {
@@ -404,6 +477,75 @@ public class StreamingOrchestrationService {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
+    }
+
+    /**
+     * Apply locked parameter values from category overrides.
+     * If a parameter is locked in the category, its value is forced regardless of user input.
+     * Returns a map of locked parameter names to their values for user messaging.
+     */
+    private Map<String, String> applyLockedParameters(String categoryId, String toolName, Map<String, Object> parameters) {
+        Map<String, String> lockedParams = new HashMap<>();
+        try {
+            JsonNode mergedTool = toolRegistryClient.getMergedToolByName(categoryId, toolName);
+            if (mergedTool == null) {
+                log.debug("No merged tool found for {} in category {}", toolName, categoryId);
+                return lockedParams;
+            }
+
+            JsonNode params = mergedTool.get("parameters");
+            if (params == null || !params.isArray()) {
+                return lockedParams;
+            }
+
+            for (JsonNode param : params) {
+                if (param.has("locked") && param.get("locked").asBoolean()) {
+                    String paramName = param.get("name").asText();
+                    String lockedValue = param.has("lockedValue") ? param.get("lockedValue").asText() : null;
+
+                    if (lockedValue != null && !lockedValue.isEmpty()) {
+                        Object previousValue = parameters.get(paramName);
+                        parameters.put(paramName, lockedValue);
+                        lockedParams.put(paramName, lockedValue);
+                        log.info("Applied locked parameter: {}={} (was: {}) for tool {} in category {}",
+                                paramName, lockedValue, previousValue, toolName, categoryId);
+                    }
+                }
+
+                // Also check nested parameters
+                applyLockedNestedParameters(param, parameters, lockedParams);
+            }
+        } catch (Exception e) {
+            log.warn("Could not apply locked parameters for tool {} in category {}: {}",
+                    toolName, categoryId, e.getMessage());
+        }
+        return lockedParams;
+    }
+
+    /**
+     * Recursively apply locked values for nested parameters.
+     */
+    private void applyLockedNestedParameters(JsonNode param, Map<String, Object> parameters, Map<String, String> lockedParams) {
+        JsonNode nestedParams = param.get("nestedParameters");
+        if (nestedParams == null || !nestedParams.isArray()) {
+            return;
+        }
+
+        for (JsonNode nested : nestedParams) {
+            if (nested.has("locked") && nested.get("locked").asBoolean()) {
+                String paramName = nested.get("name").asText();
+                String lockedValue = nested.has("lockedValue") ? nested.get("lockedValue").asText() : null;
+
+                if (lockedValue != null && !lockedValue.isEmpty()) {
+                    parameters.put(paramName, lockedValue);
+                    lockedParams.put(paramName, lockedValue);
+                    log.info("Applied locked nested parameter: {}={}", paramName, lockedValue);
+                }
+            }
+
+            // Recurse for deeper nesting
+            applyLockedNestedParameters(nested, parameters, lockedParams);
+        }
     }
 
     /**

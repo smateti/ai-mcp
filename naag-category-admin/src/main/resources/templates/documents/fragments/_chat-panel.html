@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Document Chat Panel -->
+<th:block th:fragment="chatPanel(status)">
+    <div class="card mb-4" th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Chat with this Document</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">Ask questions about this specific document. The AI will only use information from this document to answer.</p>
+            <div id="chatMessages" class="border rounded p-3 mb-3" style="min-height: 200px; max-height: 400px; overflow-y: auto; background: #ffffff;">
+                <p class="text-muted text-center mb-0" id="chatPlaceholder">Ask a question to start chatting...</p>
+            </div>
+            <div class="input-group">
+                <input type="text" id="chatInput" class="form-control" placeholder="Ask a question about this document...">
+                <button id="chatSendBtn" class="btn btn-primary" type="button">
+                    <i class="bi bi-send me-1"></i>Send
+                </button>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+</html>

@@ -15,5 +15,6 @@ public class ApplicationDto {
     private String description;
     private String owner;
     private String status;
+    private String appType; // BATCH, MICROSERVICE, UI
     private List<ServiceDto> services;
 }

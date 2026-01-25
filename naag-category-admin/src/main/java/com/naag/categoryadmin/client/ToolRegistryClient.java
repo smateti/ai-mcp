@@ -149,7 +149,7 @@ public class ToolRegistryClient {
     public void deleteTool(String toolId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/tools/" + toolId))
+                    .uri(URI.create(baseUrl + "/api/tools/by-tool-id/" + toolId))
                     .timeout(Duration.ofSeconds(30))
                     .DELETE()
                     .build();
@@ -157,8 +157,8 @@ public class ToolRegistryClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200 && response.statusCode() != 204) {
-                log.error("Failed to delete tool {}: HTTP {}", toolId, response.statusCode());
-                throw new RuntimeException("Failed to delete tool");
+                log.error("Failed to delete tool {}: HTTP {} - {}", toolId, response.statusCode(), response.body());
+                throw new RuntimeException("Failed to delete tool: " + response.body());
             }
         } catch (Exception e) {
             log.error("Error deleting tool {} from registry", toolId, e);

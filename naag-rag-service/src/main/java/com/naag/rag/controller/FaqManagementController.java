@@ -4,6 +4,7 @@ import com.naag.rag.entity.FaqEntry;
 import com.naag.rag.entity.FaqSettings;
 import com.naag.rag.entity.GeneratedQA;
 import com.naag.rag.entity.GeneratedQA.AnswerSource;
+import com.naag.rag.qdrant.FaqQdrantClient;
 import com.naag.rag.qdrant.FaqQdrantClient.FaqSearchResult;
 import com.naag.rag.service.FaqManagementService;
 import com.naag.rag.service.FaqManagementService.FaqApprovalResult;
@@ -30,6 +31,7 @@ public class FaqManagementController {
 
     private final FaqManagementService faqService;
     private final FaqSettingsService settingsService;
+    private final FaqQdrantClient faqQdrantClient;
 
     // ========== Q&A Review Endpoints ==========
 
@@ -395,4 +397,35 @@ public class FaqManagementController {
             Long sourceFaqId,
             List<Long> targetFaqIds
     ) {}
+
+    // ========== Admin Cleanup Endpoints ==========
+
+    /**
+     * Delete a stale FAQ from Qdrant by its faqId (payload field).
+     * Use this when a FAQ was deleted from the database but still exists in Qdrant.
+     */
+    @DeleteMapping("/qdrant/cleanup/{faqId}")
+    public ResponseEntity<Map<String, Object>> cleanupQdrantFaq(@PathVariable String faqId) {
+        if (faqQdrantClient == null) {
+            return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "message", "Qdrant client not available"
+            ));
+        }
+
+        try {
+            faqQdrantClient.deleteFaqsByFaqId(faqId);
+            log.info("Cleaned up stale FAQ from Qdrant: {}", faqId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Deleted FAQ with faqId " + faqId + " from Qdrant"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to cleanup FAQ {} from Qdrant", faqId, e);
+            return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "message", "Failed to delete: " + e.getMessage()
+            ));
+        }
+    }
 }

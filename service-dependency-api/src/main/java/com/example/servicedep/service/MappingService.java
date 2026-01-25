@@ -22,6 +22,7 @@ public class MappingService {
         dto.setDescription(app.getDescription());
         dto.setOwner(app.getOwner());
         dto.setStatus(app.getStatus());
+        dto.setAppType(app.getAppType());
 
         // Map services
         if (app.getServices() != null) {

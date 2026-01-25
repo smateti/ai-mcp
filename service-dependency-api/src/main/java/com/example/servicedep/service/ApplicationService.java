@@ -22,6 +22,16 @@ public class ApplicationService {
     }
 
     /**
+     * Get applications by type, or all if type is null
+     */
+    public List<Application> getApplicationsByType(String appType) {
+        if (appType == null || appType.isBlank()) {
+            return applicationRepository.findAll();
+        }
+        return applicationRepository.findByAppType(appType.toUpperCase());
+    }
+
+    /**
      * Get application by applicationId (not database ID)
      */
     public Optional<Application> getApplicationByApplicationId(String applicationId) {

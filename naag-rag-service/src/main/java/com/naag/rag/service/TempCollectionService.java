@@ -151,6 +151,61 @@ public class TempCollectionService {
         return chatClient.chatOnce(prompt, 0.2, 256);
     }
 
+    /**
+     * Get all chunks stored in the temp collection for an upload.
+     * Returns a list of chunk data including text and index.
+     */
+    public List<ChunkData> getChunksForUpload(String uploadId) {
+        String tempCollection = getTempCollectionName(uploadId);
+
+        if (!collectionExists(tempCollection)) {
+            log.debug("Temp collection does not exist for upload {}", uploadId);
+            return List.of();
+        }
+
+        List<Map<String, Object>> points = getAllPoints(tempCollection);
+
+        return points.stream()
+                .map(point -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = (Map<String, Object>) point.get("payload");
+                    if (payload == null) return null;
+
+                    int chunkIndex = payload.get("chunkIndex") != null
+                            ? ((Number) payload.get("chunkIndex")).intValue() : 0;
+                    String text = (String) payload.get("text");
+
+                    return new ChunkData(chunkIndex, text);
+                })
+                .filter(c -> c != null)
+                .sorted((a, b) -> Integer.compare(a.chunkIndex(), b.chunkIndex()))
+                .toList();
+    }
+
+    /**
+     * Check if a collection exists in Qdrant.
+     */
+    public boolean collectionExists(String collectionName) {
+        try {
+            String url = qdrantBaseUrl + "/collections/" + collectionName;
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = Http.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Record for chunk data.
+     */
+    public record ChunkData(int chunkIndex, String text) {}
+
     public void moveToMainCollection(DocumentUpload upload) {
         String tempCollection = getTempCollectionName(upload.getId());
 

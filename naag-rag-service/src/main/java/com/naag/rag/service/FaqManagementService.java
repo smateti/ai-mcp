@@ -203,6 +203,7 @@ public class FaqManagementService {
                         .question(question)
                         .answer(answer)
                         .similarityScore(qa.getSimilarityScore())
+                        .qdrantPointId(pointId)
                         .active(true)
                         .build();
                 faqEntries.add(entry);
@@ -332,15 +333,27 @@ public class FaqManagementService {
         faq.setActive(false);
         faqEntryRepository.save(faq);
 
-        // Delete from Qdrant
+        // Delete from Qdrant using the FaqEntry's qdrantPointId
         if (faqQdrantClient != null) {
             try {
-                GeneratedQA qa = qaRepository.findById(faqId).orElse(null);
-                if (qa != null && qa.getFaqQdrantPointId() != null) {
-                    faqQdrantClient.deleteFaq(qa.getFaqQdrantPointId());
+                String pointId = faq.getQdrantPointId();
+                if (pointId != null && !pointId.isEmpty()) {
+                    faqQdrantClient.deleteFaq(pointId);
+                    log.info("Deleted FAQ {} from Qdrant (pointId: {})", faqId, pointId);
+                } else {
+                    // Fallback: try to find via GeneratedQA (for backward compatibility)
+                    GeneratedQA qa = qaRepository.findById(faqId).orElse(null);
+                    if (qa != null && qa.getFaqQdrantPointId() != null) {
+                        faqQdrantClient.deleteFaq(qa.getFaqQdrantPointId());
+                        log.info("Deleted FAQ {} from Qdrant via GeneratedQA fallback", faqId);
+                    } else {
+                        // Last resort: delete by faqId payload filter
+                        faqQdrantClient.deleteFaqsByFaqId(String.valueOf(faqId));
+                        log.info("Deleted FAQ {} from Qdrant via faqId filter fallback", faqId);
+                    }
                 }
             } catch (Exception e) {
-                log.error("Failed to delete FAQ from Qdrant", e);
+                log.error("Failed to delete FAQ {} from Qdrant", faqId, e);
             }
         }
     }
@@ -378,6 +391,10 @@ public class FaqManagementService {
                         faq.getCreatedAt()
                 );
                 faqQdrantClient.upsertFaq(point);
+
+                // Update point ID in FaqEntry
+                faq.setQdrantPointId(pointId);
+                faqEntryRepository.save(faq);
 
                 // Update point ID in GeneratedQA if exists
                 GeneratedQA qa = qaRepository.findById(faqId).orElse(null);
@@ -696,6 +713,7 @@ public class FaqManagementService {
                     .question(question)
                     .answer(answer)
                     .similarityScore(null)
+                    .qdrantPointId(pointId)
                     .active(true)
                     .build();
 

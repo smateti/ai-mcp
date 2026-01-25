@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Action Buttons for READY_FOR_REVIEW status -->
+<th:block th:fragment="actionsReadyForReview(uploadId)">
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex gap-2 justify-content-between">
+                <div>
+                    <form th:action="@{/documents/uploads/{id}/approve(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-success btn-lg" onclick="return confirm('Approve and move this document to the RAG knowledge base?');">
+                            <i class="bi bi-check-circle me-2"></i>Approve & Add to RAG
+                        </button>
+                    </form>
+                </div>
+                <div class="d-flex gap-2">
+                    <form th:action="@{/documents/uploads/{id}/retry(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-arrow-repeat me-2"></i>Retry Processing
+                        </button>
+                    </form>
+                    <form th:action="@{/documents/uploads/{id}/delete(id=${uploadId})}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this upload? This cannot be undone.');">
+                            <i class="bi bi-trash me-2"></i>Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Action Buttons for FAILED status -->
+<th:block th:fragment="actionsFailed(uploadId, upload)">
+    <div class="card">
+        <div class="card-body">
+            <th:block th:with="errorMsg=${upload?.get('errorMessage')?.asText()}">
+            <div class="alert alert-danger mb-3">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Processing Failed:</strong> <span th:text="${errorMsg != null && errorMsg != 'null' && !errorMsg.isEmpty()} ? ${errorMsg} : 'Unknown error'">Error</span>
+            </div>
+            </th:block>
+            <div class="d-flex gap-2">
+                <form th:action="@{/documents/uploads/{id}/retry(id=${uploadId})}" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-repeat me-2"></i>Retry Processing
+                    </button>
+                </form>
+                <form th:action="@{/documents/uploads/{id}/delete(id=${uploadId})}" method="post" class="d-inline">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this upload?');">
+                        <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                </form>
+                <a th:href="@{/documents}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Documents
+                </a>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Action Buttons for MOVED_TO_RAG status -->
+<th:block th:fragment="actionsMovedToRag">
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-check-circle text-success fs-3 me-3"></i>
+                <div>
+                    <h5 class="mb-0">Document in Knowledge Base</h5>
+                    <p class="text-muted mb-0">This document is available in the RAG knowledge base. You can still generate more Q&A, chat with the document, or add Q&A pairs to FAQ.</p>
+                </div>
+            </div>
+            <a th:href="@{/documents}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Back to Documents
+            </a>
+        </div>
+    </div>
+</th:block>
+
+</html>

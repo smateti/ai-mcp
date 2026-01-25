@@ -32,14 +32,18 @@ public class Application {
     @Column(length = 20)
     private String status; // ACTIVE, INACTIVE, DEPRECATED
 
+    @Column(length = 20)
+    private String appType; // BATCH, MICROSERVICE, UI
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Service> services = new ArrayList<>();
 
-    public Application(String applicationId, String name, String description, String owner, String status) {
+    public Application(String applicationId, String name, String description, String owner, String status, String appType) {
         this.applicationId = applicationId;
         this.name = name;
         this.description = description;
         this.owner = owner;
         this.status = status;
+        this.appType = appType;
     }
 }
