@@ -170,34 +170,43 @@
         // FAQ Selection Functionality
         function initFaqSelection() {
             const selectAllCheckbox = document.getElementById('selectAllFaq');
-            const faqCheckboxes = document.querySelectorAll('.faq-checkbox');
             const addToFaqBtn = document.getElementById('addToFaqBtn');
 
             if (selectAllCheckbox) {
                 selectAllCheckbox.addEventListener('change', function() {
-                    faqCheckboxes.forEach(cb => cb.checked = this.checked);
-                    updateSelectedCount();
+                    document.querySelectorAll('.faq-checkbox').forEach(cb => cb.checked = this.checked);
+                    updateFaqSelectedCount();
                 });
             }
 
-            faqCheckboxes.forEach(cb => {
-                cb.addEventListener('change', updateSelectedCount);
-            });
+            // Use event delegation for checkbox changes on the table
+            const qaTable = document.querySelector('.faq-checkbox')?.closest('table');
+            if (qaTable) {
+                qaTable.addEventListener('change', function(e) {
+                    if (e.target.classList.contains('faq-checkbox')) {
+                        updateFaqSelectedCount();
+                    }
+                });
+            }
 
             if (addToFaqBtn) {
                 addToFaqBtn.addEventListener('click', addSelectedToFaq);
             }
 
             // Initialize count
-            updateSelectedCount();
+            updateFaqSelectedCount();
         }
 
-        function updateSelectedCount() {
+        function updateFaqSelectedCount() {
             const selectedCountSpan = document.getElementById('selectedCount');
             const addToFaqBtn = document.getElementById('addToFaqBtn');
-            const checked = document.querySelectorAll('.faq-checkbox:checked');
-            if (selectedCountSpan) selectedCountSpan.textContent = checked.length;
-            if (addToFaqBtn) addToFaqBtn.disabled = checked.length === 0;
+            const allCheckboxes = document.querySelectorAll('.faq-checkbox');
+            let checkedCount = 0;
+            allCheckboxes.forEach(cb => {
+                if (cb.checked) checkedCount++;
+            });
+            if (selectedCountSpan) selectedCountSpan.textContent = checkedCount;
+            if (addToFaqBtn) addToFaqBtn.disabled = checkedCount === 0;
         }
 
         async function addSelectedToFaq() {
@@ -213,9 +222,16 @@
             try {
                 // Add each Q&A to FAQ selection
                 for (const qaId of selectedQaIds) {
-                    await fetch(`/documents/uploads/${uploadId}/qa/${qaId}/select-faq`, {
+                    const selectResponse = await fetch(`/documents/uploads/${uploadId}/qa/${qaId}/select-faq`, {
                         method: 'POST'
                     });
+                    const selectData = await selectResponse.json();
+                    if (!selectData.success) {
+                        showNotification('Error selecting Q&A ' + qaId + ': ' + (selectData.error || 'Unknown error'), 'danger');
+                        addToFaqBtn.disabled = false;
+                        addToFaqBtn.innerHTML = '<i class="bi bi-bookmark-plus me-1"></i>Add Selected to FAQ';
+                        return;
+                    }
                 }
 
                 // Approve the FAQs
@@ -228,7 +244,7 @@
                     showNotification(`Added ${selectedQaIds.length} Q&A pairs to FAQ!`, 'success');
                     setTimeout(() => window.location.reload(), 1500);
                 } else {
-                    showNotification('Error: ' + (data.error || 'Failed to add to FAQ'), 'danger');
+                    showNotification('Error approving FAQ: ' + (data.error || 'Failed to add to FAQ'), 'danger');
                 }
             } catch (error) {
                 showNotification('Error: ' + error.message, 'danger');

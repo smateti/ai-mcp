@@ -107,15 +107,13 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Name</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:each="category : ${categories}">
-                                <td><code th:text="${category.id}">id</code></td>
-                                <td th:text="${category.name}">Name</td>
+                                <td th:text="${category.name}">Category Name</td>
                                 <td>
                                     <span class="badge" th:classappend="${category.active} ? 'bg-success' : 'bg-secondary'"
                                           th:text="${category.active} ? 'Active' : 'Inactive'">Status</span>
@@ -144,7 +142,7 @@
                             <tbody>
                                 <tr th:each="tool : ${tools}">
                                     <td th:text="${tool.name}">Tool Name</td>
-                                    <td><code th:text="${tool.categoryId ?: '-'}">category</code></td>
+                                    <td th:text="${tool.categoryId ?: '-'}" class="text-muted">category</td>
                                 </tr>
                                 <tr th:if="${#lists.isEmpty(tools)}">
                                     <td colspan="2" class="text-center text-muted py-3">No tools registered yet</td>

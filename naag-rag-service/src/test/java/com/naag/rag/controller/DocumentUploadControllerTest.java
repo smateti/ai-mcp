@@ -279,12 +279,12 @@ class DocumentUploadControllerTest {
             // Given
             DocumentUpload upload = DocumentUpload.builder()
                     .id("upload-123")
-                    .docId("doc-123")
+                    .docId("10000")
                     .status(ProcessingStatus.PENDING)
                     .build();
 
-            when(uploadRepository.findByDocIdAndStatusNot(eq("doc-123"), any())).thenReturn(Optional.empty());
-            when(processingService.initiateUpload("doc-123", "Test Title", "Test content", "cat-1"))
+            when(uploadRepository.existsByTitle("Test Title")).thenReturn(false);
+            when(processingService.initiateUpload("Test Title", "Test content", "cat-1"))
                     .thenReturn(upload);
 
             // When/Then
@@ -292,7 +292,6 @@ class DocumentUploadControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
-                                    "docId": "doc-123",
                                     "title": "Test Title",
                                     "content": "Test content",
                                     "categoryId": "cat-1"
@@ -300,7 +299,7 @@ class DocumentUploadControllerTest {
                                 """))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.uploadId").value("upload-123"))
-                    .andExpect(jsonPath("$.docId").value("doc-123"))
+                    .andExpect(jsonPath("$.docId").value("10000"))
                     .andExpect(jsonPath("$.status").value("PENDING"))
                     .andExpect(jsonPath("$.sseEndpoint").exists());
         }
@@ -313,7 +312,6 @@ class DocumentUploadControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
-                                    "docId": "doc-123",
                                     "title": "Test Title"
                                 }
                                 """))
@@ -322,41 +320,37 @@ class DocumentUploadControllerTest {
         }
 
         @Test
-        @DisplayName("Should return bad request when docId is missing")
-        void shouldReturnBadRequestWhenDocIdMissing() throws Exception {
+        @DisplayName("Should return bad request when title is missing")
+        void shouldReturnBadRequestWhenTitleMissing() throws Exception {
             // When/Then
             mockMvc.perform(post("/api/documents/upload")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
-                                    "title": "Test Title",
                                     "content": "Test content"
                                 }
                                 """))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("Document ID is required"));
+                    .andExpect(jsonPath("$.error").value("Title is required"));
         }
 
         @Test
-        @DisplayName("Should return bad request when docId already exists")
-        void shouldReturnBadRequestWhenDocIdExists() throws Exception {
+        @DisplayName("Should return bad request when title already exists")
+        void shouldReturnBadRequestWhenTitleExists() throws Exception {
             // Given
-            DocumentUpload existing = createUpload("existing-upload");
-            when(uploadRepository.findByDocIdAndStatusNot(eq("doc-123"), any()))
-                    .thenReturn(Optional.of(existing));
+            when(uploadRepository.existsByTitle("Test Title")).thenReturn(true);
 
             // When/Then
             mockMvc.perform(post("/api/documents/upload")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                 {
-                                    "docId": "doc-123",
                                     "title": "Test Title",
                                     "content": "Test content"
                                 }
                                 """))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("Document ID already exists"));
+                    .andExpect(jsonPath("$.error").value("A document with this title already exists"));
         }
     }
 

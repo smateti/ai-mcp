@@ -26,4 +26,8 @@ public interface DocumentUploadRepository extends JpaRepository<DocumentUpload, 
     List<DocumentUpload> findAllByStatusNotOrderByCreatedAtDesc(ProcessingStatus status);
 
     List<DocumentUpload> findAllByStatus(ProcessingStatus status);
+
+    boolean existsByTitle(String title);
+
+    boolean existsByTitleAndIdNot(String title, String id);
 }

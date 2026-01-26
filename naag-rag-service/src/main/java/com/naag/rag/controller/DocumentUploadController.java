@@ -42,24 +42,23 @@ public class DocumentUploadController {
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> uploadDocument(@RequestBody UploadRequest request) {
-        log.info("Received document upload request: docId={}, title={}", request.docId(), request.title());
+        log.info("Received document upload request: title={}", request.title());
 
         if (request.content() == null || request.content().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Content is required"));
         }
 
-        if (request.docId() == null || request.docId().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Document ID is required"));
+        if (request.title() == null || request.title().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Title is required"));
         }
 
-        // Check for duplicate docId (exclude soft-deleted documents)
-        if (uploadRepository.findByDocIdAndStatusNot(request.docId(), DocumentUpload.ProcessingStatus.DELETED).isPresent()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Document ID already exists"));
+        // Check for duplicate title
+        if (uploadRepository.existsByTitle(request.title())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "A document with this title already exists"));
         }
 
-        // Create upload record
+        // Create upload record (docId will be auto-generated)
         DocumentUpload upload = processingService.initiateUpload(
-                request.docId(),
                 request.title(),
                 request.content(),
                 request.categoryId()
@@ -109,6 +108,19 @@ public class DocumentUploadController {
         }
 
         return ResponseEntity.ok(uploads);
+    }
+
+    @GetMapping("/check-title")
+    public ResponseEntity<Map<String, Object>> checkTitleExists(
+            @RequestParam String title,
+            @RequestParam(required = false) String excludeId) {
+        boolean exists;
+        if (excludeId != null && !excludeId.isBlank()) {
+            exists = uploadRepository.existsByTitleAndIdNot(title, excludeId);
+        } else {
+            exists = uploadRepository.existsByTitle(title);
+        }
+        return ResponseEntity.ok(Map.of("exists", exists, "title", title));
     }
 
     @GetMapping("/uploads/{uploadId}")
@@ -196,7 +208,18 @@ public class DocumentUploadController {
     public ResponseEntity<Map<String, Object>> getChunks(@PathVariable String uploadId) {
         return uploadRepository.findById(uploadId)
                 .map(upload -> {
-                    List<ChunkData> chunks = tempCollectionService.getChunksForUpload(uploadId);
+                    List<ChunkData> chunks;
+                    String source;
+
+                    // If document is moved to RAG, get chunks from main collection
+                    // Otherwise, get from temp collection (for preview)
+                    if (upload.getStatus() == DocumentUpload.ProcessingStatus.MOVED_TO_RAG) {
+                        chunks = tempCollectionService.getChunksFromMainCollection(upload.getDocId());
+                        source = "main";
+                    } else {
+                        chunks = tempCollectionService.getChunksForUpload(uploadId);
+                        source = "temp";
+                    }
 
                     Map<String, Object> response = new HashMap<>();
                     response.put("uploadId", uploadId);
@@ -204,6 +227,7 @@ public class DocumentUploadController {
                     response.put("totalChunks", upload.getTotalChunks());
                     response.put("chunks", chunks);
                     response.put("chunksAvailable", !chunks.isEmpty());
+                    response.put("source", source);
 
                     return ResponseEntity.ok(response);
                 })
@@ -269,6 +293,31 @@ public class DocumentUploadController {
             log.error("Failed to delete upload: {}", uploadId, e);
             return ResponseEntity.internalServerError().body(Map.of(
                     "error", "Failed to delete upload: " + e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/uploads")
+    public ResponseEntity<Map<String, Object>> deleteAllUploads() {
+        log.info("Deleting all uploads");
+
+        try {
+            List<DocumentUpload> allUploads = uploadRepository.findAll();
+            int count = allUploads.size();
+
+            for (DocumentUpload upload : allUploads) {
+                processingService.deleteUpload(upload.getId());
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Deleted " + count + " uploads",
+                    "count", count
+            ));
+        } catch (Exception e) {
+            log.error("Failed to delete all uploads", e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Failed to delete: " + e.getMessage()
             ));
         }
     }
@@ -437,7 +486,6 @@ public class DocumentUploadController {
 
     // Request/Response DTOs
     public record UploadRequest(
-            String docId,
             String title,
             String content,
             String categoryId

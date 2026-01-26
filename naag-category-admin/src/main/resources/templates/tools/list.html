@@ -23,9 +23,8 @@
                     <tr>
                         <th>Name</th>
                         <th>Description</th>
-                        <th>Service URL</th>
                         <th>Method</th>
-                        <th>Category</th>
+                        <th>Categories</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -34,35 +33,32 @@
                         <td>
                             <strong th:text="${tool.name}">Tool Name</strong>
                         </td>
-                        <td th:text="${#strings.abbreviate(tool.description, 50)}" class="text-muted">Description</td>
-                        <td>
-                            <code th:text="${tool.serviceUrl}">http://...</code>
-                        </td>
+                        <td th:text="${#strings.abbreviate(tool.description, 40)}" class="text-muted">Description</td>
                         <td>
                             <span class="badge bg-info" th:text="${tool.method}">GET</span>
                         </td>
                         <td>
-                            <span th:if="${tool.categoryId != null}" class="badge bg-secondary"
-                                  th:text="${#lists.isEmpty(categories) ? tool.categoryId :
-                                            categories.?[id == #root.tool.categoryId].![name].isEmpty() ? tool.categoryId :
-                                            categories.?[id == #root.tool.categoryId].![name][0]}">
-                                Category
-                            </span>
-                            <span th:unless="${tool.categoryId != null}" class="text-muted">-</span>
+                            <th:block th:if="${toolCategoryMap != null && toolCategoryMap.containsKey(tool.id)}">
+                                <span th:each="catName, stat : ${toolCategoryMap.get(tool.id)}"
+                                      class="badge bg-secondary me-1" th:text="${catName}">Category</span>
+                            </th:block>
+                            <span th:unless="${toolCategoryMap != null && toolCategoryMap.containsKey(tool.id)}" class="text-muted">-</span>
                         </td>
-                        <td class="text-end action-buttons">
-                            <a th:href="@{/tools/{id}/details(id=${tool.id})}" class="btn btn-sm btn-primary" title="Edit Details">
-                                <i class="bi bi-sliders"></i>
-                            </a>
-                            <a th:href="@{/tools/{id}/edit(id=${tool.id})}" class="btn btn-sm btn-info" title="Edit Basic">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <form th:action="@{/tools/{id}/delete(id=${tool.id})}" method="post" class="d-inline"
-                                  onsubmit="return confirm('Are you sure you want to delete this tool?');">
-                                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                <a th:href="@{/tools/{id}/details(id=${tool.id})}" class="btn btn-sm btn-outline-primary" title="Edit Details">
+                                    <i class="bi bi-sliders"></i>
+                                </a>
+                                <a th:href="@{/tools/{id}/edit(id=${tool.id})}" class="btn btn-sm btn-outline-secondary" title="Edit Basic" style="border-width: 2px;">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form th:action="@{/tools/{id}/delete(id=${tool.id})}" method="post" class="d-inline"
+                                      onsubmit="return confirm('Are you sure you want to delete this tool?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

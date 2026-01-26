@@ -18,6 +18,9 @@ import java.util.List;
 public final class OpenAIEmbeddingsClient implements EmbeddingsClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAIEmbeddingsClient.class);
 
+    // Max characters to send to embedding model (2048 tokens * ~3.5 chars/token with safety margin)
+    private static final int MAX_EMBED_CHARS = 6000;
+
     private final String baseUrl;
     private final String model;
 
@@ -30,6 +33,13 @@ public final class OpenAIEmbeddingsClient implements EmbeddingsClient {
     public List<Double> embed(String text) {
         long startTime = System.currentTimeMillis();
         try {
+            // Safety truncation to avoid exceeding model's token limit
+            if (text != null && text.length() > MAX_EMBED_CHARS) {
+                log.warn("[EMBED] Truncating text from {} to {} chars to stay within token limit",
+                        text.length(), MAX_EMBED_CHARS);
+                text = text.substring(0, MAX_EMBED_CHARS);
+            }
+
             long buildStart = System.currentTimeMillis();
             ObjectNode body = Json.MAPPER.createObjectNode()
                     .put("model", model)

@@ -10,6 +10,8 @@ import java.util.Optional;
 @Repository
 public interface ToolDefinitionRepository extends JpaRepository<ToolDefinition, Long> {
     Optional<ToolDefinition> findByToolId(String toolId);
+    Optional<ToolDefinition> findByName(String name);
     boolean existsByToolId(String toolId);
+    boolean existsByName(String name);
     List<ToolDefinition> findByCategoryId(String categoryId);
 }

@@ -45,12 +45,36 @@ public class HybridChunker {
         String[] sents = p.split("(?<=[.!?])\\s+");
         StringBuilder cur = new StringBuilder();
         for (String s : sents) {
+            s = s.trim();
+            // If a single sentence is longer than maxChars, split it at word boundaries
+            if (s.length() > maxChars) {
+                if (!cur.isEmpty()) {
+                    addIfBig(out, cur.toString());
+                    cur.setLength(0);
+                }
+                splitLongSentence(out, s);
+                continue;
+            }
             if (cur.length() + s.length() + 1 > maxChars) {
                 addIfBig(out, cur.toString());
                 cur.setLength(0);
             }
             if (!cur.isEmpty()) cur.append(" ");
-            cur.append(s.trim());
+            cur.append(s);
+        }
+        addIfBig(out, cur.toString());
+    }
+
+    private void splitLongSentence(List<String> out, String sentence) {
+        String[] words = sentence.split("\\s+");
+        StringBuilder cur = new StringBuilder();
+        for (String word : words) {
+            if (cur.length() + word.length() + 1 > maxChars) {
+                addIfBig(out, cur.toString());
+                cur.setLength(0);
+            }
+            if (!cur.isEmpty()) cur.append(" ");
+            cur.append(word);
         }
         addIfBig(out, cur.toString());
     }

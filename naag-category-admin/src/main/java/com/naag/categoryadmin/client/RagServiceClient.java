@@ -258,6 +258,27 @@ public class RagServiceClient {
         }
     }
 
+    public boolean checkTitleExists(String title) {
+        try {
+            String encodedTitle = java.net.URLEncoder.encode(title, java.nio.charset.StandardCharsets.UTF_8);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/documents/check-title?title=" + encodedTitle))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                JsonNode result = objectMapper.readTree(response.body());
+                return result.has("exists") && result.get("exists").asBoolean();
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("Error checking title existence for '{}'", title, e);
+            return false;
+        }
+    }
+
     public JsonNode getDocumentInfo(String docId) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -306,7 +327,7 @@ public class RagServiceClient {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/documents/uploads/" + uploadId + "/approve"))
-                    .timeout(Duration.ofSeconds(120))
+                    .timeout(Duration.ofMinutes(10)) // Large documents may take time to re-embed
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{}"))
                     .build();
@@ -494,7 +515,8 @@ public class RagServiceClient {
 
     /**
      * Get all documents merged: RAG documents + upload metadata.
-     * This provides a complete view of all documents in the knowledge base.
+     * This provides a complete view of all documents in the knowledge base,
+     * including uploads that are pending review (not yet in RAG).
      */
     public JsonNode getMergedDocuments(String categoryFilter) {
         try {
@@ -514,11 +536,15 @@ public class RagServiceClient {
                 }
             }
 
+            // Track which docIds we've already processed (from RAG)
+            java.util.Set<String> processedDocIds = new java.util.HashSet<>();
+
             // Merge: for each RAG doc, add upload metadata if available
             var arrayNode = objectMapper.createArrayNode();
             if (ragDocs != null && ragDocs.isArray()) {
                 for (JsonNode ragDoc : ragDocs) {
                     String docId = ragDoc.has("docId") ? ragDoc.get("docId").asText() : "";
+                    processedDocIds.add(docId);
 
                     var merged = objectMapper.createObjectNode();
                     merged.put("docId", docId);
@@ -539,12 +565,59 @@ public class RagServiceClient {
                     } else {
                         merged.put("hasUploadRecord", false);
                         merged.put("uploadId", "");
-                        merged.put("categoryId", "");
+                        // Get categoryId from RAG document's categories array (first category)
+                        String ragCategoryId = "";
+                        if (ragDoc.has("categories") && ragDoc.get("categories").isArray() && ragDoc.get("categories").size() > 0) {
+                            ragCategoryId = ragDoc.get("categories").get(0).asText();
+                        }
+                        merged.put("categoryId", ragCategoryId);
                         merged.put("status", "DIRECT_INGEST");
                         merged.put("createdAt", "");
                         merged.put("questionsGenerated", 0);
                         merged.put("questionsValidated", 0);
                     }
+
+                    // Apply category filter if specified
+                    if (categoryFilter == null || categoryFilter.isBlank()) {
+                        arrayNode.add(merged);
+                    } else {
+                        String docCategoryId = merged.get("categoryId").asText();
+                        if (categoryFilter.equals(docCategoryId)) {
+                            arrayNode.add(merged);
+                        }
+                    }
+                }
+            }
+
+            // Now add uploads that are NOT yet in RAG (PENDING, GENERATING_QA, VALIDATING_QA, READY_FOR_REVIEW, FAILED)
+            if (uploads != null && uploads.isArray()) {
+                for (JsonNode upload : uploads) {
+                    String docId = upload.has("docId") ? upload.get("docId").asText() : "";
+
+                    // Skip if already processed from RAG documents
+                    if (processedDocIds.contains(docId)) {
+                        continue;
+                    }
+
+                    String status = upload.has("status") ? upload.get("status").asText() : "";
+
+                    // Skip DELETED uploads
+                    if ("DELETED".equals(status)) {
+                        continue;
+                    }
+
+                    var merged = objectMapper.createObjectNode();
+                    merged.put("docId", docId);
+                    merged.put("chunkCount", upload.has("totalChunks") ? upload.get("totalChunks").asInt() : 0);
+                    merged.put("title", upload.has("title") ? upload.get("title").asText() : docId);
+                    merged.put("inRag", false);
+                    merged.put("hasUploadRecord", true);
+                    merged.put("uploadId", upload.has("id") ? upload.get("id").asText() : "");
+                    merged.put("categoryId", upload.has("categoryId") ? upload.get("categoryId").asText() : "");
+                    merged.put("status", status);
+                    merged.put("createdAt", upload.has("createdAt") ? upload.get("createdAt").asText() : "");
+                    merged.put("questionsGenerated", upload.has("questionsGenerated") ? upload.get("questionsGenerated").asInt() : 0);
+                    merged.put("questionsValidated", upload.has("questionsValidated") ? upload.get("questionsValidated").asInt() : 0);
 
                     // Apply category filter if specified
                     if (categoryFilter == null || categoryFilter.isBlank()) {
@@ -646,7 +719,7 @@ public class RagServiceClient {
             );
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/faq/review/" + uploadId + "/select"))
+                    .uri(URI.create(baseUrl + "/api/faq-management/review/" + uploadId + "/select"))
                     .timeout(Duration.ofSeconds(30))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
@@ -676,7 +749,7 @@ public class RagServiceClient {
             Map<String, Object> body = Map.of("approvedBy", approvedBy != null ? approvedBy : "admin");
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/api/faq/review/" + uploadId + "/approve"))
+                    .uri(URI.create(baseUrl + "/api/faq-management/review/" + uploadId + "/approve"))
                     .timeout(Duration.ofSeconds(60))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))

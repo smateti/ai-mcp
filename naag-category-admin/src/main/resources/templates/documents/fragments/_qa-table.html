@@ -20,7 +20,8 @@
                 <table class="table table-hover mb-0" th:if="${qaPairs != null && qaPairs.size() > 0}">
                     <thead>
                         <tr>
-                            <th style="width: 40px;" th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
+                            <!-- FAQ selection checkbox only shown after document is in RAG -->
+                            <th style="width: 40px;" th:if="${status?.toString() == 'MOVED_TO_RAG'}">
                                 <input type="checkbox" id="selectAllFaq" class="form-check-input" title="Select all for FAQ">
                             </th>
                             <th style="width: 70px;">Type</th>
@@ -29,12 +30,17 @@
                             <th style="width: 23%;">RAG Answer</th>
                             <th style="width: 70px;">Score</th>
                             <th style="width: 70px;">Status</th>
+                            <th style="width: 70px;" th:if="${status?.toString() == 'MOVED_TO_RAG'}">FAQ</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="qa : ${qaPairs}">
-                            <td th:if="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG'}">
-                                <input type="checkbox" class="form-check-input faq-checkbox"
+                        <tr th:each="qa : ${qaPairs}" th:with="faqStatus=${qa.get('faqStatus')?.asText()}" th:classappend="${faqStatus == 'APPROVED'} ? 'table-success'">
+                            <!-- FAQ selection checkbox only shown after document is in RAG -->
+                            <td th:if="${status?.toString() == 'MOVED_TO_RAG'}">
+                                <!-- Show disabled checked checkbox for approved FAQs -->
+                                <input th:if="${faqStatus == 'APPROVED'}" type="checkbox" class="form-check-input" checked disabled title="Already in FAQ">
+                                <!-- Show normal checkbox for non-approved items -->
+                                <input th:unless="${faqStatus == 'APPROVED'}" type="checkbox" class="form-check-input faq-checkbox"
                                        th:data-qa-id="${qa.get('id')?.asLong()}"
                                        th:checked="${qa.get('selectedForFaq')?.asBoolean() ?: false}">
                             </td>
@@ -61,6 +67,11 @@
                                                       (${valStatus == 'FAILED'} ? 'bg-danger' : 'bg-warning')"
                                       th:text="${valStatus ?: 'PENDING'}">Status</span>
                             </td>
+                            <!-- FAQ status column -->
+                            <td th:if="${status?.toString() == 'MOVED_TO_RAG'}">
+                                <span th:if="${faqStatus == 'APPROVED'}" class="badge bg-success"><i class="bi bi-check-circle me-1"></i>In FAQ</span>
+                                <span th:if="${faqStatus == 'REJECTED'}" class="badge bg-secondary">Rejected</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -70,13 +81,20 @@
                 </div>
             </div>
         </div>
-        <!-- FAQ Actions Footer -->
-        <div class="card-footer" th:if="${(status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG') && qaPairs != null && qaPairs.size() > 0}">
+        <!-- FAQ Actions Footer - only shown after document is in RAG -->
+        <div class="card-footer" th:if="${status?.toString() == 'MOVED_TO_RAG' && qaPairs != null && qaPairs.size() > 0}">
             <div class="d-flex justify-content-between align-items-center">
                 <span class="text-muted small"><span id="selectedCount">0</span> Q&A pairs selected for FAQ</span>
                 <button type="button" id="addToFaqBtn" class="btn btn-sm btn-success" disabled>
                     <i class="bi bi-bookmark-plus me-1"></i>Add Selected to FAQ
                 </button>
+            </div>
+        </div>
+        <!-- Info message for READY_FOR_REVIEW status -->
+        <div class="card-footer bg-light" th:if="${status == 'READY_FOR_REVIEW' && qaPairs != null && qaPairs.size() > 0}">
+            <div class="text-muted small">
+                <i class="bi bi-info-circle me-1"></i>
+                FAQ selection will be available after the document is moved to RAG
             </div>
         </div>
     </div>

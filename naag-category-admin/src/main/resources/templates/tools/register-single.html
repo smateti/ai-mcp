@@ -43,26 +43,19 @@
                         <input type="hidden" name="sourceType" value="url">
 
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="toolId" class="form-label">Tool ID <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="toolId" name="toolId" required
-                                           placeholder="e.g., get-users, create-order">
-                                    <small class="text-muted">Unique identifier for this tool (no spaces)</small>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="categoryId" class="form-label">Category (Optional)</label>
                                     <select class="form-select" id="categoryId" name="categoryId">
                                         <option value="">-- No Category --</option>
                                         <option th:each="category : ${categories}"
                                                 th:value="${category.id}"
-                                                th:text="${category.name}">Category</option>
+                                                th:text="${category.name}">Category Name</option>
                                     </select>
                                 </div>
                             </div>
                         </div>
+
+                        <input type="hidden" id="toolId" name="toolId">
 
                         <div class="mb-3">
                             <label for="openApiEndpoint" class="form-label">OpenAPI Specification URL <span class="text-danger">*</span></label>
@@ -119,26 +112,16 @@
                     <form th:action="@{/tools/register-single/preview-file}" method="post" enctype="multipart/form-data" id="fileRegistrationForm">
                         <input type="hidden" name="sourceType" value="file">
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="fileToolId" class="form-label">Tool ID <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="fileToolId" name="toolId" required
-                                           placeholder="e.g., get-users, create-order">
-                                    <small class="text-muted">Unique identifier for this tool (no spaces)</small>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="fileCategoryId" class="form-label">Category (Optional)</label>
-                                    <select class="form-select" id="fileCategoryId" name="categoryId">
-                                        <option value="">-- No Category --</option>
-                                        <option th:each="category : ${categories}"
-                                                th:value="${category.id}"
-                                                th:text="${category.name}">Category</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <input type="hidden" id="fileToolId" name="toolId">
+
+                        <div class="mb-3">
+                            <label for="fileCategoryId" class="form-label">Category (Optional)</label>
+                            <select class="form-select" id="fileCategoryId" name="categoryId">
+                                <option value="">-- No Category --</option>
+                                <option th:each="category : ${categories}"
+                                        th:value="${category.id}"
+                                        th:text="${category.name}">Category Name</option>
+                            </select>
                         </div>
 
                         <div class="mb-3">
@@ -243,11 +226,15 @@
             const methodSelect = document.getElementById('httpMethod');
             methodSelect.innerHTML = '<option value="">-- Select Method --</option>';
 
-            if (pathInfo && pathInfo.methods) {
-                pathInfo.methods.forEach(method => {
+            if (pathInfo && pathInfo.operations) {
+                pathInfo.operations.forEach(op => {
                     const option = document.createElement('option');
-                    option.value = method;
-                    option.textContent = method;
+                    option.value = op.method;
+                    // Store operationId and summary as data attributes
+                    option.dataset.operationId = op.operationId || '';
+                    option.dataset.summary = op.summary || '';
+                    const label = op.operationId || op.summary || op.method;
+                    option.textContent = op.method + (label !== op.method ? ' - ' + label : '');
                     methodSelect.appendChild(option);
                 });
                 methodSelect.disabled = false;
@@ -259,12 +246,39 @@
 
         // Method selection change
         document.getElementById('httpMethod').addEventListener('change', function() {
+            generateToolId();
             updatePreviewButton();
             checkDuplicate();
         });
 
-        // Tool ID change
-        document.getElementById('toolId').addEventListener('input', updatePreviewButton);
+        function generateToolId() {
+            const methodSelect = document.getElementById('httpMethod');
+            const selectedOption = methodSelect.options[methodSelect.selectedIndex];
+            if (!selectedOption || !selectedOption.value) return;
+
+            // Use operationId if available, otherwise generate from summary or path
+            let toolName = selectedOption.dataset.operationId;
+            if (!toolName) {
+                toolName = selectedOption.dataset.summary;
+            }
+            if (!toolName) {
+                // Fallback: generate from path + method
+                const path = document.getElementById('path').value;
+                const method = selectedOption.value;
+                const cleanPath = path.replace(/^\//, '').replace(/[{}]/g, '').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+                toolName = method.toLowerCase() + '_' + cleanPath;
+            }
+
+            // Convert to snake_case tool ID
+            const toolId = toolName
+                .replace(/([a-z])([A-Z])/g, '$1_$2')  // camelCase to snake_case
+                .replace(/[^a-zA-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '')
+                .toLowerCase();
+
+            document.getElementById('toolId').value = toolId;
+        }
 
         function loadPaths() {
             const openApiUrl = document.getElementById('openApiEndpoint').value;
@@ -293,7 +307,8 @@
                     pathsData.forEach(pathInfo => {
                         const option = document.createElement('option');
                         option.value = pathInfo.path;
-                        option.textContent = pathInfo.path + ' (' + pathInfo.methods.join(', ') + ')';
+                        const methods = pathInfo.operations ? pathInfo.operations.map(op => op.method).join(', ') : '';
+                        option.textContent = pathInfo.path + (methods ? ' (' + methods + ')' : '');
                         pathSelect.appendChild(option);
                     });
 
@@ -311,12 +326,11 @@
         }
 
         function updatePreviewButton() {
-            const toolId = document.getElementById('toolId').value;
             const path = document.getElementById('path').value;
             const method = document.getElementById('httpMethod').value;
             const previewBtn = document.getElementById('previewBtn');
 
-            previewBtn.disabled = !(toolId && path && method);
+            previewBtn.disabled = !(path && method);
         }
 
         function checkDuplicate() {
@@ -384,7 +398,8 @@
                         filePathsData.forEach(pathInfo => {
                             const option = document.createElement('option');
                             option.value = pathInfo.path;
-                            option.textContent = pathInfo.path + ' (' + pathInfo.methods.join(', ') + ')';
+                            const methods = pathInfo.operations ? pathInfo.operations.map(op => op.method).join(', ') : '';
+                            option.textContent = pathInfo.path + (methods ? ' (' + methods + ')' : '');
                             pathSelect.appendChild(option);
                         });
 
@@ -408,11 +423,14 @@
             const methodSelect = document.getElementById('fileHttpMethod');
             methodSelect.innerHTML = '<option value="">-- Select Method --</option>';
 
-            if (pathInfo && pathInfo.methods) {
-                pathInfo.methods.forEach(method => {
+            if (pathInfo && pathInfo.operations) {
+                pathInfo.operations.forEach(op => {
                     const option = document.createElement('option');
-                    option.value = method;
-                    option.textContent = method;
+                    option.value = op.method;
+                    option.dataset.operationId = op.operationId || '';
+                    option.dataset.summary = op.summary || '';
+                    const label = op.operationId || op.summary || op.method;
+                    option.textContent = op.method + (label !== op.method ? ' - ' + label : '');
                     methodSelect.appendChild(option);
                 });
                 methodSelect.disabled = false;
@@ -421,18 +439,45 @@
             updateFilePreviewButton();
         });
 
-        document.getElementById('fileHttpMethod').addEventListener('change', updateFilePreviewButton);
-        document.getElementById('fileToolId').addEventListener('input', updateFilePreviewButton);
+        document.getElementById('fileHttpMethod').addEventListener('change', function() {
+            generateFileToolId();
+            updateFilePreviewButton();
+        });
+
+        function generateFileToolId() {
+            const methodSelect = document.getElementById('fileHttpMethod');
+            const selectedOption = methodSelect.options[methodSelect.selectedIndex];
+            if (!selectedOption || !selectedOption.value) return;
+
+            let toolName = selectedOption.dataset.operationId;
+            if (!toolName) {
+                toolName = selectedOption.dataset.summary;
+            }
+            if (!toolName) {
+                const path = document.getElementById('filePath').value;
+                const method = selectedOption.value;
+                const cleanPath = path.replace(/^\//, '').replace(/[{}]/g, '').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+                toolName = method.toLowerCase() + '_' + cleanPath;
+            }
+
+            const toolId = toolName
+                .replace(/([a-z])([A-Z])/g, '$1_$2')
+                .replace(/[^a-zA-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '')
+                .toLowerCase();
+
+            document.getElementById('fileToolId').value = toolId;
+        }
         document.getElementById('fileBaseUrl').addEventListener('input', updateFilePreviewButton);
 
         function updateFilePreviewButton() {
-            const toolId = document.getElementById('fileToolId').value;
             const baseUrl = document.getElementById('fileBaseUrl').value;
             const path = document.getElementById('filePath').value;
             const method = document.getElementById('fileHttpMethod').value;
             const previewBtn = document.getElementById('filePreviewBtn');
 
-            previewBtn.disabled = !(toolId && baseUrl && path && method);
+            previewBtn.disabled = !(baseUrl && path && method);
         }
     </script>
 </th:block>

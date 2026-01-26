@@ -41,8 +41,18 @@ public class AuditLogService {
     public static final String ACTION_RAG_QUERY = "RAG_QUERY";
     public static final String ACTION_DOCUMENT_UPLOAD = "DOCUMENT_UPLOAD";
     public static final String ACTION_DOCUMENT_DELETE = "DOCUMENT_DELETE";
+    public static final String ACTION_DOCUMENT_APPROVE = "DOCUMENT_APPROVE";
+    public static final String ACTION_DOCUMENT_RETRY = "DOCUMENT_RETRY";
+    public static final String ACTION_DOCUMENT_CHAT = "DOCUMENT_CHAT";
+    public static final String ACTION_GENERATE_QA = "GENERATE_QA";
+    public static final String ACTION_FAQ_SELECT = "FAQ_SELECT";
+    public static final String ACTION_FAQ_APPROVE = "FAQ_APPROVE";
     public static final String ACTION_TOOL_REGISTER = "TOOL_REGISTER";
+    public static final String ACTION_TOOL_UPDATE = "TOOL_UPDATE";
     public static final String ACTION_TOOL_DELETE = "TOOL_DELETE";
+    public static final String ACTION_TOOL_ADD_TO_CATEGORY = "TOOL_ADD_TO_CATEGORY";
+    public static final String ACTION_TOOL_REMOVE_FROM_CATEGORY = "TOOL_REMOVE_FROM_CATEGORY";
+    public static final String ACTION_PARAMETER_OVERRIDE = "PARAMETER_OVERRIDE";
     public static final String ACTION_CATEGORY_CREATE = "CATEGORY_CREATE";
     public static final String ACTION_CATEGORY_UPDATE = "CATEGORY_UPDATE";
     public static final String ACTION_CATEGORY_DELETE = "CATEGORY_DELETE";
@@ -257,5 +267,61 @@ public class AuditLogService {
     public void logSetupRun(String userId) {
         logAsync(userId, ACTION_SETUP_RUN, ENTITY_SYSTEM, null,
                 "Setup initialization triggered", null);
+    }
+
+    // Document workflow actions
+    public void logDocumentApprove(String userId, String docId, String categoryId) {
+        logAsync(userId, ACTION_DOCUMENT_APPROVE, ENTITY_DOCUMENT, docId,
+                "Document approved and moved to RAG", categoryId);
+    }
+
+    public void logDocumentRetry(String userId, String docId, String categoryId) {
+        logAsync(userId, ACTION_DOCUMENT_RETRY, ENTITY_DOCUMENT, docId,
+                "Document reprocessing triggered", categoryId);
+    }
+
+    public void logDocumentChat(String userId, String docId, String question, String categoryId) {
+        logAsync(userId, ACTION_DOCUMENT_CHAT, ENTITY_DOCUMENT, docId,
+                "Question: " + truncate(question, 200), categoryId);
+    }
+
+    public void logGenerateQA(String userId, String docId, int fineGrainCount, int summaryCount, String categoryId) {
+        logAsync(userId, ACTION_GENERATE_QA, ENTITY_DOCUMENT, docId,
+                "Generated Q&A: " + fineGrainCount + " fine-grain, " + summaryCount + " summary", categoryId);
+    }
+
+    public void logFaqSelect(String userId, String docId, Long qaId, String categoryId) {
+        logAsync(userId, ACTION_FAQ_SELECT, ENTITY_DOCUMENT, docId,
+                "Q&A ID: " + qaId + " selected for FAQ", categoryId);
+    }
+
+    public void logFaqApprove(String userId, String docId, int count, String categoryId) {
+        logAsync(userId, ACTION_FAQ_APPROVE, ENTITY_DOCUMENT, docId,
+                "Approved " + count + " FAQs", categoryId);
+    }
+
+    // Tool actions
+    public void logToolUpdate(String userId, String toolId, String details) {
+        logAsync(userId, ACTION_TOOL_UPDATE, ENTITY_TOOL, toolId, details, null);
+    }
+
+    public void logToolDelete(String userId, String toolId, String toolName) {
+        logAsync(userId, ACTION_TOOL_DELETE, ENTITY_TOOL, toolId,
+                "Tool: " + toolName, null);
+    }
+
+    public void logToolAddToCategory(String userId, String toolId, String categoryId) {
+        logAsync(userId, ACTION_TOOL_ADD_TO_CATEGORY, ENTITY_TOOL, toolId,
+                "Added to category", categoryId);
+    }
+
+    public void logToolRemoveFromCategory(String userId, String toolId, String categoryId) {
+        logAsync(userId, ACTION_TOOL_REMOVE_FROM_CATEGORY, ENTITY_TOOL, toolId,
+                "Removed from category", categoryId);
+    }
+
+    public void logParameterOverride(String userId, String toolId, String parameterPath, String categoryId) {
+        logAsync(userId, ACTION_PARAMETER_OVERRIDE, ENTITY_TOOL, toolId,
+                "Parameter: " + parameterPath, categoryId);
     }
 }

@@ -37,31 +37,27 @@
                     <span class="badge bg-secondary">OR</span>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="docId" class="form-label">Document ID</label>
-                        <input type="text" class="form-control" id="docId" name="docId"
-                               placeholder="unique-document-id">
-                        <small class="text-muted">Auto-generated from filename if uploading a file</small>
-                    </div>
+                <input type="hidden" id="docId" name="docId">
 
-                    <div class="col-md-6 mb-3">
-                        <label for="title" class="form-label">Title</label>
-                        <input type="text" class="form-control" id="title" name="title"
-                               placeholder="Document Title">
-                        <small class="text-muted">Auto-filled from filename if uploading a file</small>
-                    </div>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="title" name="title" required
+                           placeholder="Document Title" oninput="handleTitleChange(this.value)">
+                    <div id="titleFeedback" class="invalid-feedback">A document with this title already exists</div>
+                    <small class="text-muted">Auto-filled from filename if uploading. Must be unique.</small>
                 </div>
 
                 <div class="mb-3">
-                    <label for="categoryId" class="form-label">Category</label>
-                    <select class="form-select" id="categoryId" name="categoryId">
-                        <option value="">-- No Category --</option>
-                        <option th:each="category : ${categories}"
-                                th:value="${category.id}"
-                                th:text="${category.name}">Category</option>
-                    </select>
-                    <small class="text-muted">Assign this document to a category for filtered queries</small>
+                    <label class="form-label">Category</label>
+                    <input type="hidden" name="categoryId" th:value="${selectedCategoryId}">
+                    <div class="form-control bg-light" th:if="${selectedCategory != null}">
+                        <i class="bi bi-folder me-2"></i>
+                        <span th:text="${selectedCategory.name}">Category Name</span>
+                    </div>
+                    <div th:unless="${selectedCategory != null}" class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        No category selected. Please <a th:href="@{/categories}">select a category</a> first.
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -110,7 +106,7 @@
                 <li><strong>Word documents:</strong> Both .doc and .docx formats are supported.</li>
                 <li><strong>Markdown files:</strong> Converted to plain text while preserving structure.</li>
                 <li><strong>Text files:</strong> Ingested directly as-is.</li>
-                <li>Use descriptive document IDs like <code>product-manual-v1</code> or <code>faq-2024-01</code></li>
+                <li>The document title must be unique</li>
                 <li>Large documents will be automatically split into smaller chunks</li>
                 <li>Categories help filter results when querying specific knowledge domains</li>
             </ul>
@@ -118,11 +114,13 @@
     </div>
 
     <script th:inline="javascript">
+        let titleCheckTimeout = null;
+        let titleIsValid = true;
+
         function handleFileSelect(input) {
             const preview = document.getElementById('filePreview');
             const fileName = document.getElementById('fileName');
             const fileSize = document.getElementById('fileSize');
-            const docIdInput = document.getElementById('docId');
             const titleInput = document.getElementById('title');
             const contentArea = document.getElementById('content');
 
@@ -132,16 +130,70 @@
                 fileName.textContent = file.name;
                 fileSize.textContent = formatFileSize(file.size);
 
-                // Auto-fill docId and title if empty
-                if (!docIdInput.value) {
-                    docIdInput.value = file.name.replace(/[^a-zA-Z0-9.-]/g, '-').replace(/-+/g, '-').toLowerCase();
-                }
+                // Auto-fill title from filename (without extension)
                 if (!titleInput.value) {
-                    titleInput.value = file.name;
+                    const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                    titleInput.value = nameWithoutExt;
+                    handleTitleChange(nameWithoutExt);
                 }
 
                 // Clear text content when file is selected
                 contentArea.placeholder = 'File selected - text content will be extracted from the file';
+            }
+        }
+
+        function handleTitleChange(title) {
+            // Clear previous timeout
+            if (titleCheckTimeout) {
+                clearTimeout(titleCheckTimeout);
+            }
+
+            // Generate doc ID from title
+            const docIdInput = document.getElementById('docId');
+            if (title) {
+                const docId = title
+                    .toLowerCase()
+                    .replace(/[^a-zA-Z0-9\s]/g, '')
+                    .replace(/\s+/g, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/^-|-$/g, '');
+                docIdInput.value = docId;
+            }
+
+            // Debounce the uniqueness check
+            titleCheckTimeout = setTimeout(() => {
+                checkTitleUniqueness(title);
+            }, 500);
+        }
+
+        function checkTitleUniqueness(title) {
+            if (!title || title.trim() === '') {
+                setTitleValid(true);
+                return;
+            }
+
+            fetch(`/api/documents/check-title?title=${encodeURIComponent(title)}`)
+                .then(response => response.json())
+                .then(data => {
+                    setTitleValid(!data.exists);
+                })
+                .catch(error => {
+                    console.error('Error checking title:', error);
+                    setTitleValid(true); // Allow submission on error
+                });
+        }
+
+        function setTitleValid(isValid) {
+            const titleInput = document.getElementById('title');
+            const submitBtn = document.querySelector('button[type="submit"]');
+            titleIsValid = isValid;
+
+            if (isValid) {
+                titleInput.classList.remove('is-invalid');
+                submitBtn.disabled = false;
+            } else {
+                titleInput.classList.add('is-invalid');
+                submitBtn.disabled = true;
             }
         }
 

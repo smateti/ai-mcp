@@ -507,6 +507,14 @@ public class RagController {
                                 if (payload.has("title")) {
                                     doc.put("title", payload.get("title").asText());
                                 }
+                                // Include categories from the payload
+                                if (payload.has("categories") && payload.get("categories").isArray()) {
+                                    var categories = new java.util.ArrayList<String>();
+                                    for (var cat : payload.get("categories")) {
+                                        categories.add(cat.asText());
+                                    }
+                                    doc.put("categories", categories);
+                                }
                                 return doc;
                             });
 
@@ -608,6 +616,39 @@ public class RagController {
             System.err.println("[RAG API] Document info fetch failed: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @DeleteMapping("/documents")
+    public ResponseEntity<java.util.Map<String, Object>> deleteAllDocuments() {
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+            // Delete all points by using an empty filter
+            var deleteBody = objectMapper.createObjectNode();
+            var filter = objectMapper.createObjectNode();
+            deleteBody.set("filter", filter);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(qdrantBaseUrl + "/collections/" + qdrantCollection + "/points/delete?wait=true"))
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(deleteBody)))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return ResponseEntity.ok(java.util.Map.of("success", true, "message", "All documents deleted"));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(java.util.Map.of("success", false, "error", "Failed to delete all: " + response.body()));
+            }
+        } catch (Exception e) {
+            System.err.println("[RAG API] Delete all documents failed: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("success", false, "error", e.getMessage()));
         }
     }
 

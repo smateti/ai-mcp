@@ -405,6 +405,20 @@ textarea.form-control {
     background-color: var(--primary-color) !important;
 }
 
+/* Category badge - prominent styling */
+.badge.category-badge {
+    background-color: var(--primary-light) !important;
+    color: var(--text-on-primary) !important;
+    font-weight: 500;
+    padding: 0.4em 0.8em;
+    font-size: 0.8rem;
+}
+
+.badge.category-badge:hover {
+    background-color: var(--primary-color) !important;
+    color: var(--text-on-primary) !important;
+}
+
 /* Alerts */
 .alert {
     border-radius: var(--radius-md);

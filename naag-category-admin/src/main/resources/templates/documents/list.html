@@ -15,14 +15,9 @@
 
     <div class="page-header d-flex justify-content-between align-items-center">
         <h1><i class="bi bi-file-earmark-text me-2"></i>Documents</h1>
-        <div>
-            <a th:href="@{/documents/upload}" class="btn btn-primary">
-                <i class="bi bi-cloud-upload me-2"></i>Upload with Preview
-            </a>
-            <a th:href="@{/documents/ingest}" class="btn btn-secondary ms-2">
-                <i class="bi bi-fast-forward me-2"></i>Quick Ingest
-            </a>
-        </div>
+        <a th:href="@{/categories}" class="btn btn-primary">
+            <i class="bi bi-folder-plus me-2"></i>Add Document via Category
+        </a>
     </div>
 
     <!-- RAG Stats -->
@@ -91,7 +86,7 @@
                             <td th:with="catId=${doc.has('categoryId') && !doc.get('categoryId').isNull() ? doc.get('categoryId').asText() : ''}">
                                 <th:block th:if="${catId != ''}">
                                     <a th:href="@{/documents(category=${catId})}"
-                                       class="badge bg-secondary text-decoration-none"
+                                       class="badge category-badge text-decoration-none"
                                        th:text="${categoryMap.containsKey(catId)} ? ${categoryMap.get(catId)} : ${catId}">Category</a>
                                 </th:block>
                                 <span th:if="${catId == ''}" class="text-muted">-</span>
@@ -112,48 +107,41 @@
                                       th:text="${doc.get('status').asText()}">STATUS</span>
                             </td>
                             <td th:text="${doc.has('createdAt') && !doc.get('createdAt').isNull() && doc.get('createdAt').asText() != ''} ? ${#strings.substring(doc.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
-                            <td class="text-end action-buttons">
-                                <!-- View button -->
-                                <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
-                                    <a th:href="@{/documents/uploads/{id}(id=${doc.get('uploadId').asText()})}"
-                                       class="btn btn-sm btn-primary" title="View">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                </th:block>
-                                <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
-                                    <a th:href="@{/documents/view/{id}(id=${doc.get('docId').asText()})}"
-                                       class="btn btn-sm btn-primary" title="View">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                </th:block>
-                                <!-- Approve button for ready for review -->
-                                <form th:if="${doc.get('status').asText() == 'READY_FOR_REVIEW' && doc.has('uploadId') && doc.get('uploadId').asText() != ''}"
-                                      th:action="@{/documents/uploads/{id}/approve(id=${doc.get('uploadId').asText()})}"
-                                      method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-success"
-                                            onclick="return confirm('Approve and add to RAG?');">
-                                        <i class="bi bi-check-lg"></i>
-                                    </button>
-                                </form>
-                                <!-- Delete button -->
-                                <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
-                                    <form th:action="@{/documents/uploads/{id}/delete(id=${doc.get('uploadId').asText()})}"
-                                          method="post" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete"
-                                                onclick="return confirm('Delete this document?');">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </th:block>
-                                <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean()}">
-                                    <form th:action="@{/documents/delete/{id}(id=${doc.get('docId').asText()})}"
-                                          method="post" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete from RAG"
-                                                onclick="return confirm('Delete this document from RAG? This cannot be undone.');">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </th:block>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <!-- View button -->
+                                    <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                        <a th:href="@{/documents/uploads/{id}(id=${doc.get('uploadId').asText()})}"
+                                           class="btn btn-sm btn-outline-primary" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </th:block>
+                                    <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                        <a th:href="@{/documents/view/{id}(id=${doc.get('docId').asText()})}"
+                                           class="btn btn-sm btn-outline-primary" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </th:block>
+                                    <!-- Delete button -->
+                                    <th:block th:if="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean() && doc.has('uploadId') && doc.get('uploadId').asText() != ''}">
+                                        <form th:action="@{/documents/uploads/{id}/delete(id=${doc.get('uploadId').asText()})}"
+                                              method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
+                                                    onclick="return confirm('Delete this document?');">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </th:block>
+                                    <th:block th:unless="${doc.has('hasUploadRecord') && doc.get('hasUploadRecord').asBoolean()}">
+                                        <form th:action="@{/documents/delete/{id}(id=${doc.get('docId').asText()})}"
+                                              method="post" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete from RAG"
+                                                    onclick="return confirm('Delete this document from RAG? This cannot be undone.');">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </th:block>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -162,10 +150,10 @@
             <div class="empty-state" th:if="${documents == null || documents.isEmpty()}">
                 <i class="bi bi-cloud-upload"></i>
                 <p>No documents in the knowledge base</p>
-                <div class="d-flex gap-2 justify-content-center">
-                    <a th:href="@{/documents/upload}" class="btn btn-primary">Upload with Preview</a>
-                    <a th:href="@{/documents/ingest}" class="btn btn-secondary">Quick Ingest</a>
-                </div>
+                <p class="text-muted small">Documents must be added through a category</p>
+                <a th:href="@{/categories}" class="btn btn-primary">
+                    <i class="bi bi-folder-plus me-2"></i>Go to Categories
+                </a>
             </div>
         </div>
     </div>

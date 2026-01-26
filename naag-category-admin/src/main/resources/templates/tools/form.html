@@ -11,6 +11,12 @@
         <h1 th:text="${tool.id != null} ? 'Edit Tool' : 'New Tool'">Tool Form</h1>
     </div>
 
+    <!-- Error Message -->
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
     <div class="card">
         <div class="card-body">
             <form th:action="${tool.id != null} ? @{/tools/{id}(id=${tool.id})} : @{/tools}"
@@ -18,20 +24,29 @@
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+                        <label for="name" class="form-label">Tool Name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="name" th:field="*{name}" required
-                               placeholder="e.g., get_user, calculate_sum">
+                               placeholder="e.g., Get User Info, Calculate Sum">
+                        <small th:if="${tool.id == null}" class="text-muted">
+                            Tool ID will be auto-generated from the name (e.g., "Get User Info" → "get_user_info")
+                        </small>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="categoryId" class="form-label">Category</label>
-                        <select class="form-select" id="categoryId" th:field="*{categoryId}">
-                            <option value="">-- No Category --</option>
-                            <option th:each="category : ${categories}"
-                                    th:value="${category.id}"
-                                    th:text="${category.name}">Category</option>
-                        </select>
+                    <div class="col-md-6 mb-3" th:if="${tool.id != null}">
+                        <label for="id" class="form-label">Tool ID</label>
+                        <input type="text" class="form-control bg-light" id="id" th:value="${tool.id}" readonly>
+                        <small class="text-muted">Auto-generated unique identifier (cannot be changed)</small>
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="categoryId" class="form-label">Category</label>
+                    <select class="form-select" id="categoryId" th:field="*{categoryId}">
+                        <option value="">-- No Category --</option>
+                        <option th:each="category : ${categories}"
+                                th:value="${category.id}"
+                                th:text="${category.name}">Category Name</option>
+                    </select>
                 </div>
 
                 <div class="mb-3">

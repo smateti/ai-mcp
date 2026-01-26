@@ -11,7 +11,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <h1>
                 <i class="bi bi-folder me-2"></i>
-                <span th:text="${category?.name ?: 'Unknown Category'}">Category</span>
+                <span th:text="${category?.name ?: 'Unknown Category'}">Category Name</span>
             </h1>
             <div>
                 <a th:href="@{/categories/{id}/edit(id=${category.id})}" class="btn btn-outline-secondary">
@@ -96,7 +96,6 @@
                             <th style="width: 50px;">#</th>
                             <th>Name</th>
                             <th>Description</th>
-                            <th>Service URL</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -106,10 +105,7 @@
                             <td>
                                 <strong th:text="${tool.name}">Tool Name</strong>
                             </td>
-                            <td th:text="${tool.description}" class="text-muted">Description</td>
-                            <td>
-                                <code th:text="${tool.serviceUrl}" class="text-muted small">URL</code>
-                            </td>
+                            <td th:text="${#strings.abbreviate(tool.description, 50)}" class="text-muted">Description</td>
                             <td class="text-end">
                                 <a th:href="@{/categories/{catId}/tools/{toolId}/overrides(catId=${category.id}, toolId=${tool.id})}"
                                    class="btn btn-sm btn-outline-primary me-1" title="Parameter Overrides">
@@ -193,9 +189,14 @@
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="bi bi-database me-2"></i>Documents in RAG</h5>
-            <a th:href="@{/documents/upload}" class="btn btn-sm btn-primary">
-                <i class="bi bi-cloud-upload me-1"></i>Upload Document
-            </a>
+            <div class="d-flex gap-2">
+                <a th:href="@{/documents/upload(categoryId=${category.id})}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-cloud-upload me-1"></i>Upload with Preview
+                </a>
+                <a th:href="@{/documents/ingest(categoryId=${category.id})}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-fast-forward me-1"></i>Quick Ingest
+                </a>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive" th:if="${documents != null && !documents.isEmpty()}">

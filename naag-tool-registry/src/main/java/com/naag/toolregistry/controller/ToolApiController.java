@@ -187,6 +187,16 @@ public class ToolApiController {
         }
     }
 
+    @DeleteMapping
+    public ResponseEntity<Map<String, Object>> deleteAllTools() {
+        try {
+            int count = toolRegistrationService.deleteAllTools();
+            return ResponseEntity.ok(Map.of("success", true, "deletedCount", count, "message", "All tools deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to delete all tools: " + e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTool(@PathVariable Long id) {
         try {
@@ -366,7 +376,7 @@ public class ToolApiController {
                 openAPI.getPaths().forEach((path, pathItem) -> {
                     Map<String, Object> pathInfo = new HashMap<>();
                     pathInfo.put("path", path);
-                    pathInfo.put("methods", getAvailableMethods(pathItem));
+                    pathInfo.put("operations", getOperationsInfo(pathItem));
                     paths.add(pathInfo);
                 });
             }
@@ -376,6 +386,46 @@ public class ToolApiController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Error parsing OpenAPI: " + e.getMessage()));
         }
+    }
+
+    private List<Map<String, String>> getOperationsInfo(PathItem pathItem) {
+        List<Map<String, String>> operations = new ArrayList<>();
+        if (pathItem.getGet() != null) {
+            operations.add(Map.of(
+                "method", "GET",
+                "operationId", pathItem.getGet().getOperationId() != null ? pathItem.getGet().getOperationId() : "",
+                "summary", pathItem.getGet().getSummary() != null ? pathItem.getGet().getSummary() : ""
+            ));
+        }
+        if (pathItem.getPost() != null) {
+            operations.add(Map.of(
+                "method", "POST",
+                "operationId", pathItem.getPost().getOperationId() != null ? pathItem.getPost().getOperationId() : "",
+                "summary", pathItem.getPost().getSummary() != null ? pathItem.getPost().getSummary() : ""
+            ));
+        }
+        if (pathItem.getPut() != null) {
+            operations.add(Map.of(
+                "method", "PUT",
+                "operationId", pathItem.getPut().getOperationId() != null ? pathItem.getPut().getOperationId() : "",
+                "summary", pathItem.getPut().getSummary() != null ? pathItem.getPut().getSummary() : ""
+            ));
+        }
+        if (pathItem.getDelete() != null) {
+            operations.add(Map.of(
+                "method", "DELETE",
+                "operationId", pathItem.getDelete().getOperationId() != null ? pathItem.getDelete().getOperationId() : "",
+                "summary", pathItem.getDelete().getSummary() != null ? pathItem.getDelete().getSummary() : ""
+            ));
+        }
+        if (pathItem.getPatch() != null) {
+            operations.add(Map.of(
+                "method", "PATCH",
+                "operationId", pathItem.getPatch().getOperationId() != null ? pathItem.getPatch().getOperationId() : "",
+                "summary", pathItem.getPatch().getSummary() != null ? pathItem.getPatch().getSummary() : ""
+            ));
+        }
+        return operations;
     }
 
     @GetMapping("/check-duplicate")
@@ -410,7 +460,7 @@ public class ToolApiController {
                 openAPI.getPaths().forEach((path, pathItem) -> {
                     Map<String, Object> pathInfo = new HashMap<>();
                     pathInfo.put("path", path);
-                    pathInfo.put("methods", getAvailableMethods(pathItem));
+                    pathInfo.put("operations", getOperationsInfo(pathItem));
                     paths.add(pathInfo);
                 });
             }

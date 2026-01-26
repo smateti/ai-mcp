@@ -4,3 +4,9 @@ DELETE FROM service_dependencies [42102-224]
 2026-01-24 23:39:08.906188-05:00 jdbc[3]: exception
 org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_OPERATIONS" not found; SQL statement:
 DELETE FROM service_operations [42102-224]
+2026-01-25 09:43:55.660983-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_DEPENDENCIES" not found; SQL statement:
+DELETE FROM service_dependencies [42102-224]
+2026-01-25 09:43:55.660983-05:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "SERVICE_OPERATIONS" not found; SQL statement:
+DELETE FROM service_operations [42102-224]

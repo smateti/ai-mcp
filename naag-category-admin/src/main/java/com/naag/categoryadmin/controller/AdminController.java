@@ -26,6 +26,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Controller
 @RequiredArgsConstructor
@@ -103,7 +104,12 @@ public class AdminController {
                     if (category.getToolIds() != null && !category.getToolIds().isEmpty()) {
                         List<Tool> categoryTools = new java.util.ArrayList<>();
                         for (String toolId : category.getToolIds()) {
-                            toolRegistryClient.getTool(toolId).ifPresent(categoryTools::add);
+                            Optional<Tool> toolOpt = toolRegistryClient.getTool(toolId);
+                            if (toolOpt.isPresent()) {
+                                categoryTools.add(toolOpt.get());
+                            } else {
+                                log.warn("Tool {} assigned to category {} not found in registry", toolId, id);
+                            }
                         }
                         model.addAttribute("categoryTools", categoryTools);
                     }
@@ -147,6 +153,7 @@ public class AdminController {
         try {
             categoryService.addToolToCategory(id, toolId);
             redirectAttributes.addFlashAttribute("success", "Tool added to category");
+            auditLogService.logToolAddToCategory("admin", toolId, id);
         } catch (Exception e) {
             log.error("Error adding tool to category", e);
             redirectAttributes.addFlashAttribute("error", "Failed to add tool: " + e.getMessage());
@@ -161,6 +168,7 @@ public class AdminController {
         try {
             categoryService.removeToolFromCategory(id, toolId);
             redirectAttributes.addFlashAttribute("success", "Tool removed from category");
+            auditLogService.logToolRemoveFromCategory("admin", toolId, id);
         } catch (Exception e) {
             log.error("Error removing tool from category", e);
             redirectAttributes.addFlashAttribute("error", "Failed to remove tool: " + e.getMessage());
@@ -244,6 +252,7 @@ public class AdminController {
 
             overrideService.createOrUpdateOverride(override);
             redirectAttributes.addFlashAttribute("success", "Override saved for parameter: " + parameterPath);
+            auditLogService.logParameterOverride("admin", toolId, parameterPath, categoryId);
         } catch (Exception e) {
             log.error("Error saving override", e);
             redirectAttributes.addFlashAttribute("error", "Failed to save override: " + e.getMessage());
@@ -259,6 +268,7 @@ public class AdminController {
         try {
             overrideService.deleteOverride(overrideId);
             redirectAttributes.addFlashAttribute("success", "Override deleted");
+            auditLogService.logParameterOverride("admin", toolId, "deleted override #" + overrideId, categoryId);
         } catch (Exception e) {
             log.error("Error deleting override", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete override: " + e.getMessage());
@@ -291,6 +301,7 @@ public class AdminController {
 
             overrideService.createOrUpdateToolOverride(override);
             redirectAttributes.addFlashAttribute("success", "Tool selection guidance saved");
+            auditLogService.logToolUpdate("admin", toolId, "Tool guidance updated for category: " + categoryId);
         } catch (Exception e) {
             log.error("Error saving tool override", e);
             redirectAttributes.addFlashAttribute("error", "Failed to save tool guidance: " + e.getMessage());
@@ -324,6 +335,7 @@ public class AdminController {
         try {
             categoryService.createCategory(category);
             redirectAttributes.addFlashAttribute("success", "Category created successfully");
+            auditLogService.logCategoryCreate("admin", category.getId(), category.getName());
         } catch (Exception e) {
             log.error("Error creating category", e);
             redirectAttributes.addFlashAttribute("error", "Failed to create category: " + e.getMessage());
@@ -344,6 +356,7 @@ public class AdminController {
         try {
             categoryService.updateCategory(id, category);
             redirectAttributes.addFlashAttribute("success", "Category updated successfully");
+            auditLogService.logCategoryUpdate("admin", id, category.getName());
         } catch (Exception e) {
             log.error("Error updating category", e);
             redirectAttributes.addFlashAttribute("error", "Failed to update category: " + e.getMessage());
@@ -353,9 +366,15 @@ public class AdminController {
 
     @PostMapping("/categories/{id}/delete")
     public String deleteCategory(@PathVariable String id, RedirectAttributes redirectAttributes) {
+        String categoryName = null;
         try {
+            // Get category name before deletion for audit
+            categoryName = categoryService.getCategory(id)
+                    .map(Category::getName)
+                    .orElse(id);
             categoryService.deleteCategory(id);
             redirectAttributes.addFlashAttribute("success", "Category deleted successfully");
+            auditLogService.logCategoryDelete("admin", id, categoryName);
         } catch (Exception e) {
             log.error("Error deleting category", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete category: " + e.getMessage());
@@ -368,7 +387,20 @@ public class AdminController {
     public String listTools(Model model) {
         model.addAttribute("activePage", "tools");
         model.addAttribute("tools", toolRegistryClient.getAllTools());
-        model.addAttribute("categories", categoryService.getAllCategories());
+        List<Category> categories = categoryService.getAllCategories();
+        model.addAttribute("categories", categories);
+
+        // Build a map of toolId -> list of category names for display
+        Map<String, List<String>> toolCategoryMap = new java.util.HashMap<>();
+        for (Category cat : categories) {
+            if (cat.getToolIds() != null) {
+                for (String toolId : cat.getToolIds()) {
+                    toolCategoryMap.computeIfAbsent(toolId, k -> new java.util.ArrayList<>()).add(cat.getName());
+                }
+            }
+        }
+        model.addAttribute("toolCategoryMap", toolCategoryMap);
+
         return "tools/list";
     }
 
@@ -383,8 +415,31 @@ public class AdminController {
     @PostMapping("/tools")
     public String createTool(@ModelAttribute Tool tool, RedirectAttributes redirectAttributes) {
         try {
+            // Auto-generate tool ID from name if not provided
+            if (tool.getId() == null || tool.getId().isBlank()) {
+                if (tool.getName() == null || tool.getName().isBlank()) {
+                    redirectAttributes.addFlashAttribute("error", "Tool name is required");
+                    return "redirect:/tools/new";
+                }
+                // Generate ID from name: lowercase, replace spaces/special chars with underscore
+                String generatedId = tool.getName()
+                        .toLowerCase()
+                        .replaceAll("[^a-z0-9]+", "_")  // Replace non-alphanumeric with underscore
+                        .replaceAll("^_+|_+$", "")      // Trim leading/trailing underscores
+                        .replaceAll("_+", "_");          // Collapse multiple underscores
+                tool.setId(generatedId);
+            }
+
+            // Check if tool ID already exists
+            Optional<Tool> existing = toolRegistryClient.getTool(tool.getId());
+            if (existing.isPresent()) {
+                redirectAttributes.addFlashAttribute("error", "Tool ID '" + tool.getId() + "' already exists. Please use a different name or ID.");
+                return "redirect:/tools/new";
+            }
+
             toolRegistryClient.createTool(tool);
-            redirectAttributes.addFlashAttribute("success", "Tool created successfully");
+            redirectAttributes.addFlashAttribute("success", "Tool created successfully with ID: " + tool.getId());
+            auditLogService.logToolRegister("admin", tool.getId(), tool.getName(), null);
         } catch (Exception e) {
             log.error("Error creating tool", e);
             redirectAttributes.addFlashAttribute("error", "Failed to create tool: " + e.getMessage());
@@ -406,6 +461,7 @@ public class AdminController {
         try {
             toolRegistryClient.updateTool(id, tool);
             redirectAttributes.addFlashAttribute("success", "Tool updated successfully");
+            auditLogService.logToolUpdate("admin", id, "Tool: " + tool.getName());
         } catch (Exception e) {
             log.error("Error updating tool", e);
             redirectAttributes.addFlashAttribute("error", "Failed to update tool: " + e.getMessage());
@@ -415,9 +471,15 @@ public class AdminController {
 
     @PostMapping("/tools/{id}/delete")
     public String deleteTool(@PathVariable String id, RedirectAttributes redirectAttributes) {
+        String toolName = null;
         try {
+            // Get tool name before deletion for audit
+            toolName = toolRegistryClient.getTool(id)
+                    .map(Tool::getName)
+                    .orElse(id);
             toolRegistryClient.deleteTool(id);
             redirectAttributes.addFlashAttribute("success", "Tool deleted successfully");
+            auditLogService.logToolDelete("admin", id, toolName);
         } catch (Exception e) {
             log.error("Error deleting tool", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete tool: " + e.getMessage());
@@ -766,6 +828,7 @@ public class AdminController {
             }
 
             redirectAttributes.addFlashAttribute("success", "Tool '" + toolId + "' registered successfully");
+            auditLogService.logToolRegister("admin", toolId, toolId, categoryId);
             return "redirect:/tools";
         } catch (Exception e) {
             log.error("Error registering tool", e);
@@ -860,6 +923,8 @@ public class AdminController {
         try {
             var result = toolRegistryClient.registerFromOpenApi(openApiUrl, categoryId);
             redirectAttributes.addFlashAttribute("success", "Tools registered from OpenAPI: " + result.toString());
+            int toolCount = result.has("count") ? result.get("count").asInt() : 0;
+            auditLogService.logOpenApiImport("admin", openApiUrl, toolCount, categoryId);
         } catch (Exception e) {
             log.error("Error registering from OpenAPI", e);
             redirectAttributes.addFlashAttribute("error", "Failed to register from OpenAPI: " + e.getMessage());
@@ -883,6 +948,8 @@ public class AdminController {
 
             var result = toolRegistryClient.registerFromOpenApiContent(content, baseUrl, categoryId, filename);
             redirectAttributes.addFlashAttribute("success", "Tools registered from OpenAPI file: " + result.toString());
+            int toolCount = result.has("count") ? result.get("count").asInt() : 0;
+            auditLogService.logOpenApiImport("admin", filename, toolCount, categoryId);
         } catch (Exception e) {
             log.error("Error registering from OpenAPI file", e);
             redirectAttributes.addFlashAttribute("error", "Failed to register from OpenAPI file: " + e.getMessage());
@@ -932,10 +999,25 @@ public class AdminController {
         return "documents/list";
     }
 
+    @GetMapping("/api/documents/check-title")
+    @ResponseBody
+    public java.util.Map<String, Object> checkDocumentTitle(@RequestParam String title) {
+        try {
+            boolean exists = ragServiceClient.checkTitleExists(title);
+            return java.util.Map.of("exists", exists, "title", title);
+        } catch (Exception e) {
+            log.error("Error checking document title", e);
+            return java.util.Map.of("exists", false, "error", e.getMessage());
+        }
+    }
+
     @GetMapping("/documents/upload")
-    public String uploadDocumentForm(Model model) {
+    public String uploadDocumentForm(@RequestParam(required = false) String categoryId, Model model) {
         model.addAttribute("activePage", "documents");
-        model.addAttribute("categories", categoryService.getAllCategories());
+        model.addAttribute("selectedCategoryId", categoryId);
+        if (categoryId != null && !categoryId.isBlank()) {
+            categoryService.getCategory(categoryId).ifPresent(cat -> model.addAttribute("selectedCategory", cat));
+        }
         model.addAttribute("acceptedFileTypes", documentParserService.getAcceptAttribute());
         model.addAttribute("supportedExtensions", documentParserService.getSupportedExtensions());
         return "documents/upload";
@@ -944,10 +1026,16 @@ public class AdminController {
     @PostMapping("/documents/upload")
     public String uploadDocument(@RequestParam(required = false) String docId,
                                   @RequestParam(required = false) String content,
-                                  @RequestParam(required = false) String categoryId,
+                                  @RequestParam String categoryId,
                                   @RequestParam(required = false) String title,
                                   @RequestParam(required = false) MultipartFile file,
                                   RedirectAttributes redirectAttributes) {
+        // Validate category is provided
+        if (categoryId == null || categoryId.isBlank()) {
+            redirectAttributes.addFlashAttribute("error", "Category is required. Please select a category.");
+            return "redirect:/documents/upload";
+        }
+
         try {
             String textContent = content;
             String documentId = docId;
@@ -1004,6 +1092,10 @@ public class AdminController {
             String uploadId = result.has("uploadId") ? result.get("uploadId").asText() : "";
             redirectAttributes.addFlashAttribute("success", "Document uploaded. Processing started.");
             redirectAttributes.addFlashAttribute("uploadId", uploadId);
+
+            // Log successful upload
+            auditLogService.logDocumentUpload("admin", documentId, documentTitle, categoryId);
+
             return "redirect:/documents/uploads/" + uploadId;
         } catch (Exception e) {
             log.error("Error uploading document", e);
@@ -1067,10 +1159,26 @@ public class AdminController {
 
     @PostMapping("/documents/uploads/{uploadId}/approve")
     public String approveUpload(@PathVariable String uploadId, RedirectAttributes redirectAttributes) {
+        String docId = null;
+        String categoryId = null;
         try {
+            // Get upload details for audit logging
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+
             var result = ragServiceClient.approveUpload(uploadId);
             if (result.has("success") && result.get("success").asBoolean()) {
+                // Ensure RAG tool exists for this category (auto-add on first document)
+                if (categoryId != null && categoryService.ensureRagToolForCategory(categoryId)) {
+                    log.info("Auto-added RAG tool to category {} on document approval", categoryId);
+                }
+
                 redirectAttributes.addFlashAttribute("success", "Document approved and moved to RAG knowledge base");
+                auditLogService.logDocumentApprove("admin", docId != null ? docId : uploadId, categoryId);
             } else {
                 String error = result.has("error") ? result.get("error").asText() : "Unknown error";
                 redirectAttributes.addFlashAttribute("error", "Failed to approve: " + error);
@@ -1079,14 +1187,26 @@ public class AdminController {
             log.error("Error approving upload", e);
             redirectAttributes.addFlashAttribute("error", "Failed to approve: " + e.getMessage());
         }
-        return "redirect:/documents";
+        // Redirect back to the same document detail page to show updated status
+        return "redirect:/documents/uploads/" + uploadId;
     }
 
     @PostMapping("/documents/uploads/{uploadId}/retry")
     public String retryUpload(@PathVariable String uploadId, RedirectAttributes redirectAttributes) {
+        String docId = null;
+        String categoryId = null;
         try {
+            // Get upload details for audit logging
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+
             ragServiceClient.retryUpload(uploadId);
             redirectAttributes.addFlashAttribute("success", "Reprocessing started");
+            auditLogService.logDocumentRetry("admin", docId != null ? docId : uploadId, categoryId);
         } catch (Exception e) {
             log.error("Error retrying upload", e);
             redirectAttributes.addFlashAttribute("error", "Failed to retry: " + e.getMessage());
@@ -1096,9 +1216,22 @@ public class AdminController {
 
     @PostMapping("/documents/uploads/{uploadId}/delete")
     public String deleteUpload(@PathVariable String uploadId, RedirectAttributes redirectAttributes) {
+        String docId = null;
+        String categoryId = null;
         try {
+            // Get upload details before deletion for audit logging
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+
             ragServiceClient.deleteUpload(uploadId);
             redirectAttributes.addFlashAttribute("success", "Upload deleted successfully");
+
+            // Log successful deletion
+            auditLogService.logDocumentDelete("admin", docId != null ? docId : uploadId, categoryId);
         } catch (Exception e) {
             log.error("Error deleting upload", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete upload: " + e.getMessage());
@@ -1111,6 +1244,9 @@ public class AdminController {
         try {
             ragServiceClient.deleteDocument(docId);
             redirectAttributes.addFlashAttribute("success", "Document '" + docId + "' deleted from RAG");
+
+            // Log successful deletion
+            auditLogService.logDocumentDelete("admin", docId, null);
         } catch (Exception e) {
             log.error("Error deleting document from RAG: {}", docId, e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete document: " + e.getMessage());
@@ -1153,9 +1289,12 @@ public class AdminController {
 
     // Direct ingest (bypasses preview) - supports file upload OR text input
     @GetMapping("/documents/ingest")
-    public String ingestDocumentForm(Model model) {
+    public String ingestDocumentForm(@RequestParam(required = false) String categoryId, Model model) {
         model.addAttribute("activePage", "documents");
-        model.addAttribute("categories", categoryService.getAllCategories());
+        model.addAttribute("selectedCategoryId", categoryId);
+        if (categoryId != null && !categoryId.isBlank()) {
+            categoryService.getCategory(categoryId).ifPresent(cat -> model.addAttribute("selectedCategory", cat));
+        }
         model.addAttribute("acceptedFileTypes", documentParserService.getAcceptAttribute());
         model.addAttribute("supportedExtensions", documentParserService.getSupportedExtensions());
         return "documents/ingest";
@@ -1164,10 +1303,16 @@ public class AdminController {
     @PostMapping("/documents/ingest")
     public String ingestDocument(@RequestParam(required = false) String docId,
                                   @RequestParam(required = false) String content,
-                                  @RequestParam(required = false) String categoryId,
+                                  @RequestParam String categoryId,
                                   @RequestParam(required = false) String title,
                                   @RequestParam(required = false) MultipartFile file,
                                   RedirectAttributes redirectAttributes) {
+        // Validate category is provided
+        if (categoryId == null || categoryId.isBlank()) {
+            redirectAttributes.addFlashAttribute("error", "Category is required. Please select a category.");
+            return "redirect:/documents/ingest";
+        }
+
         try {
             String textContent = content;
             String documentId = docId;
@@ -1229,8 +1374,17 @@ public class AdminController {
             metadata.put("documentType", documentType);
 
             ragServiceClient.ingestDocument(documentId, textContent, categoryId, metadata);
+
+            // Ensure RAG tool exists for this category (auto-add on first document)
+            if (categoryService.ensureRagToolForCategory(categoryId)) {
+                log.info("Auto-added RAG tool to category {} on first document ingest", categoryId);
+            }
+
             redirectAttributes.addFlashAttribute("success",
                     "Document ingested successfully (" + textContent.length() + " characters)");
+
+            // Log successful ingest
+            auditLogService.logDocumentUpload("admin", documentId, documentTitle, categoryId);
         } catch (Exception e) {
             log.error("Error ingesting document", e);
             redirectAttributes.addFlashAttribute("error", "Failed to ingest document: " + e.getMessage());
@@ -1243,6 +1397,9 @@ public class AdminController {
         try {
             ragServiceClient.deleteDocument(docId);
             redirectAttributes.addFlashAttribute("success", "Document deleted successfully");
+
+            // Log successful deletion
+            auditLogService.logDocumentDelete("admin", docId, null);
         } catch (Exception e) {
             log.error("Error deleting document", e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete document: " + e.getMessage());
@@ -1540,6 +1697,18 @@ public class AdminController {
             @RequestParam(defaultValue = "2") int summaryCount) {
         try {
             var result = ragServiceClient.generateMoreQA(uploadId, fineGrainCount, summaryCount);
+
+            // Get docId for audit logging
+            String docId = uploadId;
+            String categoryId = null;
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+            auditLogService.logGenerateQA("admin", docId, fineGrainCount, summaryCount, categoryId);
+
             return Map.of(
                     "success", true,
                     "message", "Generated Q&A pairs",
@@ -1568,6 +1737,18 @@ public class AdminController {
                 return Map.of("success", false, "error", "Question is required");
             }
             var result = ragServiceClient.documentChat(uploadId, question);
+
+            // Get docId for audit logging
+            String docId = uploadId;
+            String categoryId = null;
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+            auditLogService.logDocumentChat("admin", docId, question, categoryId);
+
             return Map.of(
                     "success", true,
                     "answer", result.has("answer") ? result.get("answer").asText() : ""
@@ -1591,6 +1772,18 @@ public class AdminController {
             @PathVariable Long qaId) {
         try {
             var result = ragServiceClient.addQAToFaq(uploadId, qaId);
+
+            // Get docId for audit logging
+            String docId = uploadId;
+            String categoryId = null;
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+            auditLogService.logFaqSelect("admin", docId, qaId, categoryId);
+
             return Map.of(
                     "success", true,
                     "message", "Q&A selected for FAQ"
@@ -1614,6 +1807,19 @@ public class AdminController {
             @RequestParam(required = false) String approvedBy) {
         try {
             var result = ragServiceClient.approveSelectedFaqs(uploadId, approvedBy);
+
+            // Get docId for audit logging
+            String docId = uploadId;
+            String categoryId = null;
+            var details = ragServiceClient.getUploadDetails(uploadId);
+            if (details != null && details.has("upload")) {
+                var upload = details.get("upload");
+                docId = upload.has("docId") ? upload.get("docId").asText() : uploadId;
+                categoryId = upload.has("categoryId") ? upload.get("categoryId").asText() : null;
+            }
+            int faqCount = result.has("approvedCount") ? result.get("approvedCount").asInt() : 0;
+            auditLogService.logFaqApprove("admin", docId, faqCount, categoryId);
+
             return Map.of(
                     "success", true,
                     "message", "FAQs approved",

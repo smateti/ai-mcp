@@ -30,14 +30,14 @@ public class ToolRegistrationService {
     private final ToolDefinitionRepository toolDefinitionRepository;
     private final ObjectMapper objectMapper;
     private final ToolRegistryMetrics metrics;
+    private final SequenceGeneratorService sequenceGeneratorService;
 
     @Transactional
     public ToolDefinition registerTool(ToolRegistrationRequest request) {
         long startTime = System.currentTimeMillis();
         try {
-            if (toolDefinitionRepository.existsByToolId(request.getToolId())) {
-                throw new IllegalArgumentException("Tool with ID " + request.getToolId() + " already exists");
-            }
+            // Generate sequential tool ID
+            String generatedToolId = sequenceGeneratorService.generateToolId();
 
             long parseStart = System.currentTimeMillis();
             ParsedToolInfo parsedInfo = openApiParserService.parseOpenApiEndpoint(
@@ -48,8 +48,10 @@ public class ToolRegistrationService {
             metrics.recordOpenApiParsing(System.currentTimeMillis() - parseStart);
 
         ToolDefinition toolDefinition = new ToolDefinition();
-        toolDefinition.setToolId(request.getToolId());
-        toolDefinition.setName(parsedInfo.getName());
+        toolDefinition.setToolId(generatedToolId);
+        // Use name from request if provided, otherwise from OpenAPI
+        toolDefinition.setName(request.getToolId() != null && !request.getToolId().isBlank()
+                ? request.getToolId() : parsedInfo.getName());
         toolDefinition.setDescription(parsedInfo.getDescription());
 
         if (request.getHumanReadableDescription() != null && !request.getHumanReadableDescription().trim().isEmpty()) {
@@ -117,9 +119,8 @@ public class ToolRegistrationService {
     public ToolDefinition registerToolFromContent(ToolRegistrationRequest request, String openApiContent) {
         long startTime = System.currentTimeMillis();
         try {
-            if (toolDefinitionRepository.existsByToolId(request.getToolId())) {
-                throw new IllegalArgumentException("Tool with ID " + request.getToolId() + " already exists");
-            }
+            // Generate sequential tool ID
+            String generatedToolId = sequenceGeneratorService.generateToolId();
 
             long parseStart = System.currentTimeMillis();
             ParsedToolInfo parsedInfo = openApiParserService.parseOpenApiFromContent(
@@ -130,8 +131,10 @@ public class ToolRegistrationService {
             metrics.recordOpenApiParsing(System.currentTimeMillis() - parseStart);
 
             ToolDefinition toolDefinition = new ToolDefinition();
-            toolDefinition.setToolId(request.getToolId());
-            toolDefinition.setName(parsedInfo.getName());
+            toolDefinition.setToolId(generatedToolId);
+            // Use name from request if provided, otherwise from OpenAPI
+            toolDefinition.setName(request.getToolId() != null && !request.getToolId().isBlank()
+                    ? request.getToolId() : parsedInfo.getName());
             toolDefinition.setDescription(parsedInfo.getDescription());
 
             if (request.getHumanReadableDescription() != null && !request.getHumanReadableDescription().trim().isEmpty()) {
@@ -245,24 +248,26 @@ public class ToolRegistrationService {
     /**
      * Create or update a simple tool without OpenAPI parsing.
      * Useful for registering public APIs manually.
-     * If the tool already exists, it will be updated.
+     * If the tool already exists (by name), it will be updated.
      */
     @Transactional
     public ToolDefinition createSimpleTool(SimpleToolRequest request) {
-        log.info("Creating/updating simple tool: {}", request.toolId());
+        String toolName = request.name() != null && !request.name().isBlank()
+                ? request.name()
+                : (request.toolId() != null ? request.toolId() : "Unnamed Tool");
+        log.info("Creating/updating simple tool: {}", toolName);
 
-        if (request.toolId() == null || request.toolId().isBlank()) {
-            throw new IllegalArgumentException("Tool ID is required");
-        }
-
-        // Check if tool already exists - if so, update it
-        ToolDefinition toolDefinition = toolDefinitionRepository.findByToolId(request.toolId())
+        // Check if tool already exists by name - if so, update it
+        ToolDefinition toolDefinition = toolDefinitionRepository.findByName(toolName)
                 .orElse(new ToolDefinition());
 
         boolean isUpdate = toolDefinition.getId() != null;
 
-        toolDefinition.setToolId(request.toolId());
-        toolDefinition.setName(request.name() != null ? request.name() : request.toolId());
+        // Generate new tool ID only for new tools
+        if (!isUpdate) {
+            toolDefinition.setToolId(sequenceGeneratorService.generateToolId());
+        }
+        toolDefinition.setName(toolName);
         toolDefinition.setDescription(request.description());
         toolDefinition.setHumanReadableDescription(request.description());
         toolDefinition.setOpenApiEndpoint(request.baseUrl() != null ? request.baseUrl() : "manual-registration");
@@ -366,6 +371,18 @@ public class ToolRegistrationService {
         toolDefinitionRepository.delete(tool);
         metrics.recordToolDeleted();
         updateToolCount();
+    }
+
+    @Transactional
+    public int deleteAllTools() {
+        List<ToolDefinition> allTools = toolDefinitionRepository.findAll();
+        int count = allTools.size();
+        toolDefinitionRepository.deleteAll();
+        for (int i = 0; i < count; i++) {
+            metrics.recordToolDeleted();
+        }
+        updateToolCount();
+        return count;
     }
 
     /**

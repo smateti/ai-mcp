@@ -167,19 +167,111 @@ public class TempCollectionService {
 
         return points.stream()
                 .map(point -> {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> payload = (Map<String, Object>) point.get("payload");
-                    if (payload == null) return null;
+                    Object payloadObj = point.get("payload");
+                    if (payloadObj == null) return null;
 
-                    int chunkIndex = payload.get("chunkIndex") != null
-                            ? ((Number) payload.get("chunkIndex")).intValue() : 0;
-                    String text = (String) payload.get("text");
+                    // Handle both JsonNode and Map types
+                    int chunkIndex;
+                    String text;
+
+                    if (payloadObj instanceof JsonNode) {
+                        JsonNode payload = (JsonNode) payloadObj;
+                        JsonNode chunkIndexNode = payload.get("chunkIndex");
+                        JsonNode textNode = payload.get("text");
+                        chunkIndex = chunkIndexNode != null ? chunkIndexNode.asInt(0) : 0;
+                        text = textNode != null ? textNode.asText() : "";
+                    } else if (payloadObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> payload = (Map<String, Object>) payloadObj;
+                        chunkIndex = payload.get("chunkIndex") != null
+                                ? ((Number) payload.get("chunkIndex")).intValue() : 0;
+                        text = (String) payload.get("text");
+                    } else {
+                        return null;
+                    }
 
                     return new ChunkData(chunkIndex, text);
                 })
                 .filter(c -> c != null)
                 .sorted((a, b) -> Integer.compare(a.chunkIndex(), b.chunkIndex()))
                 .toList();
+    }
+
+    /**
+     * Get all chunks from the main collection for a specific docId.
+     * Used after document has been moved to RAG to show chunks from main collection.
+     */
+    public List<ChunkData> getChunksFromMainCollection(String docId) {
+        log.debug("Getting chunks from main collection for docId: {}", docId);
+        List<ChunkData> chunks = getChunksByDocId(mainCollection, docId);
+        log.info("Found {} chunks in main collection for docId: {}", chunks.size(), docId);
+        return chunks;
+    }
+
+    /**
+     * Get chunks from a collection filtered by docId.
+     * Returns ChunkData directly to avoid JSON parsing issues.
+     */
+    private List<ChunkData> getChunksByDocId(String collection, String docId) {
+        try {
+            // Create filter for docId
+            ObjectNode matchVal = Json.MAPPER.createObjectNode();
+            matchVal.put("value", docId);
+
+            ObjectNode keyFilter = Json.MAPPER.createObjectNode();
+            keyFilter.put("key", "docId");
+            keyFilter.set("match", matchVal);
+
+            ObjectNode filter = Json.MAPPER.createObjectNode();
+            filter.set("must", Json.MAPPER.createArrayNode().add(keyFilter));
+
+            ObjectNode body = Json.MAPPER.createObjectNode();
+            body.put("limit", 10000);
+            body.put("with_payload", true);
+            body.put("with_vector", false);
+            body.set("filter", filter);
+
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(qdrantBaseUrl + "/collections/" + collection + "/points/scroll"))
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(Json.MAPPER.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> resp = Http.CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() / 100 != 2) {
+                log.warn("Failed to scroll points from {} for docId {}: HTTP {}", collection, docId, resp.statusCode());
+                return List.of();
+            }
+
+            JsonNode root = Json.MAPPER.readTree(resp.body());
+            JsonNode result = root.get("result");
+            if (result == null) return List.of();
+
+            JsonNode points = result.get("points");
+            if (points == null || !points.isArray()) return List.of();
+
+            List<ChunkData> chunks = new ArrayList<>();
+            for (JsonNode point : points) {
+                JsonNode payload = point.get("payload");
+                if (payload == null) continue;
+
+                JsonNode chunkIndexNode = payload.get("chunkIndex");
+                JsonNode textNode = payload.get("text");
+
+                int chunkIndex = chunkIndexNode != null ? chunkIndexNode.asInt(0) : 0;
+                String text = textNode != null ? textNode.asText() : "";
+
+                chunks.add(new ChunkData(chunkIndex, text));
+            }
+
+            // Sort by chunk index
+            chunks.sort((a, b) -> Integer.compare(a.chunkIndex(), b.chunkIndex()));
+            return chunks;
+        } catch (Exception e) {
+            log.error("Failed to get chunks by docId {} from {}", docId, collection, e);
+            return List.of();
+        }
     }
 
     /**
@@ -209,28 +301,37 @@ public class TempCollectionService {
     public void moveToMainCollection(DocumentUpload upload) {
         String tempCollection = getTempCollectionName(upload.getId());
 
-        // Get all points from temp collection
-        List<Map<String, Object>> points = getAllPoints(tempCollection);
+        // Get all points from temp collection (including vectors)
+        List<Map<String, Object>> tempPoints = getAllPoints(tempCollection);
 
-        if (points.isEmpty()) {
+        if (tempPoints.isEmpty()) {
             log.warn("No points found in temp collection for upload {}", upload.getId());
             return;
         }
 
-        // Re-chunk and store in main collection (for clean slate)
-        HybridChunker chunker = new HybridChunker(maxChars, overlapChars, minChars);
-        List<String> chunks = chunker.chunk(upload.getOriginalContent());
-
+        // Reuse existing vectors from temp collection - no need to re-embed
         List<Point> batch = new ArrayList<>();
 
-        for (int i = 0; i < chunks.size(); i++) {
-            String chunk = chunks.get(i);
-            List<Double> vector = embeddingsClient.embed(chunk);
+        for (Map<String, Object> tempPoint : tempPoints) {
+            JsonNode payloadNode = (JsonNode) tempPoint.get("payload");
+            JsonNode vectorNode = (JsonNode) tempPoint.get("vector");
 
+            if (payloadNode == null || vectorNode == null) {
+                log.warn("Skipping point with missing payload or vector");
+                continue;
+            }
+
+            // Extract vector
+            List<Double> vector = new ArrayList<>();
+            for (JsonNode v : vectorNode) {
+                vector.add(v.asDouble());
+            }
+
+            // Build new payload with updated metadata
             Map<String, Object> payload = new HashMap<>();
             payload.put("docId", upload.getDocId());
-            payload.put("chunkIndex", i);
-            payload.put("text", chunk);
+            payload.put("chunkIndex", payloadNode.has("chunkIndex") ? payloadNode.get("chunkIndex").asInt() : 0);
+            payload.put("text", payloadNode.has("text") ? payloadNode.get("text").asText() : "");
             if (upload.getCategoryId() != null) {
                 payload.put("categories", List.of(upload.getCategoryId()));
             }
@@ -238,8 +339,10 @@ public class TempCollectionService {
                 payload.put("title", upload.getTitle());
             }
 
+            String text = (String) payload.get("text");
+            int chunkIndex = (int) payload.get("chunkIndex");
             Point point = new Point(
-                    stableId(upload.getDocId() + ":" + i + ":" + chunk),
+                    stableId(upload.getDocId() + ":" + chunkIndex + ":" + text),
                     vector,
                     payload
             );
@@ -256,8 +359,8 @@ public class TempCollectionService {
             upsertBatchToMain(batch);
         }
 
-        log.info("Moved {} chunks from temp to main collection for upload {}",
-                chunks.size(), upload.getId());
+        log.info("Moved {} chunks from temp to main collection for upload {} (reused existing vectors)",
+                tempPoints.size(), upload.getId());
     }
 
     public void deleteTempCollection(String uploadId) {

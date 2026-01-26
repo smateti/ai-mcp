@@ -44,7 +44,7 @@
                     </small>
                 </div>
                 <div class="col-md-4 text-end">
-                    <span class="badge bg-info fs-6" th:text="'Category: ' + ${category.name}">Category</span>
+                    <span class="badge bg-info fs-6">Category: <span th:text="${category.name}">Category Name</span></span>
                 </div>
             </div>
         </div>
@@ -58,7 +58,7 @@
         </div>
         <div class="card-body">
             <p class="text-muted mb-3">
-                Help the AI model understand <strong>when</strong> to use this tool in the <span th:text="${category.name}">category</span> context.
+                Help the AI model understand <strong>when</strong> to use this tool in the <strong th:text="${category.name}">Category Name</strong> context.
                 This guidance appears in the tool description sent to the AI.
             </p>
             <form th:action="@{/categories/{catId}/tools/{toolId}/tool-override(catId=${category.id}, toolId=${tool.get('toolId').asText()})}" method="post">
@@ -133,7 +133,7 @@
     <div class="alert alert-info mb-4">
         <i class="bi bi-info-circle me-2"></i>
         <strong>Override Parameters for this Category:</strong>
-        Configure how this tool's parameters behave when used in the <strong th:text="${category.name}">category</strong> category.
+        Configure how this tool's parameters behave when used in the <strong th:text="${category.name}">Category Name</strong> category.
         <ul class="mb-0 mt-2">
             <li><strong>Locked Value:</strong> Pre-fill the parameter with a fixed value that users cannot change</li>
             <li><strong>Enum Override:</strong> Restrict the allowed values to a subset (comma-separated)</li>

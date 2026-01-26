@@ -47,6 +47,7 @@ public class DocumentProcessingService {
     private final FaqCacheService faqCacheService;
     private final LinkExtractionService linkExtractionService;
     private final RagService ragService;
+    private final DocumentSequenceService documentSequenceService;
 
     @Value("${naag.rag.chunking.maxChars:1200}")
     private int maxChars;
@@ -64,12 +65,14 @@ public class DocumentProcessingService {
     private int summaryCount;
 
     @Transactional
-    public DocumentUpload initiateUpload(String docId, String title, String content, String categoryId) {
+    public DocumentUpload initiateUpload(String title, String content, String categoryId) {
         String uploadId = UUID.randomUUID().toString();
+        // Generate sequential document ID
+        String generatedDocId = documentSequenceService.generateDocId();
 
         DocumentUpload upload = DocumentUpload.builder()
                 .id(uploadId)
-                .docId(docId)
+                .docId(generatedDocId)
                 .title(title)
                 .originalContent(content)
                 .categoryId(categoryId)

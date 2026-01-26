@@ -50,7 +50,7 @@
                                 <option value="">-- Auto-assign based on tags --</option>
                                 <option th:each="category : ${categories}"
                                         th:value="${category.id}"
-                                        th:text="${category.name}">Category</option>
+                                        th:text="${category.name}">Category Name</option>
                             </select>
                             <small class="text-muted">All imported tools will be assigned to this category</small>
                         </div>
@@ -89,7 +89,7 @@
                                 <option value="">-- Auto-assign based on tags --</option>
                                 <option th:each="category : ${categories}"
                                         th:value="${category.id}"
-                                        th:text="${category.name}">Category</option>
+                                        th:text="${category.name}">Category Name</option>
                             </select>
                             <small class="text-muted">All imported tools will be assigned to this category</small>
                         </div>

@@ -65,6 +65,9 @@ class DocumentProcessingServiceTest {
     @Mock
     private RagService ragService;
 
+    @Mock
+    private DocumentSequenceService documentSequenceService;
+
     private DocumentProcessingService processingService;
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -81,7 +84,8 @@ class DocumentProcessingServiceTest {
                 objectMapper,
                 faqCacheService,
                 linkExtractionService,
-                ragService
+                ragService,
+                documentSequenceService
         );
     }
 
@@ -396,23 +400,25 @@ class DocumentProcessingServiceTest {
     class InitiateUploadTests {
 
         @Test
-        @DisplayName("Should initiate upload successfully")
+        @DisplayName("Should initiate upload successfully with auto-generated docId")
         void shouldInitiateUploadSuccessfully() {
             // Given
+            when(documentSequenceService.generateDocId()).thenReturn("10000");
             when(uploadRepository.save(any(DocumentUpload.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // When
             DocumentUpload result = processingService.initiateUpload(
-                    "doc-123", "Test Title", "Test Content", "cat-1");
+                    "Test Title", "Test Content", "cat-1");
 
             // Then
             assertThat(result).isNotNull();
-            assertThat(result.getDocId()).isEqualTo("doc-123");
+            assertThat(result.getDocId()).isEqualTo("10000");
             assertThat(result.getTitle()).isEqualTo("Test Title");
             assertThat(result.getOriginalContent()).isEqualTo("Test Content");
             assertThat(result.getCategoryId()).isEqualTo("cat-1");
             assertThat(result.getStatus()).isEqualTo(ProcessingStatus.PENDING);
             assertThat(result.getId()).isNotNull();
+            verify(documentSequenceService).generateDocId();
         }
     }
 
