@@ -1,0 +1,103 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: naagi-chat-app
+  thymeleaf:
+    cache: false
+
+  # H2 Database Configuration (for chat history)
+  datasource:
+    url: jdbc:h2:file:./data/naagi-chat-db
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Elasticsearch Configuration (for audit trail - optional)
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+  # Disable auto-scan - ES repository is managed by ElasticsearchHealthChecker
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+
+# NAAG Configuration
+naagi:
+  services:
+    orchestrator:
+      url: http://localhost:8086
+    category-admin:
+      url: http://localhost:8085
+    rag:
+      url: http://localhost:8080
+
+  # Elasticsearch Settings
+  elasticsearch:
+    health-check-interval-seconds: 60  # Check ES availability every 60 seconds
+
+  # Persistence Configuration
+  persistence:
+    # Chat History Storage
+    history:
+      enabled: true
+      type: H2  # Options: H2, ELASTICSEARCH, BOTH
+
+    # Audit Trail Storage
+    #
+    # Architecture Overview:
+    # - chat-app writes audit logs to H2 (real-time, transactional)
+    # - category-admin's AuditLogBulkSyncService syncs H2 -> Elasticsearch (every 5 min)
+    # - Elasticsearch is used for analytics dashboards and reporting
+    #
+    # This separation ensures:
+    # - Fast writes without ES dependency
+    # - Graceful degradation if ES is unavailable
+    # - Analytics queries don't impact chat performance
+    #
+    audit:
+      enabled: true
+      type: BOTH  # Write to both H2 and Elasticsearch
+      log-prompts: true  # Log user questions (includes LLM system prompt)
+      log-responses: true  # Log assistant responses
+      retention-days: 90  # How long to keep audit logs in H2
+
+# Logging
+logging:
+  level:
+    com.naagii.chat: DEBUG
+    org.springframework.data.elasticsearch: WARN
+    org.elasticsearch: WARN
+
+# Actuator/Prometheus Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: naagi-chat-app
+    export:
+      prometheus:
+        enabled: true

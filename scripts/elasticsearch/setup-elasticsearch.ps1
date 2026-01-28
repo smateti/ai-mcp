@@ -98,7 +98,7 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "1. Enable Elasticsearch in application.yml:" -ForegroundColor White
 Write-Host "   naag.elasticsearch.enabled: true" -ForegroundColor Gray
 Write-Host ""
-Write-Host "2. Restart naag-category-admin" -ForegroundColor White
+Write-Host "2. Restart naagi-category-admin" -ForegroundColor White
 Write-Host ""
 Write-Host "3. Trigger initial sync:" -ForegroundColor White
 Write-Host "   curl -X POST http://localhost:8085/api/elasticsearch/sync/full" -ForegroundColor Gray

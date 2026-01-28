@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Document Information and Stats Row -->
+<th:block th:fragment="documentInfo(upload, stats)">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Document Information</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Title</dt>
+                        <dd class="col-sm-9">
+                            <span id="titleDisplay">
+                                <span id="titleText" th:text="${upload?.get('title')?.asText() ?: '(No title)'}">Title</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="showTitleEdit()" title="Edit title">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </span>
+                            <span id="titleEdit" class="d-none">
+                                <input type="text" id="titleInput" class="form-control form-control-sm d-inline-block" style="width: 300px;"
+                                       th:value="${upload?.get('title')?.asText() ?: ''}">
+                                <button type="button" class="btn btn-sm btn-success ms-1" onclick="saveTitle()">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-secondary ms-1" onclick="cancelTitleEdit()">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-3">Category</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('categoryId')?.asText() ?: '(None)'}">Category</dd>
+
+                        <dt class="col-sm-3">Chunks</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('totalChunks')?.asInt() ?: 0}">0</dd>
+
+                        <dt class="col-sm-3">Created</dt>
+                        <dd class="col-sm-9" th:text="${upload?.get('createdAt')?.asText() ?: 'N/A'}">Date</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Validation Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="fs-4 text-success" th:text="${stats?.get('passed')?.asInt() ?: 0}">0</div>
+                            <small class="text-muted">Passed</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 text-danger" th:text="${stats?.get('failed')?.asInt() ?: 0}">0</div>
+                            <small class="text-muted">Failed</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-4 text-info" th:text="${stats?.get('averageScore') != null && !stats.get('averageScore').isNull()} ? ${#numbers.formatDecimal(stats.get('averageScore').asDouble(), 1, 2)} : 'N/A'">N/A</div>
+                            <small class="text-muted">Avg Score</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Processing Progress Card -->
+<th:block th:fragment="processingProgress(status)">
+    <div id="processingCard" class="card mb-4"
+         th:classappend="${status == 'READY_FOR_REVIEW' || status == 'MOVED_TO_RAG' || status == 'FAILED'} ? 'd-none' : ''">
+        <div class="card-body">
+            <h5><i class="bi bi-gear-wide-connected me-2 spinning"></i>Processing Document...</h5>
+            <div class="progress mb-2" style="height: 25px;">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                     role="progressbar" style="width: 10%">10%</div>
+            </div>
+            <p id="progressMessage" class="text-muted mb-0">Initializing...</p>
+        </div>
+    </div>
+</th:block>
+
+</html>

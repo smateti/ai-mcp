@@ -1,0 +1,16 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: naagi-utility-tools
+
+logging:
+  level:
+    com.naagii.utilitytools: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

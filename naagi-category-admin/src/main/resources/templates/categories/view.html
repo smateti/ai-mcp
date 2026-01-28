@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <div class="page-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a th:href="@{/categories}">Categories</a></li>
+                <li class="breadcrumb-item active" th:text="${category?.name ?: 'Category'}">Category</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="bi bi-folder me-2"></i>
+                <span th:text="${category?.name ?: 'Unknown Category'}">Category Name</span>
+            </h1>
+            <div>
+                <a th:href="@{/categories/{id}/edit(id=${category.id})}" class="btn btn-outline-secondary">
+                    <i class="bi bi-pencil me-2"></i>Edit Category
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${success}">Success</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${error}">Error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Category Info -->
+    <div class="card mb-4" th:if="${category != null}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <p th:if="${category.description}" th:text="${category.description}" class="mb-2">Description</p>
+                    <p th:unless="${category.description}" class="text-muted mb-2">No description</p>
+                    <small class="text-muted">
+                        ID: <code th:text="${category.id}">id</code>
+                        <span th:if="${category.createdAt}">
+                            | Created: <span th:text="${#temporals.format(category.createdAt, 'yyyy-MM-dd HH:mm')}">date</span>
+                        </span>
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <span class="badge fs-6" th:classappend="${category.active} ? 'bg-success' : 'bg-secondary'"
+                          th:text="${category.active} ? 'Active' : 'Inactive'">Status</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools Section -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Tools</h5>
+            <div>
+                <form th:action="@{/categories/{id}/tools/reset-priorities(id=${category.id})}" method="post" class="d-inline"
+                      th:if="${categoryTools != null && !categoryTools.isEmpty()}">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Reset tool priorities to alphabetical order?');">
+                        <i class="bi bi-arrow-repeat me-1"></i>Reset Priorities
+                    </button>
+                </form>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Add Tool Form -->
+            <form th:action="@{/categories/{id}/tools/add(id=${category.id})}" method="post" class="mb-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label">Add Tool to Category</label>
+                        <select name="toolId" class="form-select" required>
+                            <option value="">Select a tool...</option>
+                            <th:block th:each="tool : ${allTools}">
+                                <option th:value="${tool.id}" th:text="${tool.name}"
+                                        th:disabled="${category.toolIds != null && category.toolIds.contains(tool.id)}">Tool Name</option>
+                            </th:block>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-circle me-1"></i>Add Tool
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Tools List -->
+            <div class="table-responsive" th:if="${categoryTools != null && !categoryTools.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="tool, stat : ${categoryTools}">
+                            <td class="text-muted" th:text="${stat.index + 1}">1</td>
+                            <td>
+                                <strong th:text="${tool.name}">Tool Name</strong>
+                            </td>
+                            <td th:text="${#strings.abbreviate(tool.description, 50)}" class="text-muted">Description</td>
+                            <td class="text-end">
+                                <a th:href="@{/categories/{catId}/tools/{toolId}/overrides(catId=${category.id}, toolId=${tool.id})}"
+                                   class="btn btn-sm btn-outline-primary me-1" title="Parameter Overrides">
+                                    <i class="bi bi-sliders"></i>
+                                </a>
+                                <form th:action="@{/categories/{catId}/tools/{toolId}/remove(catId=${category.id}, toolId=${tool.id})}"
+                                      method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Remove this tool from the category?');">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center py-4 text-muted" th:if="${categoryTools == null || categoryTools.isEmpty()}">
+                <i class="bi bi-tools fs-1"></i>
+                <p>No tools assigned to this category</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ Cache Configuration -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>FAQ Cache Settings</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshFaqCache()">
+                <i class="bi bi-arrow-repeat me-1"></i>Refresh Cache
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Cache Expiry Time (minutes)</label>
+                    <input type="number" id="faqExpiryMinutes" class="form-control" value="5" min="1" max="1440">
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" id="faqCacheEnabled" checked>
+                        <label class="form-check-label" for="faqCacheEnabled">Cache Enabled</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button type="button" class="btn btn-primary w-100" onclick="saveFaqConfig()">
+                        <i class="bi bi-save me-1"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card bg-light">
+                        <div class="card-body py-2">
+                            <div class="row text-center">
+                                <div class="col-md-3">
+                                    <small class="text-muted">FAQ Count</small>
+                                    <div class="fs-5 fw-bold" id="faqCount">-</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Cache Status</small>
+                                    <div class="fs-5" id="cacheStatus"><span class="badge bg-secondary">Loading...</span></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Cache Age</small>
+                                    <div class="fs-5" id="cacheAge">-</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Last Refresh</small>
+                                    <div class="fs-5 small" id="lastRefresh">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents in RAG -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-database me-2"></i>Documents in RAG</h5>
+            <div class="d-flex gap-2">
+                <a th:href="@{/documents/upload(categoryId=${category.id})}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-cloud-upload me-1"></i>Upload with Preview
+                </a>
+                <a th:href="@{/documents/ingest(categoryId=${category.id})}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-fast-forward me-1"></i>Quick Ingest
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" th:if="${documents != null && !documents.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Chunks</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="doc : ${documents}">
+                            <td>
+                                <a th:href="@{/documents/view/{docId}(docId=${doc.docId})}" class="text-decoration-none">
+                                    <span th:text="${doc.title ?: '(No title)'}">Title</span>
+                                </a>
+                            </td>
+                            <td th:text="${doc.chunkCount ?: 0}">0</td>
+                            <td class="text-end">
+                                <a th:href="@{/documents/view/{docId}(docId=${doc.docId})}" class="btn btn-sm btn-outline-secondary me-1" title="View Document">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <form th:action="@{/documents/{docId}/delete(docId=${doc.docId})}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Delete this document from RAG?');">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center py-4 text-muted" th:if="${documents == null || documents.isEmpty()}">
+                <i class="bi bi-database fs-1"></i>
+                <p>No documents in RAG for this category</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload History -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Upload History</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" th:if="${uploads != null && !uploads.isEmpty()}">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Q&A Pairs</th>
+                            <th>Created</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="upload : ${uploads}">
+                            <td>
+                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}" class="text-decoration-none"
+                                   th:text="${upload.has('title') && !upload.get('title').isNull()} ? ${upload.get('title').asText()} : '(No title)'">Title</a>
+                            </td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${upload.get('status').asText() == 'READY_FOR_REVIEW'} ? 'bg-success' :
+                                                      (${upload.get('status').asText() == 'FAILED'} ? 'bg-danger' :
+                                                      (${upload.get('status').asText() == 'MOVED_TO_RAG'} ? 'bg-info' : 'bg-warning'))"
+                                      th:text="${upload.get('status').asText()}">STATUS</span>
+                            </td>
+                            <td>
+                                <span th:text="${upload.has('questionsGenerated')} ? ${upload.get('questionsGenerated').asInt()} : 0">0</span>
+                                /
+                                <span th:text="${upload.has('questionsValidated')} ? ${upload.get('questionsValidated').asInt()} : 0">0</span>
+                            </td>
+                            <td th:text="${upload.has('createdAt') && !upload.get('createdAt').isNull()} ? ${#strings.substring(upload.get('createdAt').asText(), 0, 16)} : '-'">Date</td>
+                            <td class="text-end">
+                                <a th:href="@{/documents/uploads/{id}(id=${upload.get('id').asText()})}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-center py-4 text-muted" th:if="${uploads == null || uploads.isEmpty()}">
+                <i class="bi bi-inbox fs-1"></i>
+                <p>No uploads for this category</p>
+            </div>
+        </div>
+    </div>
+    <script th:inline="javascript">
+        const categoryId = /*[[${category.id}]]*/ '';
+        const ragServiceUrl = /*[[${@environment.getProperty('naag.services.rag.url', 'http://localhost:8080')}]]*/ 'http://localhost:8080';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFaqConfig();
+        });
+
+        async function loadFaqConfig() {
+            try {
+                // Load config
+                const configResponse = await fetch(`${ragServiceUrl}/api/faq/config/${categoryId}`);
+                if (configResponse.ok) {
+                    const config = await configResponse.json();
+                    document.getElementById('faqExpiryMinutes').value = config.cacheExpiryMinutes || 5;
+                    document.getElementById('faqCacheEnabled').checked = config.cacheEnabled !== false;
+                    if (config.lastRefreshedAt) {
+                        document.getElementById('lastRefresh').textContent = config.lastRefreshedAt.substring(0, 16).replace('T', ' ');
+                    }
+                }
+
+                // Load stats
+                const statsResponse = await fetch(`${ragServiceUrl}/api/faq/cache/stats`);
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    const catStats = stats.categories?.find(c => c.categoryId === categoryId);
+                    if (catStats) {
+                        document.getElementById('faqCount').textContent = catStats.faqCount || 0;
+                        document.getElementById('cacheAge').textContent = catStats.cacheAge || 'Not loaded';
+                        document.getElementById('cacheStatus').innerHTML = catStats.cacheLoaded
+                            ? '<span class="badge bg-success">Loaded</span>'
+                            : '<span class="badge bg-warning">Not loaded</span>';
+                    } else {
+                        document.getElementById('faqCount').textContent = '0';
+                        document.getElementById('cacheStatus').innerHTML = '<span class="badge bg-secondary">No data</span>';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load FAQ config:', error);
+                document.getElementById('cacheStatus').innerHTML = '<span class="badge bg-danger">Error</span>';
+            }
+        }
+
+        async function saveFaqConfig() {
+            const expiryMinutes = parseInt(document.getElementById('faqExpiryMinutes').value) || 5;
+            const enabled = document.getElementById('faqCacheEnabled').checked;
+
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq/config/${categoryId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expiryMinutes, enabled })
+                });
+
+                if (response.ok) {
+                    alert('FAQ cache settings saved successfully!');
+                    loadFaqConfig();
+                } else {
+                    alert('Failed to save FAQ cache settings');
+                }
+            } catch (error) {
+                console.error('Failed to save FAQ config:', error);
+                alert('Error saving FAQ cache settings: ' + error.message);
+            }
+        }
+
+        async function refreshFaqCache() {
+            try {
+                const response = await fetch(`${ragServiceUrl}/api/faq/cache/${categoryId}/refresh`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    alert('FAQ cache refreshed successfully!');
+                    loadFaqConfig();
+                } else {
+                    alert('Failed to refresh FAQ cache');
+                }
+            } catch (error) {
+                console.error('Failed to refresh FAQ cache:', error);
+                alert('Error refreshing FAQ cache: ' + error.message);
+            }
+        }
+    </script>
+</th:block>
+</html>

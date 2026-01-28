@@ -31,11 +31,11 @@ chmod +x scripts/start-metrics.sh
 
 | Service | Port | Metrics Endpoint |
 |---------|------|------------------|
-| naag-chat-app | 8080 | /actuator/prometheus |
-| naag-rag-service | 8082 | /actuator/prometheus |
-| naag-category-admin | 8084 | /actuator/prometheus |
-| naag-tool-registry | 8085 | /actuator/prometheus |
-| naag-ai-orchestrator | 8086 | /actuator/prometheus |
+| naagi-chat-app | 8080 | /actuator/prometheus |
+| naagi-rag-service | 8082 | /actuator/prometheus |
+| naagi-category-admin | 8084 | /actuator/prometheus |
+| naagi-tool-registry | 8085 | /actuator/prometheus |
+| naagi-ai-orchestrator | 8086 | /actuator/prometheus |
 
 ## Dashboards
 

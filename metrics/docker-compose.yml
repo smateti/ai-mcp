@@ -3,7 +3,7 @@ version: '3.8'
 services:
   prometheus:
     image: prom/prometheus:v2.48.0
-    container_name: naag-prometheus
+    container_name: naagi-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -17,11 +17,11 @@ services:
       - '--web.enable-lifecycle'
     restart: unless-stopped
     networks:
-      - naag-metrics
+      - naagi-metrics
 
   grafana:
     image: grafana/grafana:10.2.2
-    container_name: naag-grafana
+    container_name: naagi-grafana
     ports:
       - "3000:3000"
     environment:
@@ -37,12 +37,12 @@ services:
       - prometheus
     restart: unless-stopped
     networks:
-      - naag-metrics
+      - naagi-metrics
 
 volumes:
   prometheus_data:
   grafana_data:
 
 networks:
-  naag-metrics:
+  naagi-metrics:
     driver: bridge

@@ -1,0 +1,56 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: naagi-ai-orchestrator
+
+# NAAG Service Dependencies
+naagi:
+  services:
+    rag-service:
+      url: http://localhost:8080
+    tool-registry:
+      url: http://localhost:8081
+    mcp-gateway:
+      url: http://localhost:8082
+    category-admin:
+      url: http://localhost:8085
+
+  # LLM Configuration
+  llm:
+    provider: llamacpp-openai
+    baseUrl: http://localhost:8000
+    model: llama3.1
+    timeout: 60000
+
+  # Tool selection thresholds
+  tool-selection:
+    confidence:
+      high-threshold: 0.8
+      low-threshold: 0.5
+    max-alternatives: 3
+    parameter-timeout-minutes: 5
+
+# Logging
+logging:
+  level:
+    com.naagii.orchestrator: DEBUG
+
+# Actuator/Prometheus Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: naagi-ai-orchestrator
+    export:
+      prometheus:
+        enabled: true

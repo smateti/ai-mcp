@@ -1,0 +1,167 @@
+server:
+  port: 8080
+  tomcat:
+    max-swallow-size: 200MB
+
+spring:
+  application:
+    name: naagi-rag-service
+
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+      file-size-threshold: 2MB
+
+  # H2 Database Configuration
+  datasource:
+    url: jdbc:h2:file:./data/naagi-rag-db
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Cache Configuration
+  cache:
+    type: jcache
+    jcache:
+      config: classpath:ehcache.xml
+
+# NAAG RAG Configuration
+naagi:
+  rag:
+    llm:
+      # Provider type: ollama-native | ollama-openai | llamacpp | llamacpp-openai
+      provider: llamacpp-openai
+
+    # Ollama configuration
+    ollama:
+      baseUrl: http://localhost:11434
+      embedModel: nomic-embed-text
+      chatModel: llama3.1
+
+    # llama.cpp configuration
+    llama:
+      baseUrl: http://localhost:8000
+      embedModel: nomic-embed-text
+      chatModel: llama3.1
+
+    # Qdrant vector database
+    qdrant:
+      baseUrl: http://localhost:6333
+      collection: naagi_rag_chunks
+      vectorSize: 768
+      distance: Cosine
+
+    # Chunking settings
+    chunking:
+      maxChars: 1200
+      overlapChars: 200
+      minChars: 100
+
+    # Retrieval settings
+    retrieval:
+      topK: 5
+      minRelevanceScore: 0.65  # Minimum score to consider context relevant
+
+    # Performance tuning
+    performance:
+      maxConcurrentEmbeddings: 4
+      qdrantBatchSize: 64
+
+    # Hybrid Search Configuration
+    # Combines dense (semantic/embedding) with sparse (BM25/keyword) retrieval
+    # Uses Reciprocal Rank Fusion (RRF) to merge results
+    hybrid:
+      enabled: false                # Set to true to enable hybrid search
+      dense-weight: 0.7             # Weight for semantic/embedding search (0-1)
+      sparse-weight: 0.3            # Weight for BM25/keyword search (0-1)
+      rrf-k: 60                     # RRF constant (higher = more equal rank weighting)
+
+    # Re-ranking Configuration
+    # Two-stage retrieval: initial retrieval -> cross-encoder re-ranking
+    # Providers: local, cohere, jina, llm
+    rerank:
+      enabled: true                 # Set to true to enable re-ranking
+      provider: local               # local uses llama.cpp /rerank endpoint
+      base-url: http://localhost:8001  # Separate llama.cpp server for reranker
+      model: bge-reranker-v2-m3     # BGE multilingual reranker model
+      api-key:                      # API key for Cohere/Jina
+      candidate-count: 50           # Initial retrieval count before re-ranking
+      min-score: 0.0                # Minimum re-rank score to include
+
+    # Corrective RAG (CRAG) Configuration
+    # Evaluates retrieval quality and applies corrective strategies
+    crag:
+      enabled: true                          # Enable CRAG evaluation and correction
+      high-confidence-threshold: 0.85        # Above this = CORRECT (use directly)
+      low-confidence-threshold: 0.65         # Below this = INCORRECT (apply corrections)
+      score-gap-threshold: 0.15              # Large gap to 2nd result = more confident
+      llm-evaluation-enabled: false          # Use LLM to verify borderline results
+      query-expansion-enabled: true          # Expand queries when confidence is low
+      knowledge-refinement-enabled: true     # Refine/filter retrieved chunks
+      max-retry-attempts: 2                  # Max query expansion retries
+      min-relevance-for-answer: 0.75         # Don't generate answer if top score below this (prevents hallucination)
+
+    # Q&A Generation settings for document preview
+    qa-generation:
+      fine-grain-count: 5
+      summary-count: 3
+      validation-similarity-threshold: 0.7
+
+  # FAQ Configuration
+  faq:
+    enabled: true
+    collection: naagi_faq
+    min-similarity-score: 0.85       # Minimum score to return FAQ answer
+    auto-select-threshold: 0.7       # Auto-select Q&A with validation score >= this
+
+  # User Questions Configuration
+  user-questions:
+    enabled: true
+    collection: naagi_user_questions
+    deduplication-threshold: 0.95    # Consider questions duplicate if score >= this
+    store-all-questions: true        # Store every question for analytics
+
+  # Cache TTL settings (in seconds)
+  cache:
+    enabled: true
+    default-ttl-seconds: 60
+    embeddings-ttl-seconds: 300
+    query-ttl-seconds: 60
+
+# Logging configuration for performance tracing
+logging:
+  level:
+    com.naagii.rag.service.RagService: INFO
+    com.naagii.rag.search: DEBUG
+    com.naagii.rag.llm: DEBUG
+    com.naagii.rag.qdrant: DEBUG
+
+# Actuator/Prometheus Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: naagi-rag-service
+    export:
+      prometheus:
+        enabled: true

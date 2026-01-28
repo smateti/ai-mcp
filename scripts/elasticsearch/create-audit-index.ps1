@@ -13,7 +13,7 @@ Write-Host "Setting up Elasticsearch audit log index at ${EsUrl}..." -Foreground
 # Index template JSON
 $indexTemplate = @'
 {
-  "index_patterns": ["naag-audit-logs*"],
+  "index_patterns": ["naagi-audit-logs*"],
   "priority": 100,
   "template": {
     "settings": {
@@ -106,7 +106,7 @@ $indexTemplate = @'
 try {
     # Create index template
     Write-Host "Creating index template..." -ForegroundColor Yellow
-    $response = Invoke-RestMethod -Uri "${EsUrl}/_index_template/naag-audit-logs-template" `
+    $response = Invoke-RestMethod -Uri "${EsUrl}/_index_template/naagi-audit-logs-template" `
         -Method PUT `
         -ContentType "application/json" `
         -Body $indexTemplate
@@ -118,8 +118,8 @@ catch {
 
 try {
     # Create the index
-    Write-Host "Creating index naag-audit-logs..." -ForegroundColor Yellow
-    $response = Invoke-RestMethod -Uri "${EsUrl}/naag-audit-logs" `
+    Write-Host "Creating index naagi-audit-logs..." -ForegroundColor Yellow
+    $response = Invoke-RestMethod -Uri "${EsUrl}/naagi-audit-logs" `
         -Method PUT `
         -ContentType "application/json"
     Write-Host "Index created: $($response | ConvertTo-Json -Compress)" -ForegroundColor Green
@@ -135,7 +135,7 @@ catch {
 try {
     # Verify index was created
     Write-Host "Verifying index..." -ForegroundColor Yellow
-    $response = Invoke-RestMethod -Uri "${EsUrl}/naag-audit-logs/_mapping" -Method GET
+    $response = Invoke-RestMethod -Uri "${EsUrl}/naagi-audit-logs/_mapping" -Method GET
     Write-Host "Index mapping verified" -ForegroundColor Green
 }
 catch {
@@ -144,5 +144,5 @@ catch {
 
 Write-Host ""
 Write-Host "Elasticsearch audit log index setup complete!" -ForegroundColor Cyan
-Write-Host "Index: naag-audit-logs" -ForegroundColor White
-Write-Host "URL: ${EsUrl}/naag-audit-logs" -ForegroundColor White
+Write-Host "Index: naagi-audit-logs" -ForegroundColor White
+Write-Host "URL: ${EsUrl}/naagi-audit-logs" -ForegroundColor White

@@ -12,10 +12,10 @@ Each service is self-contained with its own dependencies. Services communicate v
 
 ## Naming Convention
 
-All services use the **naag-** prefix with 3-word names:
-- `naag-rag-service` (not `rag-service`)
-- `naag-tool-registry` (not `tool-registry`)
-- `naag-mcp-gateway` (not `mcp-gateway`)
+All services use the **naagi-** prefix with 3-word names:
+- `naagi-rag-service` (not `rag-service`)
+- `naagi-tool-registry` (not `tool-registry`)
+- `naagi-mcp-gateway` (not `mcp-gateway`)
 
 ---
 
@@ -23,13 +23,13 @@ All services use the **naag-** prefix with 3-word names:
 
 | Port | Service | Dependencies | Purpose |
 |------|---------|--------------|---------|
-| 8080 | **naag-rag-service** | None | RAG (ingest, query, embeddings, document parsing) |
-| 8081 | **naag-tool-registry** | None | Register and manage tool definitions |
-| 8082 | **naag-mcp-gateway** | 8081 | MCP protocol gateway for tool execution |
-| 8083 | **naag-utility-tools** | 8081 | Basic utility tools (echo, add, time) |
-| 8085 | **naag-category-admin** | 8080, 8081 | Admin UI for categories, tools, documents |
-| 8086 | **naag-ai-orchestrator** | 8080, 8081, 8082, 8085 | LLM tool selection & intelligent routing |
-| 8087 | **naag-chat-app** | 8086 | User chat interface |
+| 8080 | **naagi-rag-service** | None | RAG (ingest, query, embeddings, document parsing) |
+| 8081 | **naagi-tool-registry** | None | Register and manage tool definitions |
+| 8082 | **naagi-mcp-gateway** | 8081 | MCP protocol gateway for tool execution |
+| 8083 | **naagi-utility-tools** | 8081 | Basic utility tools (echo, add, time) |
+| 8085 | **naagi-category-admin** | 8080, 8081 | Admin UI for categories, tools, documents |
+| 8086 | **naagi-ai-orchestrator** | 8080, 8081, 8082, 8085 | LLM tool selection & intelligent routing |
+| 8087 | **naagi-chat-app** | 8086 | User chat interface |
 
 Note: Port 8084 is reserved for test services (not part of core platform).
 
@@ -42,7 +42,7 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 │                           USER INTERFACES                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────┐              ┌──────────────────┐                     │
-│  │ naag-chat-app    │              │ naag-category-   │                     │
+│  │ naagi-chat-app    │              │ naagi-category-   │                     │
 │  │  (Port 8087)     │              │   admin (8085)   │                     │
 │  │                  │              │                  │                     │
 │  │  - Chat UI       │              │  - Category CRUD │                     │
@@ -56,7 +56,7 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 │                         ORCHESTRATION LAYER                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                    naag-ai-orchestrator                               │   │
+│  │                    naagi-ai-orchestrator                               │   │
 │  │                         (Port 8086)                                   │   │
 │  │                                                                       │   │
 │  │  - LLM Tool Selection       - Intent Detection                       │   │
@@ -71,7 +71,7 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 │                           CORE SERVICES                                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │ naag-mcp-       │  │ naag-tool-      │  │ naag-rag-       │              │
+│  │ naagi-mcp-       │  │ naagi-tool-      │  │ naagi-rag-       │              │
 │  │  gateway (8082) │  │  registry (8081)│  │  service (8080) │              │
 │  │                 │  │                 │  │                 │              │
 │  │ - JSON-RPC 2.0  │  │ - Tool CRUD     │  │ - Ingest        │              │
@@ -83,7 +83,7 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 │           ▼                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                    External Tool Endpoints                           │    │
-│  │  - naag-utility-tools (8083) - echo, add, time                      │    │
+│  │  - naagi-utility-tools (8083) - echo, add, time                      │    │
 │  │  - Any registered OpenAPI endpoint                                   │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -93,11 +93,11 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 
 ## Service Details
 
-### 1. naag-ai-orchestrator (Port 8086)
+### 1. naagi-ai-orchestrator (Port 8086)
 
 **Purpose**: Central intelligence layer for LLM-powered tool selection and routing
 
-**Dependencies**: naag-rag-service (8080), naag-tool-registry (8081), naag-mcp-gateway (8082), naag-category-admin (8085)
+**Dependencies**: naagi-rag-service (8080), naagi-tool-registry (8081), naagi-mcp-gateway (8082), naagi-category-admin (8085)
 
 **Responsibilities**:
 - Receive user messages from chat-app
@@ -109,7 +109,7 @@ Note: Port 8084 is reserved for test services (not part of core platform).
 
 **Structure**:
 ```
-naag-ai-orchestrator/
+naagi-ai-orchestrator/
 ├── pom.xml
 └── src/main/java/com/naag/orchestrator/
     ├── NaagOrchestratorApplication.java
@@ -164,11 +164,11 @@ Response:
 
 ---
 
-### 2. naag-utility-tools (Port 8083)
+### 2. naagi-utility-tools (Port 8083)
 
 **Purpose**: Provide basic utility tools as a separate service
 
-**Dependencies**: naag-tool-registry (8081)
+**Dependencies**: naagi-tool-registry (8081)
 
 **Responsibilities**:
 - Echo messages
@@ -178,7 +178,7 @@ Response:
 
 **Structure**:
 ```
-naag-utility-tools/
+naagi-utility-tools/
 ├── pom.xml
 └── src/main/java/com/naag/utilitytools/
     ├── NaagUtilityToolsApplication.java
@@ -210,11 +210,11 @@ Response: { "time": "2025-01-17T10:30:00Z", "timezone": "UTC" }
 
 ## Core Services
 
-### 3. naag-mcp-gateway (Port 8082)
+### 3. naagi-mcp-gateway (Port 8082)
 
 **Purpose**: MCP protocol gateway for tool execution
 
-**Dependencies**: naag-tool-registry (8081)
+**Dependencies**: naagi-tool-registry (8081)
 
 **Responsibilities**:
 - Implement MCP JSON-RPC 2.0 protocol
@@ -224,7 +224,7 @@ Response: { "time": "2025-01-17T10:30:00Z", "timezone": "UTC" }
 
 **Structure**:
 ```
-naag-mcp-gateway/
+naagi-mcp-gateway/
 ├── pom.xml
 └── src/main/java/com/naag/mcpgateway/
     ├── NaagMcpGatewayApplication.java
@@ -257,11 +257,11 @@ public void refreshTools() {
 
 ---
 
-### 4. naag-chat-app (Port 8087)
+### 4. naagi-chat-app (Port 8087)
 
 **Purpose**: User chat interface (thin UI layer)
 
-**Dependencies**: naag-ai-orchestrator (8086)
+**Dependencies**: naagi-ai-orchestrator (8086)
 
 **Responsibilities**:
 - Provide chat UI (REST and WebSocket)
@@ -270,7 +270,7 @@ public void refreshTools() {
 
 **Structure**:
 ```
-naag-chat-app/
+naagi-chat-app/
 ├── pom.xml
 └── src/main/java/com/naag/chatapp/
     ├── NaagChatAppApplication.java
@@ -308,11 +308,11 @@ public ChatMessage processMessage(String sessionId, String message, String categ
 
 ---
 
-### 5. naag-category-admin (Port 8085)
+### 5. naagi-category-admin (Port 8085)
 
 **Purpose**: Admin UI for categories, tools, and document metadata
 
-**Dependencies**: naag-rag-service (8080), naag-tool-registry (8081)
+**Dependencies**: naagi-rag-service (8080), naagi-tool-registry (8081)
 
 **Responsibilities**:
 - Category CRUD operations
@@ -321,7 +321,7 @@ public ChatMessage processMessage(String sessionId, String message, String categ
 
 **Structure**:
 ```
-naag-category-admin/
+naagi-category-admin/
 ├── pom.xml
 └── src/main/java/com/naag/categoryadmin/
     ├── NaagCategoryAdminApplication.java
@@ -360,7 +360,7 @@ public void uploadDocument(MultipartFile file, String categoryId) {
 
 ---
 
-### 6. naag-rag-service (Port 8080)
+### 6. naagi-rag-service (Port 8080)
 
 **Purpose**: RAG operations with document parsing
 
@@ -374,7 +374,7 @@ public void uploadDocument(MultipartFile file, String categoryId) {
 
 **Structure**:
 ```
-naag-rag-service/
+naagi-rag-service/
 ├── pom.xml
 └── src/main/java/com/naag/ragservice/
     ├── NaagRagServiceApplication.java
@@ -418,7 +418,7 @@ POST /api/rag/query            // Semantic search
 
 ---
 
-### 7. naag-tool-registry (Port 8081)
+### 7. naagi-tool-registry (Port 8081)
 
 **Purpose**: Register and manage tool definitions
 
@@ -432,7 +432,7 @@ POST /api/rag/query            // Semantic search
 
 **Structure**:
 ```
-naag-tool-registry/
+naagi-tool-registry/
 ├── pom.xml
 └── src/main/java/com/naag/toolregistry/
     ├── NaagToolRegistryApplication.java
@@ -462,7 +462,7 @@ POST /api/tools/register   // Auto-register from OpenAPI spec
 
 ```
 ┌─────────────────┐   POST /api/orchestrate   ┌─────────────────────┐
-│ naag-chat-app   │ ─────────────────────────▶│ naag-ai-orchestrator│
+│ naagi-chat-app   │ ─────────────────────────▶│ naagi-ai-orchestrator│
 │ (8087)          │◀───────────────────────── │ (8086)              │
 └─────────────────┘   OrchestrationResponse   └──────────┬──────────┘
                                                          │
@@ -470,7 +470,7 @@ POST /api/tools/register   // Auto-register from OpenAPI spec
                     │                                    │                            │
                     ▼                                    ▼                            ▼
          ┌──────────────────┐            ┌──────────────────┐          ┌──────────────────┐
-         │ naag-mcp-gateway │            │ naag-tool-       │          │ naag-rag-service │
+         │ naagi-mcp-gateway │            │ naagi-tool-       │          │ naagi-rag-service │
          │ (8082)           │            │   registry (8081)│          │ (8080)           │
          │                  │            │                  │          │                  │
          │ POST /mcp/exec   │            │ GET /api/tools   │          │ POST /api/rag/*  │
@@ -478,7 +478,7 @@ POST /api/tools/register   // Auto-register from OpenAPI spec
                   │
                   ▼
          ┌──────────────────┐
-         │ naag-utility-    │
+         │ naagi-utility-    │
          │   tools (8083)   │
          │                  │
          │ POST /api/echo   │
@@ -491,17 +491,17 @@ POST /api/tools/register   // Auto-register from OpenAPI spec
 
 | From | To | Endpoint | Purpose |
 |------|-----|----------|---------|
-| naag-chat-app | naag-ai-orchestrator | POST /api/orchestrate | Process user message |
-| naag-ai-orchestrator | naag-mcp-gateway | POST /mcp/execute | Execute tool |
-| naag-ai-orchestrator | naag-tool-registry | GET /api/tools | Get tool schemas |
-| naag-ai-orchestrator | naag-category-admin | GET /api/categories/{id}/enabled-tools | Get category config |
-| naag-ai-orchestrator | naag-rag-service | POST /api/rag/query | Direct RAG query |
-| naag-mcp-gateway | naag-tool-registry | GET /api/tools | Load tool definitions |
-| naag-mcp-gateway | naag-utility-tools | POST /api/* | Execute utility tools |
-| naag-mcp-gateway | Any registered endpoint | HTTP | Execute registered tools |
-| naag-category-admin | naag-rag-service | POST /api/rag/parse-and-ingest | Upload document |
-| naag-category-admin | naag-tool-registry | GET /api/tools | List available tools |
-| naag-utility-tools | naag-tool-registry | POST /api/tools/register | Self-registration |
+| naagi-chat-app | naagi-ai-orchestrator | POST /api/orchestrate | Process user message |
+| naagi-ai-orchestrator | naagi-mcp-gateway | POST /mcp/execute | Execute tool |
+| naagi-ai-orchestrator | naagi-tool-registry | GET /api/tools | Get tool schemas |
+| naagi-ai-orchestrator | naagi-category-admin | GET /api/categories/{id}/enabled-tools | Get category config |
+| naagi-ai-orchestrator | naagi-rag-service | POST /api/rag/query | Direct RAG query |
+| naagi-mcp-gateway | naagi-tool-registry | GET /api/tools | Load tool definitions |
+| naagi-mcp-gateway | naagi-utility-tools | POST /api/* | Execute utility tools |
+| naagi-mcp-gateway | Any registered endpoint | HTTP | Execute registered tools |
+| naagi-category-admin | naagi-rag-service | POST /api/rag/parse-and-ingest | Upload document |
+| naagi-category-admin | naagi-tool-registry | GET /api/tools | List available tools |
+| naagi-utility-tools | naagi-tool-registry | POST /api/tools/register | Self-registration |
 
 ---
 
@@ -509,13 +509,13 @@ POST /api/tools/register   // Auto-register from OpenAPI spec
 
 | Port | Service | Dependencies | Description |
 |------|---------|--------------|-------------|
-| 8080 | naag-rag-service | None | RAG operations + document parsing |
-| 8081 | naag-tool-registry | None | Tool definitions management |
-| 8082 | naag-mcp-gateway | 8081 | MCP protocol gateway |
-| 8083 | naag-utility-tools | 8081 | Basic tools: echo, add, time |
-| 8085 | naag-category-admin | 8080, 8081 | Category/tool configuration |
-| 8086 | naag-ai-orchestrator | 8080, 8081, 8082, 8085 | LLM tool selection & routing |
-| 8087 | naag-chat-app | 8086 | User chat interface |
+| 8080 | naagi-rag-service | None | RAG operations + document parsing |
+| 8081 | naagi-tool-registry | None | Tool definitions management |
+| 8082 | naagi-mcp-gateway | 8081 | MCP protocol gateway |
+| 8083 | naagi-utility-tools | 8081 | Basic tools: echo, add, time |
+| 8085 | naagi-category-admin | 8080, 8081 | Category/tool configuration |
+| 8086 | naagi-ai-orchestrator | 8080, 8081, 8082, 8085 | LLM tool selection & routing |
+| 8087 | naagi-chat-app | 8086 | User chat interface |
 
 Note: Port 8084 reserved for test services (not part of core platform).
 
@@ -524,42 +524,42 @@ Note: Port 8084 reserved for test services (not part of core platform).
 ## Implementation Phases
 
 ### Phase 1: Create foundational services (no dependencies)
-1. Create naag-rag-service (port 8080)
+1. Create naagi-rag-service (port 8080)
    - Copy from bkp/full-rag-springboot-sync
-   - Rename packages to com.naag.ragservice
+   - Rename packages to com.naagi.ragservice
    - Add document parsing (PDFBox, POI)
 
-2. Create naag-tool-registry (port 8081)
+2. Create naagi-tool-registry (port 8081)
    - Copy from bkp/dynamic-tool-registry
-   - Rename packages to com.naag.toolregistry
+   - Rename packages to com.naagi.toolregistry
 
 ### Phase 2: Create dependent core services
-3. Create naag-mcp-gateway (port 8082)
+3. Create naagi-mcp-gateway (port 8082)
    - Copy from bkp/mcp-spring-boot-server
    - Remove built-in tools, load from registry only
-   - Rename packages to com.naag.mcpgateway
+   - Rename packages to com.naagi.mcpgateway
 
-4. Create naag-utility-tools (port 8083)
+4. Create naagi-utility-tools (port 8083)
    - New Spring Boot project
    - Implement echo, add, time endpoints
    - Auto-register with tool-registry on startup
 
 ### Phase 3: Create admin and orchestration
-5. Create naag-category-admin (port 8085)
+5. Create naagi-category-admin (port 8085)
    - Copy from bkp/mcp-category-admin
    - Remove RAG/document parsing logic (delegate to RAG service)
-   - Rename packages to com.naag.categoryadmin
+   - Rename packages to com.naagi.categoryadmin
 
-6. Create naag-ai-orchestrator (port 8086)
+6. Create naagi-ai-orchestrator (port 8086)
    - New Spring Boot project
    - Copy LLM clients (self-contained)
    - Implement tool selection, intent detection, parameter extraction
 
 ### Phase 4: Create user interface
-7. Create naag-chat-app (port 8087)
+7. Create naagi-chat-app (port 8087)
    - Copy from bkp/mcp-chat-app
    - Simplify: remove all LLM logic, delegate to orchestrator
-   - Rename packages to com.naag.chatapp
+   - Rename packages to com.naagi.chatapp
 
 ---
 
@@ -593,72 +593,72 @@ All services have Prometheus metrics enabled via Spring Boot Actuator:
 
 | Service | Port | Metrics Endpoint |
 |---------|------|-----------------|
-| naag-rag-service | 8080 | http://localhost:8080/actuator/prometheus |
-| naag-tool-registry | 8081 | http://localhost:8081/actuator/prometheus |
-| naag-mcp-gateway | 8082 | http://localhost:8082/actuator/prometheus |
-| naag-utility-tools | 8083 | http://localhost:8083/actuator/prometheus |
-| naag-category-admin | 8085 | http://localhost:8085/actuator/prometheus |
-| naag-ai-orchestrator | 8086 | http://localhost:8086/actuator/prometheus |
-| naag-chat-app | 8087 | http://localhost:8087/actuator/prometheus |
+| naagi-rag-service | 8080 | http://localhost:8080/actuator/prometheus |
+| naagi-tool-registry | 8081 | http://localhost:8081/actuator/prometheus |
+| naagi-mcp-gateway | 8082 | http://localhost:8082/actuator/prometheus |
+| naagi-utility-tools | 8083 | http://localhost:8083/actuator/prometheus |
+| naagi-category-admin | 8085 | http://localhost:8085/actuator/prometheus |
+| naagi-ai-orchestrator | 8086 | http://localhost:8086/actuator/prometheus |
+| naagi-chat-app | 8087 | http://localhost:8087/actuator/prometheus |
 
 Prometheus scrape config:
 
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'naag-rag-service'
+  - job_name: 'naagi-rag-service'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8080']
         labels:
-          application: 'naag-rag-service'
+          application: 'naagi-rag-service'
     scrape_interval: 5s
 
-  - job_name: 'naag-tool-registry'
+  - job_name: 'naagi-tool-registry'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8081']
         labels:
-          application: 'naag-tool-registry'
+          application: 'naagi-tool-registry'
     scrape_interval: 5s
 
-  - job_name: 'naag-mcp-gateway'
+  - job_name: 'naagi-mcp-gateway'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8082']
         labels:
-          application: 'naag-mcp-gateway'
+          application: 'naagi-mcp-gateway'
     scrape_interval: 5s
 
-  - job_name: 'naag-utility-tools'
+  - job_name: 'naagi-utility-tools'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8083']
         labels:
-          application: 'naag-utility-tools'
+          application: 'naagi-utility-tools'
     scrape_interval: 5s
 
-  - job_name: 'naag-category-admin'
+  - job_name: 'naagi-category-admin'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8085']
         labels:
-          application: 'naag-category-admin'
+          application: 'naagi-category-admin'
     scrape_interval: 5s
 
-  - job_name: 'naag-ai-orchestrator'
+  - job_name: 'naagi-ai-orchestrator'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8086']
         labels:
-          application: 'naag-ai-orchestrator'
+          application: 'naagi-ai-orchestrator'
     scrape_interval: 5s
 
-  - job_name: 'naag-chat-app'
+  - job_name: 'naagi-chat-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['host.docker.internal:8087']
         labels:
-          application: 'naag-chat-app'
+          application: 'naagi-chat-app'
     scrape_interval: 5s
 ```
