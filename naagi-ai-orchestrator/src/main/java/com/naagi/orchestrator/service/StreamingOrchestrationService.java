@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.naagi.orchestrator.llm.LlmClient;
 import com.naagi.orchestrator.metrics.OrchestratorMetrics;
 import com.naagi.orchestrator.model.*;
+import com.naagi.orchestrator.model.AgentConfig;
+import com.naagi.orchestrator.coordinator.AgentSelectionResult;
+import com.naagi.orchestrator.coordinator.CoordinatorService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -32,7 +36,10 @@ public class StreamingOrchestrationService {
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
     private final OrchestratorMetrics metrics;
+    private final AgentStreamExecutor agentStreamExecutor;
+    private final CoordinatorService coordinatorService;
     private final String ragServiceUrl;
+    private final boolean coordinatorEnabled;
     private final HttpClient httpClient;
 
     public StreamingOrchestrationService(
@@ -42,28 +49,161 @@ public class StreamingOrchestrationService {
             LlmClient llmClient,
             ObjectMapper objectMapper,
             OrchestratorMetrics metrics,
-            @Value("${naagi.services.rag-service.url}") String ragServiceUrl) {
+            AgentStreamExecutor agentStreamExecutor,
+            CoordinatorService coordinatorService,
+            @Value("${naagi.services.rag-service.url}") String ragServiceUrl,
+            @Value("${naagi.coordinator.enabled:true}") boolean coordinatorEnabled) {
         this.toolSelectionService = toolSelectionService;
         this.toolRegistryClient = toolRegistryClient;
         this.mcpGatewayClient = mcpGatewayClient;
         this.llmClient = llmClient;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
+        this.agentStreamExecutor = agentStreamExecutor;
+        this.coordinatorService = coordinatorService;
         this.ragServiceUrl = ragServiceUrl;
+        this.coordinatorEnabled = coordinatorEnabled;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
     }
 
     /**
-     * Stream orchestrated response - handles both RAG queries and tool calls
+     * Stream orchestrated response — coordinator-based flow.
+     * The coordinator selects the right agent, then the agent streams directly to the user.
      */
     public void orchestrateStream(OrchestrationRequest request, SseEmitter emitter) {
+        if (!coordinatorEnabled) {
+            orchestrateWithLegacyRouting(request, emitter);
+            return;
+        }
+
         long orchestrationStart = System.currentTimeMillis();
-        log.info("Streaming orchestration for: {} (category: {})", request.getMessage(), request.getCategoryId());
+        log.info("[COORDINATOR] Orchestration for: {} (category: {}, replyToMode: {}, hasConversationContext: {}, contextSize: {})",
+                request.getMessage(), request.getCategoryId(), request.isReplyToMode(),
+                request.getConversationContext() != null,
+                request.getConversationContext() != null ? request.getConversationContext().size() : 0);
+        if (request.getConversationContext() != null) {
+            for (var ctx : request.getConversationContext()) {
+                log.info("[COORDINATOR] Context entry: role={}, contentLength={}, preview={}",
+                        ctx.getRole(), ctx.getContent().length(),
+                        ctx.getContent().substring(0, Math.min(200, ctx.getContent().length())));
+            }
+        }
 
         try {
-            // Get available tools
+            // 0. Explicit agent mode bypass — skip RAG pre-routing
+            if (request.isUseAgent()) {
+                log.info("[COORDINATOR] Explicit useAgent flag, delegating to agent");
+                coordinateAndDelegate(request, emitter, orchestrationStart);
+                return;
+            }
+
+            // 1. Pre-route knowledge questions directly to RAG (fast path, no agent needed)
+            if (isKnowledgeQuestion(request.getMessage())) {
+                log.info("[COORDINATOR] Pre-routing to RAG for knowledge question: {}", request.getMessage());
+                Map<String, Object> ragParams = new HashMap<>();
+                ragParams.put("question", request.getMessage());
+                if (request.getCategoryId() != null) {
+                    ragParams.put("category", request.getCategoryId());
+                }
+                streamRagQuery(ragParams, emitter);
+                return;
+            }
+
+            // 2. Action queries — coordinator selects the right agent
+            coordinateAndDelegate(request, emitter, orchestrationStart);
+
+        } catch (Exception e) {
+            log.error("[COORDINATOR] Orchestration error, falling back to legacy", e);
+            metrics.recordOrchestrationError();
+            orchestrateWithLegacyRouting(request, emitter);
+        }
+    }
+
+    /**
+     * Coordinator selects the right agent, emits the agent_selected event, and delegates.
+     * Falls back to legacy routing if no agent is found.
+     */
+    private void coordinateAndDelegate(OrchestrationRequest request, SseEmitter emitter, long orchestrationStart) {
+        AgentSelectionResult selection = coordinatorService.selectAgent(
+                request.getMessage(), request.getCategoryId());
+
+        sendAgentSelectedEvent(emitter, selection);
+
+        if (!selection.hasAgent()) {
+            log.info("[COORDINATOR] No agent available for category {}, falling back to legacy routing",
+                    request.getCategoryId());
+            orchestrateWithLegacyRouting(request, emitter);
+            return;
+        }
+
+        AgentConfig agent = selection.getSelectedAgent();
+        log.info("[COORDINATOR] Delegating to agent {} ({}) via {} strategy in {}ms",
+                agent.getAgentId(), agent.getName(), selection.getStrategy(), selection.getSelectionTimeMs());
+
+        String contextSessionId = request.isReplyToMode() ? request.getSessionId() : null;
+        agentStreamExecutor.executeStream(
+                request.getMessage(), request.getCategoryId(), contextSessionId,
+                request.getConversationContext(), emitter, agent);
+
+        long orchestrationTime = System.currentTimeMillis() - orchestrationStart;
+        metrics.recordOrchestrationTime(orchestrationTime);
+        log.info("[TIMING] Coordinator orchestration: {}ms", orchestrationTime);
+    }
+
+    /**
+     * Emit an agent_selected SSE event so the frontend knows which agent was chosen.
+     */
+    private void sendAgentSelectedEvent(SseEmitter emitter, AgentSelectionResult selection) {
+        try {
+            ObjectNode event = objectMapper.createObjectNode();
+            if (selection.hasAgent()) {
+                event.put("agentId", selection.getSelectedAgent().getAgentId());
+                event.put("agentName", selection.getSelectedAgent().getName());
+            }
+            event.put("strategy", selection.getStrategy().name());
+            event.put("selectionTimeMs", selection.getSelectionTimeMs());
+            if (selection.getReasoning() != null) {
+                event.put("reasoning", selection.getReasoning());
+            }
+            emitter.send(SseEmitter.event().name("agent_selected").data(objectMapper.writeValueAsString(event)));
+        } catch (Exception e) {
+            log.debug("Could not send agent_selected event", e);
+        }
+    }
+
+    /**
+     * Legacy 5-path routing — kept behind naagi.coordinator.enabled=false flag.
+     */
+    private void orchestrateWithLegacyRouting(OrchestrationRequest request, SseEmitter emitter) {
+        long orchestrationStart = System.currentTimeMillis();
+        log.info("Legacy orchestration for: {} (category: {}, useAgent: {})",
+                request.getMessage(), request.getCategoryId(), request.isUseAgent());
+
+        // Only pass sessionId for context when user explicitly replied to a message
+        String contextSessionId = request.isReplyToMode() ? request.getSessionId() : null;
+
+        // Explicit agent mode bypass
+        if (request.isUseAgent()) {
+            log.info("Delegating to agent executor (explicit useAgent flag)");
+            delegateToAgent(request.getMessage(), request.getCategoryId(), contextSessionId,
+                    request.getConversationContext(), emitter);
+            return;
+        }
+
+        try {
+            if (isKnowledgeQuestion(request.getMessage())) {
+                log.info("Pre-routing to RAG for knowledge question: {}", request.getMessage());
+                Map<String, Object> ragParams = new HashMap<>();
+                ragParams.put("question", request.getMessage());
+                if (request.getCategoryId() != null) {
+                    ragParams.put("category", request.getCategoryId());
+                }
+                streamRagQuery(ragParams, emitter);
+                return;
+            }
+
             List<JsonNode> availableTools;
             if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
                 availableTools = toolRegistryClient.getToolsByCategory(request.getCategoryId());
@@ -76,7 +216,6 @@ public class StreamingOrchestrationService {
                 return;
             }
 
-            // Select tool
             long selectionStart = System.currentTimeMillis();
             ToolSelectionResult selection = toolSelectionService.selectTool(request.getMessage(), availableTools);
             long selectionTime = System.currentTimeMillis() - selectionStart;
@@ -88,21 +227,37 @@ public class StreamingOrchestrationService {
             boolean isLow = toolSelectionService.isLowConfidence(selection.getConfidence());
             metrics.recordConfidence(selection.getConfidence(), isHigh, isLow);
 
-            // Send tool selection info
+            String selectedTool = selection.getSelectedTool();
+            boolean isRagTool = selectedTool != null && selectedTool.startsWith("rag_query");
+            if (selectedTool != null && !isRagTool && isHigh) {
+                log.info("Auto-routing to agent executor for non-RAG tool: {}", selectedTool);
+                delegateToAgent(request.getMessage(), request.getCategoryId(), contextSessionId,
+                        request.getConversationContext(), emitter);
+                return;
+            }
+
+            if (selection.getSelectedTool() == null) {
+                log.info("No valid tool selected, falling back to RAG for: {}", request.getMessage());
+                Map<String, Object> ragParams = new HashMap<>();
+                ragParams.put("question", request.getMessage());
+                if (request.getCategoryId() != null) {
+                    ragParams.put("category", request.getCategoryId());
+                }
+                streamRagQuery(ragParams, emitter);
+                return;
+            }
+
             sendToolInfo(emitter, selection);
 
-            if (selection.getSelectedTool() == null || isLow) {
-                // Low confidence - send clarification message
+            if (isLow) {
                 String clarification = buildClarificationMessage(selection);
                 sendTextTokens(emitter, clarification);
                 sendDone(emitter);
             } else if (!isHigh) {
-                // Medium confidence - ask for confirmation
                 String confirmation = buildConfirmationMessage(selection);
                 sendTextTokens(emitter, confirmation);
                 sendDone(emitter);
             } else {
-                // High confidence - execute and stream
                 executeAndStream(request, selection, emitter);
             }
 
@@ -468,6 +623,85 @@ public class StreamingOrchestrationService {
                 // Ignore
             }
         }
+    }
+
+    /**
+     * Delegate to agent executor, looking up agent config for the category first.
+     * Falls back to global defaults if no agent is registered.
+     */
+    private void delegateToAgent(String message, String categoryId, String sessionId,
+                                  List<OrchestrationRequest.ConversationContext> conversationContext,
+                                  SseEmitter emitter) {
+        if (categoryId != null && !categoryId.isBlank()) {
+            Optional<AgentConfig> agentConfig = toolRegistryClient.getAgentForCategory(categoryId);
+            if (agentConfig.isPresent()) {
+                log.info("Using agent config {} ({}) for category {}",
+                        agentConfig.get().getAgentId(), agentConfig.get().getName(), categoryId);
+                agentStreamExecutor.executeStream(message, categoryId, sessionId, conversationContext, emitter, agentConfig.get());
+                return;
+            }
+        }
+        // No agent registered — use global defaults
+        agentStreamExecutor.executeStream(message, categoryId, sessionId, conversationContext, emitter);
+    }
+
+    /**
+     * Detect knowledge/conceptual questions that should go directly to RAG
+     * without tool selection (which may misroute to action tools).
+     */
+    private boolean isKnowledgeQuestion(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.trim().toLowerCase();
+
+        // If the message contains specific entity IDs (APP-XXX, OP-XXX, etc.),
+        // it's an action/lookup question, not a knowledge question
+        if (message.matches(".*\\b[A-Z]{2,}-[A-Z0-9-]+\\b.*")) {
+            return false;
+        }
+
+        // If the message contains UUIDs, it's likely a lookup for a specific instance
+        if (lower.matches(".*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*")) {
+            return false;
+        }
+
+        // Starts-with patterns that indicate a knowledge/conceptual question
+        boolean startsWithKnowledge =
+               lower.startsWith("what is ") ||
+               lower.startsWith("what are ") ||
+               lower.startsWith("how do ") ||
+               lower.startsWith("how does ") ||
+               lower.startsWith("how to ") ||
+               lower.startsWith("how many ") ||
+               lower.startsWith("explain ") ||
+               lower.startsWith("describe ") ||
+               lower.startsWith("why ") ||
+               lower.startsWith("tell me about ") ||
+               lower.startsWith("can you explain ") ||
+               lower.startsWith("can you give ") ||
+               lower.startsWith("can you show ") ||
+               lower.startsWith("can you provide ") ||
+               lower.startsWith("give me ") ||
+               lower.startsWith("show me ") ||
+               lower.startsWith("provide ") ||
+               lower.startsWith("what does ") ||
+               lower.startsWith("where is ") ||
+               lower.startsWith("where are ") ||
+               lower.startsWith("when do ") ||
+               lower.startsWith("when does ") ||
+               lower.startsWith("which ") ||
+               lower.startsWith("is there ");
+
+        if (startsWithKnowledge) return true;
+
+        // Contains patterns — phrases that strongly suggest knowledge retrieval
+        return lower.contains("sample ") ||
+               lower.contains("example ") ||
+               lower.contains("template ") ||
+               lower.contains("documentation ") ||
+               lower.contains("how can i ") ||
+               lower.contains("what is the ") ||
+               lower.contains("what are the ") ||
+               lower.contains("best practice");
     }
 
     private String escapeJson(String s) {

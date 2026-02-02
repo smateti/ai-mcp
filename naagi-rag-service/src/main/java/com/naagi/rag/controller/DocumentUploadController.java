@@ -7,6 +7,7 @@ import com.naagi.rag.entity.GeneratedQA;
 import com.naagi.rag.repository.DocumentUploadRepository;
 import com.naagi.rag.repository.GeneratedQARepository;
 import com.naagi.rag.service.DocumentProcessingService;
+import com.naagi.rag.service.RagService;
 import com.naagi.rag.service.LinkExtractionService;
 import com.naagi.rag.service.LinkExtractionService.ExtractedLink;
 import com.naagi.rag.service.TempCollectionService;
@@ -61,7 +62,8 @@ public class DocumentUploadController {
         DocumentUpload upload = processingService.initiateUpload(
                 request.title(),
                 request.content(),
-                request.categoryId()
+                request.categoryId(),
+                request.systemPrompt()
         );
 
         // Start async processing
@@ -315,6 +317,42 @@ public class DocumentUploadController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PatchMapping("/uploads/{uploadId}/system-prompt")
+    public ResponseEntity<Map<String, Object>> updateSystemPrompt(
+            @PathVariable String uploadId,
+            @RequestBody UpdateSystemPromptRequest request) {
+        log.info("Updating system prompt for upload: {}", uploadId);
+
+        return uploadRepository.findById(uploadId)
+                .map(upload -> {
+                    // Normalize: if prompt matches default template, store null to avoid redundancy
+                    String promptToStore = request.systemPrompt();
+                    if (promptToStore != null && promptToStore.trim().equals(RagService.DEFAULT_PROMPT_TEMPLATE.trim())) {
+                        promptToStore = null;
+                    }
+                    upload.setSystemPrompt(promptToStore);
+                    uploadRepository.save(upload);
+
+                    // If document is already in RAG, update in Qdrant too
+                    if (upload.getStatus() == DocumentUpload.ProcessingStatus.MOVED_TO_RAG) {
+                        try {
+                            tempCollectionService.updateSystemPromptInMainCollection(
+                                    upload.getDocId(), promptToStore);
+                            log.info("Updated system prompt in Qdrant for docId: {}", upload.getDocId());
+                        } catch (Exception e) {
+                            log.error("Failed to update system prompt in Qdrant for docId: {}", upload.getDocId(), e);
+                        }
+                    }
+
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", true);
+                    response.put("uploadId", uploadId);
+                    response.put("qdrantUpdated", upload.getStatus() == DocumentUpload.ProcessingStatus.MOVED_TO_RAG);
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/uploads/{uploadId}")
     public ResponseEntity<Map<String, Object>> deleteUpload(@PathVariable String uploadId) {
         log.info("Deleting upload: {}", uploadId);
@@ -526,7 +564,8 @@ public class DocumentUploadController {
     public record UploadRequest(
             String title,
             String content,
-            String categoryId
+            String categoryId,
+            String systemPrompt
     ) {}
 
     public record DocumentUploadDetails(
@@ -553,5 +592,9 @@ public class DocumentUploadController {
 
     public record UpdateTitleRequest(
             String title
+    ) {}
+
+    public record UpdateSystemPromptRequest(
+            String systemPrompt
     ) {}
 }

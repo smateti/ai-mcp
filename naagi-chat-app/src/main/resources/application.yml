@@ -77,6 +77,18 @@ naagi:
       log-responses: true  # Log assistant responses
       retention-days: 90  # How long to keep audit logs in H2
 
+  # Context-Driven Chat — reply-to anchoring and automatic compaction
+  context-chat:
+    compaction:
+      enabled: true
+      threshold: 0.70                # Compact when context exceeds 70% of max conversation tokens
+      keep-recent: 4                 # Keep last N messages in full during compaction
+      max-summary-tokens: 400        # Maximum tokens for compaction summary
+      max-conversation-tokens: 3000  # Approximate max conversation tokens before compaction triggers
+    reply-to:
+      enabled: true                  # Enable reply-to anchoring in chat UI
+      include-session-summary: true  # Include session summary in reply-to context
+
 # Logging
 logging:
   level:

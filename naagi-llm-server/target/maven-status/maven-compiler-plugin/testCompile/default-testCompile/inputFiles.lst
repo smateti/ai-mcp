@@ -1,0 +1,7 @@
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\controller\ChatControllerTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\controller\ToolChatControllerTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\model\ModelRecordTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\service\AgentExecutorServiceTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\service\ConversationServiceTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\service\LlamaCppProxyTest.java
+D:\apps\ws\ws8\naagi-llm-server\src\test\java\com\naagi\llm\service\ToolExecutionServiceTest.java

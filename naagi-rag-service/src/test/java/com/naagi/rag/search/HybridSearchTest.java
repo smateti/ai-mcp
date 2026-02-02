@@ -115,16 +115,16 @@ class HybridSearchTest {
         void testBasicRRFFusion() {
             // Dense results (semantic search)
             List<SearchHit> denseResults = List.of(
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.95),
-                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.85),
-                    new SearchHit("id3", "doc2", 0, "text3", "Title 2", 0.75)
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.95, null),
+                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.85, null),
+                    new SearchHit("id3", "doc2", 0, "text3", "Title 2", 0.75, null)
             );
 
             // Sparse results (BM25) - note id2 appears in both
             List<SearchHit> sparseResults = List.of(
-                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 5.5),  // Also in dense
-                    new SearchHit("id4", "doc3", 0, "text4", "Title 3", 4.2),
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 3.8)   // Also in dense
+                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 5.5, null),  // Also in dense
+                    new SearchHit("id4", "doc3", 0, "text4", "Title 3", 4.2, null),
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 3.8, null)   // Also in dense
             );
 
             List<HybridResult> fused = service.fuseWithRRF(denseResults, sparseResults, 5);
@@ -145,11 +145,11 @@ class HybridSearchTest {
         @Test
         void testWeightedRRFFusion() {
             List<SearchHit> denseResults = List.of(
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.95)
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.95, null)
             );
 
             List<SearchHit> sparseResults = List.of(
-                    new SearchHit("id2", "doc2", 0, "text2", "Title 2", 5.5)
+                    new SearchHit("id2", "doc2", 0, "text2", "Title 2", 5.5, null)
             );
 
             // With higher dense weight
@@ -177,7 +177,7 @@ class HybridSearchTest {
 
             // Only dense results
             List<SearchHit> denseOnly = List.of(
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9)
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9, null)
             );
             List<HybridResult> denseOnlyFused = service.fuseWithRRF(denseOnly, List.of(), 5);
             assertEquals(1, denseOnlyFused.size());
@@ -186,7 +186,7 @@ class HybridSearchTest {
 
             // Only sparse results
             List<SearchHit> sparseOnly = List.of(
-                    new SearchHit("id2", "doc2", 0, "text2", "Title 2", 5.0)
+                    new SearchHit("id2", "doc2", 0, "text2", "Title 2", 5.0, null)
             );
             List<HybridResult> sparseOnlyFused = service.fuseWithRRF(List.of(), sparseOnly, 5);
             assertEquals(1, sparseOnlyFused.size());
@@ -197,13 +197,13 @@ class HybridSearchTest {
         @Test
         void testLinearCombination() {
             List<SearchHit> denseResults = List.of(
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9),
-                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.5)
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9, null),
+                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.5, null)
             );
 
             List<SearchHit> sparseResults = List.of(
-                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 10.0),
-                    new SearchHit("id3", "doc2", 0, "text3", "Title 2", 5.0)
+                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 10.0, null),
+                    new SearchHit("id3", "doc2", 0, "text3", "Title 2", 5.0, null)
             );
 
             List<HybridResult> linear = service.fuseWithLinearCombination(
@@ -217,11 +217,11 @@ class HybridSearchTest {
         @Test
         void testTopKLimit() {
             List<SearchHit> denseResults = List.of(
-                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9),
-                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.8),
-                    new SearchHit("id3", "doc1", 2, "text3", "Title 1", 0.7),
-                    new SearchHit("id4", "doc1", 3, "text4", "Title 1", 0.6),
-                    new SearchHit("id5", "doc1", 4, "text5", "Title 1", 0.5)
+                    new SearchHit("id1", "doc1", 0, "text1", "Title 1", 0.9, null),
+                    new SearchHit("id2", "doc1", 1, "text2", "Title 1", 0.8, null),
+                    new SearchHit("id3", "doc1", 2, "text3", "Title 1", 0.7, null),
+                    new SearchHit("id4", "doc1", 3, "text4", "Title 1", 0.6, null),
+                    new SearchHit("id5", "doc1", 4, "text5", "Title 1", 0.5, null)
             );
 
             List<HybridResult> limited = service.fuseWithRRF(denseResults, List.of(), 3);

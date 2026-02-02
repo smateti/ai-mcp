@@ -83,7 +83,7 @@ naagi:
     # Combines dense (semantic/embedding) with sparse (BM25/keyword) retrieval
     # Uses Reciprocal Rank Fusion (RRF) to merge results
     hybrid:
-      enabled: false                # Set to true to enable hybrid search
+      enabled: true                 # Hybrid search: BM25 + dense + RRF fusion
       dense-weight: 0.7             # Weight for semantic/embedding search (0-1)
       sparse-weight: 0.3            # Weight for BM25/keyword search (0-1)
       rrf-k: 60                     # RRF constant (higher = more equal rank weighting)
@@ -112,6 +112,34 @@ naagi:
       knowledge-refinement-enabled: true     # Refine/filter retrieved chunks
       max-retry-attempts: 2                  # Max query expansion retries
       min-relevance-for-answer: 0.75         # Don't generate answer if top score below this (prevents hallucination)
+
+    # HyDE (Hypothetical Document Embeddings)
+    # Generates a hypothetical answer before embedding for improved retrieval
+    hyde:
+      enabled: false                          # Set to true to enable HyDE
+
+    # Semantic Cache Configuration
+    # Caches RAG answers by query similarity in Qdrant
+    semantic-cache:
+      enabled: false                          # Set to true to enable semantic caching
+      collection: naagi_semantic_cache
+      ttl-minutes: 60
+      similarity-threshold: 0.92             # Minimum similarity to return cached answer
+
+    # Query Decomposition
+    # Splits complex multi-faceted questions into sub-queries
+    query-decomposition:
+      enabled: false                          # Set to true to enable query decomposition
+      max-sub-queries: 3
+
+    # Entity Extraction (knowledge graph construction during ingestion)
+    entity-extraction:
+      enabled: false                          # Set to true to enable entity extraction
+
+    # Graph-Augmented Retrieval
+    graph-search:
+      enabled: false                          # Set to true to enable graph search
+      max-hops: 2                             # Max relationship hops to traverse
 
     # Q&A Generation settings for document preview
     qa-generation:

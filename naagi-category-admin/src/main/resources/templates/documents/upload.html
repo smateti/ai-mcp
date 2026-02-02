@@ -83,6 +83,19 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="systemPrompt" class="form-label">
+                                <i class="bi bi-chat-square-text me-1"></i>Prompt Template
+                            </label>
+                            <textarea class="form-control font-monospace" id="systemPrompt" name="systemPrompt" rows="12"
+                                      style="font-size: 0.85rem;"
+                                      th:text="${defaultPromptTemplate}"></textarea>
+                            <small class="text-muted">
+                                Full prompt template sent to the LLM. Use <code>{context}</code> and <code>{question}</code> as placeholders.
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="resetPromptToDefault()">Reset to default</button>
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
                             <label for="content" class="form-label">
                                 <i class="bi bi-textarea-t me-1"></i>Text Content
                             </label>
@@ -136,8 +149,13 @@
     </div>
 
     <script th:inline="javascript">
+        const defaultPromptTemplate = /*[[${defaultPromptTemplate}]]*/ '';
         let titleCheckTimeout = null;
         let titleIsValid = true;
+
+        function resetPromptToDefault() {
+            document.getElementById('systemPrompt').value = defaultPromptTemplate;
+        }
 
         function handleFileSelect(input) {
             const preview = document.getElementById('filePreview');

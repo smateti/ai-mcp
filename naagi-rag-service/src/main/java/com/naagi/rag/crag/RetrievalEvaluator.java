@@ -1,6 +1,9 @@
 package com.naagi.rag.crag;
 
 import com.naagi.rag.llm.ChatClient;
+import com.naagi.rag.llm.ChatMessage;
+import com.naagi.rag.llm.ChatRequest;
+import com.naagi.rag.llm.ChatResponse;
 import com.naagi.rag.service.RagService.SourceChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +34,7 @@ public class RetrievalEvaluator {
 
     public RetrievalEvaluator(
             ChatClient chatClient,
-            @Value("${naagi.rag.crag.llm-evaluation-enabled:false}") boolean llmEvaluationEnabled,
+            @Value("${naagi.rag.crag.llm-evaluation-enabled:true}") boolean llmEvaluationEnabled,
             @Value("${naagi.rag.crag.high-confidence-threshold:0.8}") double highConfidenceThreshold,
             @Value("${naagi.rag.crag.low-confidence-threshold:0.5}") double lowConfidenceThreshold,
             @Value("${naagi.rag.crag.score-gap-threshold:0.15}") double scoreGapThreshold
@@ -136,8 +139,14 @@ public class RetrievalEvaluator {
     private double calculateHeuristicConfidence(double topScore, double avgScore,
             double variance, double topToSecondGap, int resultCount) {
 
-        // Base score from top result (most important)
-        double baseScore = topScore;
+        // Normalize scores to 0-1 range (reranker scores can be > 1)
+        // Use sigmoid for smooth normalization: scores around 0.5-1.0 map to ~0.6-0.7
+        // High reranker scores (3+) will map to ~0.95, but this alone shouldn't mean CORRECT
+        double normalizedTopScore = normalizeScore(topScore);
+        double normalizedAvg = normalizeScore(avgScore);
+
+        // Base score from normalized top result
+        double baseScore = normalizedTopScore;
 
         // Bonus for clear top result (large gap to second)
         double gapBonus = 0;
@@ -148,9 +157,9 @@ public class RetrievalEvaluator {
         // Penalty for high variance (inconsistent results)
         double variancePenalty = Math.min(0.2, variance * 0.5);
 
-        // Bonus for consistent high scores
+        // Bonus for consistent high scores (use normalized avg)
         double consistencyBonus = 0;
-        if (avgScore > 0.6 && variance < 0.05) {
+        if (normalizedAvg > 0.6 && variance < 0.05) {
             consistencyBonus = 0.05;
         }
 
@@ -181,6 +190,29 @@ public class RetrievalEvaluator {
     }
 
     /**
+     * Normalize relevance scores to 0-1 range.
+     * Reranker scores can be much larger than 1, so we use sigmoid normalization.
+     * This ensures scores like 3.7 don't automatically become CORRECT.
+     *
+     * Conservative mapping to ensure LLM evaluation is triggered:
+     * - score 0.5 -> ~0.5
+     * - score 1.0 -> ~0.5
+     * - score 2.0 -> ~0.62
+     * - score 3.0 -> ~0.73
+     * - score 4.0 -> ~0.82
+     * - score 5.0 -> ~0.88
+     *
+     * This means reranker scores need to be very high (5+) to be CORRECT without LLM check.
+     */
+    private double normalizeScore(double score) {
+        if (score <= 0) return 0.0;
+        if (score <= 1.0) return score * 0.5; // Compress 0-1 similarity scores to 0-0.5
+        // For reranker scores > 1, use conservative sigmoid
+        // Shift by 3 so that scores need to be very high to exceed threshold
+        return 1.0 / (1.0 + Math.exp(-score + 3));
+    }
+
+    /**
      * Check if score is in ambiguous range requiring LLM evaluation
      */
     private boolean isAmbiguousScore(double score) {
@@ -202,24 +234,28 @@ public class RetrievalEvaluator {
             contextBuilder.append("\n\n");
         }
 
-        String prompt = """
-                You are evaluating the relevance of retrieved documents to a user's query.
+        String systemMsg = """
+                You are evaluating whether retrieved documents can DIRECTLY ANSWER a user's specific question.
 
-                Query: %s
+                IMPORTANT: Rate whether these documents contain EXPLICIT information to answer the SPECIFIC question asked.
+                Do NOT give a high score just because the documents are about a related topic.
 
-                Retrieved Documents:
-                %s
+                Rate on a scale of 0 to 10:
+                - 0-3: Documents do NOT contain information that answers this specific question
+                - 4-6: Documents contain partially relevant info but may not fully answer the specific question
+                - 7-10: Documents contain EXPLICIT information that DIRECTLY answers the specific question
 
-                Rate the overall relevance of these documents to the query on a scale of 0 to 10:
-                - 0-3: Documents are not relevant to the query
-                - 4-6: Documents are somewhat relevant but may not fully answer the query
-                - 7-10: Documents are highly relevant and likely contain the answer
+                Example: If asked "How to call function X asynchronously?" but documents only discuss general batch processing without mentioning async calls to function X, score should be 0-3.
 
-                Respond with ONLY a single number from 0 to 10, nothing else.
-                """.formatted(query, contextBuilder.toString());
+                Respond with ONLY a single number from 0 to 10, nothing else.""";
+
+        String userMsg = "Question: %s\n\nRetrieved Documents:\n%s".formatted(query, contextBuilder.toString());
 
         try {
-            String response = chatClient.chatOnce(prompt, 0.1, 10);
+            ChatResponse resp = chatClient.chat(ChatRequest.of(
+                    java.util.List.of(ChatMessage.system(systemMsg), ChatMessage.user(userMsg)),
+                    0.1, 10));
+            String response = resp.content();
             double score = Double.parseDouble(response.trim());
             return Math.max(0.0, Math.min(1.0, score / 10.0));
         } catch (Exception e) {

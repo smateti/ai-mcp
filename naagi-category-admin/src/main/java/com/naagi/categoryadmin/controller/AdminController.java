@@ -1,6 +1,7 @@
 package com.naagi.categoryadmin.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.naagi.categoryadmin.client.AgentRegistryClient;
 import com.naagi.categoryadmin.client.ChatAppClient;
 import com.naagi.categoryadmin.client.RagServiceClient;
 import com.naagi.categoryadmin.client.ToolRegistryClient;
@@ -36,6 +37,7 @@ public class AdminController {
     private final CategoryService categoryService;
     private final CategoryParameterOverrideService overrideService;
     private final ToolRegistryClient toolRegistryClient;
+    private final AgentRegistryClient agentRegistryClient;
     private final RagServiceClient ragServiceClient;
     private final DocumentParserService documentParserService;
     private final SetupDataInitializer setupDataInitializer;
@@ -53,6 +55,7 @@ public class AdminController {
         model.addAttribute("categoryCount", categories.size());
         model.addAttribute("toolCount", tools.size());
         model.addAttribute("activeCategories", categoryService.getActiveCategories().size());
+        model.addAttribute("agentCount", agentRegistryClient.getAllAgents().size());
 
         // Add RAG document stats
         try {
@@ -100,18 +103,16 @@ public class AdminController {
                 category -> {
                     model.addAttribute("category", category);
 
-                    // Get tools for this category
-                    if (category.getToolIds() != null && !category.getToolIds().isEmpty()) {
-                        List<Tool> categoryTools = new java.util.ArrayList<>();
-                        for (String toolId : category.getToolIds()) {
-                            Optional<Tool> toolOpt = toolRegistryClient.getTool(toolId);
-                            if (toolOpt.isPresent()) {
-                                categoryTools.add(toolOpt.get());
-                            } else {
-                                log.warn("Tool {} assigned to category {} not found in registry", toolId, id);
-                            }
-                        }
-                        model.addAttribute("categoryTools", categoryTools);
+                    // Get agents for this category
+                    try {
+                        List<Map<String, Object>> allAgents = agentRegistryClient.getAllAgents();
+                        List<Map<String, Object>> categoryAgents = allAgents.stream()
+                                .filter(a -> id.equals(a.get("categoryId")))
+                                .filter(a -> !Boolean.FALSE.equals(a.get("active")))
+                                .collect(java.util.stream.Collectors.toList());
+                        model.addAttribute("categoryAgents", categoryAgents);
+                    } catch (Exception e) {
+                        log.warn("Could not fetch agents for category {}", id, e);
                     }
 
                     // Get documents for this category
@@ -137,55 +138,11 @@ public class AdminController {
                         log.warn("Could not fetch uploads for category {}", id, e);
                     }
 
-                    // Get all tools for assignment
-                    model.addAttribute("allTools", toolRegistryClient.getAllTools());
-                },
+},
                 () -> model.addAttribute("error", "Category not found")
         );
 
         return "categories/view";
-    }
-
-    @PostMapping("/categories/{id}/tools/add")
-    public String addToolToCategory(@PathVariable String id,
-                                     @RequestParam String toolId,
-                                     RedirectAttributes redirectAttributes) {
-        try {
-            categoryService.addToolToCategory(id, toolId);
-            redirectAttributes.addFlashAttribute("success", "Tool added to category");
-            auditLogService.logToolAddToCategory("admin", toolId, id);
-        } catch (Exception e) {
-            log.error("Error adding tool to category", e);
-            redirectAttributes.addFlashAttribute("error", "Failed to add tool: " + e.getMessage());
-        }
-        return "redirect:/categories/" + id;
-    }
-
-    @PostMapping("/categories/{id}/tools/{toolId}/remove")
-    public String removeToolFromCategory(@PathVariable String id,
-                                          @PathVariable String toolId,
-                                          RedirectAttributes redirectAttributes) {
-        try {
-            categoryService.removeToolFromCategory(id, toolId);
-            redirectAttributes.addFlashAttribute("success", "Tool removed from category");
-            auditLogService.logToolRemoveFromCategory("admin", toolId, id);
-        } catch (Exception e) {
-            log.error("Error removing tool from category", e);
-            redirectAttributes.addFlashAttribute("error", "Failed to remove tool: " + e.getMessage());
-        }
-        return "redirect:/categories/" + id;
-    }
-
-    @PostMapping("/categories/{id}/tools/reset-priorities")
-    public String resetToolPriorities(@PathVariable String id, RedirectAttributes redirectAttributes) {
-        try {
-            categoryService.resetToolPriorities(id);
-            redirectAttributes.addFlashAttribute("success", "Tool priorities reset");
-        } catch (Exception e) {
-            log.error("Error resetting tool priorities", e);
-            redirectAttributes.addFlashAttribute("error", "Failed to reset priorities: " + e.getMessage());
-        }
-        return "redirect:/categories/" + id;
     }
 
     // Tool Parameter Overrides
@@ -517,7 +474,21 @@ public class AdminController {
             log.error("Error loading tool details for {}", id, e);
             model.addAttribute("error", "Error loading tool: " + e.getMessage());
         }
-        model.addAttribute("categories", categoryService.getAllCategories());
+        // Load agents that use this tool
+        try {
+            List<Map<String, Object>> allAgents = agentRegistryClient.getAllAgents();
+            List<Map<String, Object>> toolAgents = allAgents.stream()
+                    .filter(a -> !Boolean.FALSE.equals(a.get("active")))
+                    .filter(a -> {
+                        @SuppressWarnings("unchecked")
+                        var tools = (List<Map<String, Object>>) a.get("tools");
+                        return tools != null && tools.stream().anyMatch(t -> id.equals(String.valueOf(t.get("toolId"))));
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+            model.addAttribute("toolAgents", toolAgents);
+        } catch (Exception e) {
+            log.warn("Could not fetch agents for tool {}", id, e);
+        }
         return "tools/edit-details";
     }
 
@@ -525,10 +496,9 @@ public class AdminController {
     public String updateToolDetails(@PathVariable String id,
                                     @RequestParam(required = false) String description,
                                     @RequestParam(required = false) String humanReadableDescription,
-                                    @RequestParam(required = false) String categoryId,
                                     RedirectAttributes redirectAttributes) {
         try {
-            toolRegistryClient.updateToolDetails(id, description, humanReadableDescription, categoryId);
+            toolRegistryClient.updateToolDetails(id, description, humanReadableDescription, null);
             redirectAttributes.addFlashAttribute("success", "Tool details updated successfully");
         } catch (Exception e) {
             log.error("Error updating tool details", e);
@@ -1020,6 +990,7 @@ public class AdminController {
         }
         model.addAttribute("acceptedFileTypes", documentParserService.getAcceptAttribute());
         model.addAttribute("supportedExtensions", documentParserService.getSupportedExtensions());
+        model.addAttribute("defaultPromptTemplate", ragServiceClient.getDefaultPromptTemplate());
         return "documents/upload";
     }
 
@@ -1028,6 +999,7 @@ public class AdminController {
                                   @RequestParam(required = false) String content,
                                   @RequestParam String categoryId,
                                   @RequestParam(required = false) String title,
+                                  @RequestParam(required = false) String systemPrompt,
                                   @RequestParam(required = false) MultipartFile file,
                                   RedirectAttributes redirectAttributes) {
         // Validate category is provided
@@ -1088,7 +1060,7 @@ public class AdminController {
                 return "redirect:/documents/upload";
             }
 
-            var result = ragServiceClient.uploadDocumentWithPreview(documentId, documentTitle, textContent, categoryId);
+            var result = ragServiceClient.uploadDocumentWithPreview(documentId, documentTitle, textContent, categoryId, systemPrompt);
             String uploadId = result.has("uploadId") ? result.get("uploadId").asText() : "";
             redirectAttributes.addFlashAttribute("success", "Document uploaded. Processing started.");
             redirectAttributes.addFlashAttribute("uploadId", uploadId);
@@ -1122,6 +1094,7 @@ public class AdminController {
             model.addAttribute("uploadId", uploadId);
             model.addAttribute("sseEndpoint", ragServiceClient.getUploadSseEndpoint(uploadId));
             model.addAttribute("categories", categoryService.getAllCategories());
+            model.addAttribute("defaultPromptTemplate", ragServiceClient.getDefaultPromptTemplate());
         } catch (Exception e) {
             log.error("Error fetching upload details for {}", uploadId, e);
             redirectAttributes.addFlashAttribute("error", "Failed to load upload details: " + e.getMessage());
@@ -1147,6 +1120,7 @@ public class AdminController {
                 model.addAttribute("document", docInfo);
                 model.addAttribute("docId", docId);
                 model.addAttribute("categories", categoryService.getAllCategories());
+                model.addAttribute("defaultPromptTemplate", ragServiceClient.getDefaultPromptTemplate());
                 return "documents/view";
             }
         } catch (Exception e) {
@@ -1803,6 +1777,29 @@ public class AdminController {
         }
     }
 
+    @PatchMapping("/documents/uploads/{uploadId}/system-prompt")
+    @ResponseBody
+    public Map<String, Object> updateUploadSystemPrompt(
+            @PathVariable String uploadId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String systemPrompt = request.get("systemPrompt");
+
+            ragServiceClient.updateUploadSystemPrompt(uploadId, systemPrompt);
+
+            return Map.of(
+                    "success", true,
+                    "message", "System prompt updated successfully"
+            );
+        } catch (Exception e) {
+            log.error("Error updating system prompt for upload {}", uploadId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
+    }
+
     /**
      * Update the title of a document by docId (for documents already in RAG).
      */
@@ -1841,6 +1838,38 @@ public class AdminController {
             );
         } catch (Exception e) {
             log.error("Error updating title for document {}", docId, e);
+            return Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Update the system prompt of a document by docId (for documents already in RAG).
+     */
+    @PatchMapping("/documents/{docId}/system-prompt")
+    @ResponseBody
+    public Map<String, Object> updateDocumentSystemPrompt(
+            @PathVariable String docId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String systemPrompt = request.get("systemPrompt");
+
+            // Find uploadId by docId
+            String uploadId = ragServiceClient.findUploadIdByDocId(docId);
+            if (uploadId == null) {
+                return Map.of("success", false, "error", "Upload record not found for document: " + docId);
+            }
+
+            ragServiceClient.updateUploadSystemPrompt(uploadId, systemPrompt);
+
+            return Map.of(
+                    "success", true,
+                    "message", "System prompt updated successfully"
+            );
+        } catch (Exception e) {
+            log.error("Error updating system prompt for document {}", docId, e);
             return Map.of(
                     "success", false,
                     "error", e.getMessage()
@@ -1918,6 +1947,219 @@ public class AdminController {
                     "error", e.getMessage()
             );
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Agent Management
+    // ══════════════════════════════════════════════════════════════
+
+    @GetMapping("/agents")
+    public String listAgents(Model model) {
+        model.addAttribute("activePage", "agents");
+        model.addAttribute("agents", agentRegistryClient.getAllAgents());
+        return "agents/list";
+    }
+
+    @GetMapping("/agents/new")
+    public String newAgentForm(Model model) {
+        model.addAttribute("activePage", "agents");
+        model.addAttribute("agent", new java.util.HashMap<String, Object>());
+        model.addAttribute("categories", categoryService.getAllCategories());
+        return "agents/form";
+    }
+
+    @PostMapping("/agents")
+    public String createAgent(@RequestParam Map<String, String> params, RedirectAttributes redirectAttributes) {
+        try {
+            Map<String, Object> agent = buildAgentMap(params);
+            Map<String, Object> created = agentRegistryClient.createAgent(agent);
+            redirectAttributes.addFlashAttribute("success", "Agent created: " + created.get("name") + " (ID: " + created.get("agentId") + ")");
+            auditLogService.log("admin", "AGENT_CREATE", "agent", String.valueOf(created.get("agentId")),
+                    "Agent created: " + created.get("name"), null, AuditLog.AuditStatus.SUCCESS, null);
+        } catch (Exception e) {
+            log.error("Error creating agent", e);
+            redirectAttributes.addFlashAttribute("error", "Failed to create agent: " + e.getMessage());
+        }
+        return "redirect:/agents";
+    }
+
+    @GetMapping("/agents/{agentId}")
+    public String viewAgent(@PathVariable String agentId, Model model) {
+        model.addAttribute("activePage", "agents");
+        agentRegistryClient.getAgent(agentId).ifPresentOrElse(
+                agent -> model.addAttribute("agent", agent),
+                () -> model.addAttribute("error", "Agent not found: " + agentId)
+        );
+        // Load all tools for the dropdown selector (same pattern as category view)
+        model.addAttribute("allTools", toolRegistryClient.getAllTools());
+        return "agents/view";
+    }
+
+    @GetMapping("/agents/{agentId}/edit")
+    public String editAgentForm(@PathVariable String agentId, Model model) {
+        model.addAttribute("activePage", "agents");
+        agentRegistryClient.getAgent(agentId).ifPresent(agent -> model.addAttribute("agent", agent));
+        model.addAttribute("categories", categoryService.getAllCategories());
+        return "agents/form";
+    }
+
+    @PostMapping("/agents/{agentId}")
+    public String updateAgent(@PathVariable String agentId, @RequestParam Map<String, String> params,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            Map<String, Object> updates = buildAgentMap(params);
+            agentRegistryClient.updateAgent(agentId, updates);
+            redirectAttributes.addFlashAttribute("success", "Agent updated successfully");
+            auditLogService.log("admin", "AGENT_UPDATE", "agent", agentId,
+                    "Agent updated", null, AuditLog.AuditStatus.SUCCESS, null);
+        } catch (Exception e) {
+            log.error("Error updating agent {}", agentId, e);
+            redirectAttributes.addFlashAttribute("error", "Failed to update agent: " + e.getMessage());
+        }
+        return "redirect:/agents/" + agentId;
+    }
+
+    @PostMapping("/agents/{agentId}/delete")
+    public String deleteAgent(@PathVariable String agentId,
+                              @RequestParam(value = "redirectTo", required = false) String redirectTo,
+                              RedirectAttributes redirectAttributes) {
+        try {
+            agentRegistryClient.deleteAgent(agentId);
+            redirectAttributes.addFlashAttribute("success", "Agent deleted");
+            auditLogService.log("admin", "AGENT_DELETE", "agent", agentId,
+                    "Agent deleted", null, AuditLog.AuditStatus.SUCCESS, null);
+        } catch (Exception e) {
+            log.error("Error deleting agent {}", agentId, e);
+            redirectAttributes.addFlashAttribute("error", "Failed to delete agent: " + e.getMessage());
+        }
+        if (redirectTo != null && redirectTo.startsWith("/")) {
+            return "redirect:" + redirectTo;
+        }
+        return "redirect:/agents";
+    }
+
+    // ── Agent sub-resources (AJAX endpoints) ────────────────────
+
+    @PostMapping("/agents/{agentId}/skills/add")
+    @ResponseBody
+    public Map<String, Object> addSkill(@PathVariable String agentId, @RequestBody Map<String, Object> skill) {
+        try {
+            Map<String, Object> result = agentRegistryClient.addSkill(agentId, skill);
+            return Map.of("success", true, "result", result);
+        } catch (Exception e) {
+            log.error("Error adding skill to agent {}", agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/skills/{skillId}/delete")
+    @ResponseBody
+    public Map<String, Object> removeSkill(@PathVariable String agentId, @PathVariable String skillId) {
+        try {
+            agentRegistryClient.removeSkill(agentId, skillId);
+            return Map.of("success", true);
+        } catch (Exception e) {
+            log.error("Error removing skill {} from agent {}", skillId, agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/tools/add")
+    @ResponseBody
+    public Map<String, Object> assignTool(@PathVariable String agentId, @RequestBody Map<String, Object> tool) {
+        try {
+            Map<String, Object> result = agentRegistryClient.assignTool(agentId, tool);
+            return Map.of("success", true, "result", result);
+        } catch (Exception e) {
+            log.error("Error assigning tool to agent {}", agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/tools/{toolId}/delete")
+    @ResponseBody
+    public Map<String, Object> removeToolFromAgent(@PathVariable String agentId, @PathVariable String toolId) {
+        try {
+            agentRegistryClient.removeTool(agentId, toolId);
+            return Map.of("success", true);
+        } catch (Exception e) {
+            log.error("Error removing tool {} from agent {}", toolId, agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/tools/{toolId}/restrictions")
+    @ResponseBody
+    public Map<String, Object> setToolRestrictions(@PathVariable String agentId, @PathVariable String toolId,
+                                                    @RequestBody List<Map<String, Object>> restrictions) {
+        try {
+            Map<String, Object> result = agentRegistryClient.setToolRestrictions(agentId, toolId, restrictions);
+            return Map.of("success", true, "result", result);
+        } catch (Exception e) {
+            log.error("Error setting restrictions for tool {} on agent {}", toolId, agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/pinned-documents/add")
+    @ResponseBody
+    public Map<String, Object> pinDocumentToAgent(@PathVariable String agentId, @RequestBody Map<String, Object> doc) {
+        try {
+            Map<String, Object> result = agentRegistryClient.pinDocument(agentId, doc);
+            return Map.of("success", true, "result", result);
+        } catch (Exception e) {
+            log.error("Error pinning document to agent {}", agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/agents/{agentId}/pinned-documents/{docId}/delete")
+    @ResponseBody
+    public Map<String, Object> unpinDocumentFromAgent(@PathVariable String agentId, @PathVariable String docId) {
+        try {
+            agentRegistryClient.unpinDocument(agentId, docId);
+            return Map.of("success", true);
+        } catch (Exception e) {
+            log.error("Error unpinning document {} from agent {}", docId, agentId, e);
+            return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    @GetMapping("/agents/{agentId}/card-json")
+    @ResponseBody
+    public Map<String, Object> getAgentCardJson(@PathVariable String agentId) {
+        try {
+            return agentRegistryClient.getAgentCard(agentId);
+        } catch (Exception e) {
+            log.error("Error fetching agent card for {}", agentId, e);
+            return Map.of("error", e.getMessage());
+        }
+    }
+
+    private Map<String, Object> buildAgentMap(Map<String, String> params) {
+        Map<String, Object> agent = new java.util.HashMap<>();
+        if (params.containsKey("name")) agent.put("name", params.get("name"));
+        if (params.containsKey("description")) agent.put("description", params.get("description"));
+        if (params.containsKey("role") && !params.get("role").isBlank()) agent.put("role", params.get("role"));
+        if (params.containsKey("agentType")) agent.put("agentType", params.get("agentType"));
+        if (params.containsKey("categoryId") && !params.get("categoryId").isBlank()) agent.put("categoryId", params.get("categoryId"));
+        if (params.containsKey("documentAccess")) agent.put("documentAccess", params.get("documentAccess"));
+        if (params.containsKey("status")) agent.put("status", params.get("status"));
+        if (params.containsKey("endpoint") && !params.get("endpoint").isBlank()) agent.put("endpoint", params.get("endpoint"));
+        if (params.containsKey("healthCheckUrl") && !params.get("healthCheckUrl").isBlank()) agent.put("healthCheckUrl", params.get("healthCheckUrl"));
+        if (params.containsKey("systemPromptOverride") && !params.get("systemPromptOverride").isBlank()) agent.put("systemPromptOverride", params.get("systemPromptOverride"));
+
+        if (params.containsKey("maxSteps")) {
+            try { agent.put("maxSteps", Integer.parseInt(params.get("maxSteps"))); } catch (NumberFormatException ignored) {}
+        }
+
+        // Checkboxes: present in params = checked, absent = unchecked
+        agent.put("planningEnabled", params.containsKey("planningEnabled"));
+        agent.put("reflectionEnabled", params.containsKey("reflectionEnabled"));
+        agent.put("parallelToolCalls", params.containsKey("parallelToolCalls"));
+        agent.put("active", params.containsKey("active"));
+
+        return agent;
     }
 
 }

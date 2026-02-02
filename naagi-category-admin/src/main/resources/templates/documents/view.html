@@ -41,6 +41,35 @@
                     </span>
                 </dd>
 
+                <dt class="col-sm-2">Prompt Template</dt>
+                <dd class="col-sm-10">
+                    <span id="systemPromptDisplay">
+                        <span id="systemPromptText"
+                              th:text="${document?.get('systemPrompt')?.asText() != null ? '(Custom template set)' : '(Using default)'}"
+                              class="text-muted">(Using default)</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="showSystemPromptEdit()" title="Edit prompt template">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </span>
+                    <span id="systemPromptEdit" class="d-none">
+                        <textarea id="systemPromptInput" class="form-control form-control-sm font-monospace mb-2" rows="12"
+                                  style="font-size: 0.85rem;"
+                                  th:text="${document?.get('systemPrompt')?.asText() ?: defaultPromptTemplate}"></textarea>
+                        <small class="text-muted">
+                            Use <code>{context}</code> and <code>{question}</code> as placeholders.
+                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="resetPromptToDefault()">Reset to default</button>
+                        </small>
+                        <div class="mt-1">
+                            <button type="button" class="btn btn-sm btn-success" onclick="saveSystemPrompt()">
+                                <i class="bi bi-check me-1"></i>Save
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary ms-1" onclick="cancelSystemPromptEdit()">
+                                <i class="bi bi-x me-1"></i>Cancel
+                            </button>
+                        </div>
+                    </span>
+                </dd>
+
                 <dt class="col-sm-2">Chunks</dt>
                 <dd class="col-sm-10" th:text="${document?.get('chunkCount')?.asInt() ?: 0}">0</dd>
 
@@ -102,6 +131,7 @@
 
     <script th:inline="javascript">
         const docId = /*[[${docId}]]*/ '';
+        const defaultPromptTemplate = /*[[${defaultPromptTemplate}]]*/ '';
 
         function showTitleEdit() {
             document.getElementById('titleDisplay').classList.add('d-none');
@@ -137,6 +167,45 @@
                     showNotification('Title updated successfully', 'success');
                 } else {
                     showNotification('Error: ' + (data.error || 'Failed to update title'), 'danger');
+                }
+            } catch (error) {
+                showNotification('Error: ' + error.message, 'danger');
+            }
+        }
+
+        function showSystemPromptEdit() {
+            document.getElementById('systemPromptDisplay').classList.add('d-none');
+            document.getElementById('systemPromptEdit').classList.remove('d-none');
+            document.getElementById('systemPromptInput').focus();
+        }
+
+        function cancelSystemPromptEdit() {
+            document.getElementById('systemPromptEdit').classList.add('d-none');
+            document.getElementById('systemPromptDisplay').classList.remove('d-none');
+        }
+
+        function resetPromptToDefault() {
+            document.getElementById('systemPromptInput').value = defaultPromptTemplate;
+        }
+
+        async function saveSystemPrompt() {
+            const input = document.getElementById('systemPromptInput');
+            const newPrompt = input.value.trim();
+
+            try {
+                const response = await fetch(`/documents/${docId}/system-prompt`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ systemPrompt: newPrompt })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('systemPromptText').textContent = newPrompt ? '(Custom template set)' : '(Using default)';
+                    cancelSystemPromptEdit();
+                    showNotification('Prompt template updated successfully', 'success');
+                } else {
+                    showNotification('Error: ' + (data.error || 'Failed to update prompt template'), 'danger');
                 }
             } catch (error) {
                 showNotification('Error: ' + error.message, 'danger');

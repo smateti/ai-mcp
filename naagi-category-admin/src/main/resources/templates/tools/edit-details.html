@@ -60,14 +60,14 @@
                               placeholder="A friendly description for humans/LLM"></textarea>
                 </div>
                 <div class="mb-3">
-                    <label for="categoryId" class="form-label">Category</label>
-                    <select class="form-select" id="categoryId" name="categoryId">
-                        <option value="">-- No Category --</option>
-                        <option th:each="category : ${categories}"
-                                th:value="${category.id}"
-                                th:selected="${category.id == tool.categoryId}"
-                                th:text="${category.name}">Category Name</option>
-                    </select>
+                    <label class="form-label">Agents using this tool</label>
+                    <div th:if="${toolAgents != null && !toolAgents.isEmpty()}">
+                        <span th:each="ag : ${toolAgents}" class="me-2">
+                            <a th:href="@{/agents/{id}(id=${ag['agentId']})}" class="badge bg-primary text-decoration-none"
+                               th:text="${ag['name'] + ' (' + ag['agentId'] + ')'}">Agent</a>
+                        </span>
+                    </div>
+                    <span th:if="${toolAgents == null || toolAgents.isEmpty()}" class="text-muted">Not assigned to any agent</span>
                 </div>
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-check-lg me-2"></i>Save Basic Info

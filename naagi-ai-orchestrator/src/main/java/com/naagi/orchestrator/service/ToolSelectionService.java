@@ -3,7 +3,9 @@ package com.naagi.orchestrator.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.naagi.orchestrator.llm.LlmClient;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.naagi.orchestrator.llm.*;
 import com.naagi.orchestrator.model.AlternativeTool;
 import com.naagi.orchestrator.model.ToolSelectionResult;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,9 @@ public class ToolSelectionService {
     @Value("${naagi.tool-selection.confidence.low-threshold:0.5}")
     private double lowConfidenceThreshold;
 
+    @Value("${naagi.tool-selection.mode:auto}")
+    private String toolSelectionMode;
+
     public ToolSelectionService(LlmClient llmClient, ToolRegistryClient toolRegistryClient, ObjectMapper objectMapper) {
         this.llmClient = llmClient;
         this.toolRegistryClient = toolRegistryClient;
@@ -36,15 +41,163 @@ public class ToolSelectionService {
     }
 
     public ToolSelectionResult selectTool(String userMessage, List<JsonNode> availableTools) {
+        // Build set of valid tool names for validation
+        java.util.Set<String> validToolNames = buildValidToolNames(availableTools);
+
+        ToolSelectionResult result;
+        if ("native".equalsIgnoreCase(toolSelectionMode)) {
+            result = selectToolNative(userMessage, availableTools);
+        } else if ("prompt".equalsIgnoreCase(toolSelectionMode)) {
+            result = selectToolPromptBased(userMessage, availableTools);
+        } else {
+            // auto: try native first, fall back to prompt-based
+            result = null;
+            try {
+                ToolSelectionResult nativeResult = selectToolNative(userMessage, availableTools);
+                if (nativeResult.getSelectedTool() != null) {
+                    result = nativeResult;
+                } else {
+                    log.debug("Native tool calling returned no tool, falling back to prompt-based");
+                }
+            } catch (Exception e) {
+                log.debug("Native tool calling failed, falling back to prompt-based: {}", e.getMessage());
+            }
+            if (result == null) {
+                result = selectToolPromptBased(userMessage, availableTools);
+            }
+        }
+
+        // Validate that the selected tool actually exists in the available tools
+        if (result.getSelectedTool() != null && !validToolNames.contains(result.getSelectedTool())) {
+            log.warn("LLM selected non-existent tool '{}', treating as no match", result.getSelectedTool());
+            return new ToolSelectionResult(null, 0.0, new HashMap<>(),
+                    "LLM hallucinated tool name: " + result.getSelectedTool(), List.of());
+        }
+
+        return result;
+    }
+
+    /**
+     * Build a set of all valid tool names (both toolId and resolved function names)
+     * for validating tool selection results.
+     */
+    private java.util.Set<String> buildValidToolNames(List<JsonNode> tools) {
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (JsonNode tool : tools) {
+            String toolId = tool.has("toolId") ? tool.get("toolId").asText() : "";
+            String name = tool.has("name") ? tool.get("name").asText() : toolId;
+            String functionName = resolveFunctionName(toolId, name);
+            if (!toolId.isBlank()) names.add(toolId);
+            if (!name.isBlank()) names.add(name);
+            if (functionName != null && !functionName.isBlank()) names.add(functionName);
+        }
+        return names;
+    }
+
+    private ToolSelectionResult selectToolPromptBased(String userMessage, List<JsonNode> availableTools) {
         String prompt = buildToolSelectionPrompt(userMessage, availableTools);
 
-        log.debug("Tool selection prompt: {}", prompt);
+        log.debug("Tool selection prompt (prompt-based): {}", prompt);
 
         String llmResponse = llmClient.chat(prompt, 0.2, 512);
 
-        log.debug("LLM response: {}", llmResponse);
+        log.debug("LLM response (prompt-based): {}", llmResponse);
 
         return parseToolSelection(llmResponse);
+    }
+
+    private ToolSelectionResult selectToolNative(String userMessage, List<JsonNode> availableTools) {
+        List<ToolDefinition> toolDefs = buildToolDefinitions(availableTools);
+        List<ChatMessage> messages = List.of(
+                ChatMessage.system("You are an intelligent tool selection assistant. "
+                        + "Analyze the user's message and call the most appropriate tool. "
+                        + "For knowledge questions (what is, how to, explain, how many, why, best practices), use rag_query."),
+                ChatMessage.user(userMessage)
+        );
+
+        ChatRequest request = ChatRequest.withTools(messages, toolDefs, "auto", 0.2, 512);
+
+        log.debug("Tool selection request (native): {} tools defined", toolDefs.size());
+
+        ChatResponse response = llmClient.chat(request);
+
+        log.debug("Tool selection response (native): toolCalls={}, content={}",
+                response.toolCalls(), response.content());
+
+        return parseNativeToolCallResponse(response);
+    }
+
+    private String resolveFunctionName(String toolId, String name) {
+        if (toolId != null && !toolId.isBlank() && !toolId.matches("\\d+")) {
+            return toolId;
+        }
+        if (name != null && !name.isBlank()) {
+            return name.replaceAll("[^a-zA-Z0-9_-]", "_").toLowerCase();
+        }
+        return toolId;
+    }
+
+    private List<ToolDefinition> buildToolDefinitions(List<JsonNode> tools) {
+        List<ToolDefinition> defs = new ArrayList<>();
+        for (JsonNode tool : tools) {
+            String toolId = tool.has("toolId") ? tool.get("toolId").asText() : "";
+            String name = tool.has("name") ? tool.get("name").asText() : toolId;
+            name = resolveFunctionName(toolId, name);
+            String description = tool.has("humanReadableDescription") && !tool.get("humanReadableDescription").isNull()
+                    ? tool.get("humanReadableDescription").asText()
+                    : (tool.has("description") ? tool.get("description").asText() : "No description");
+
+            // Build JSON Schema parameters object from tool's parameter list
+            ObjectNode parametersSchema = objectMapper.createObjectNode();
+            parametersSchema.put("type", "object");
+            ObjectNode properties = parametersSchema.putObject("properties");
+            ArrayNode required = parametersSchema.putArray("required");
+
+            if (tool.has("parameters") && tool.get("parameters").isArray()) {
+                for (JsonNode param : tool.get("parameters")) {
+                    String paramName = param.get("name").asText();
+                    String paramType = param.has("type") ? param.get("type").asText() : "string";
+                    boolean isRequired = param.has("required") && param.get("required").asBoolean();
+
+                    ObjectNode prop = properties.putObject(paramName);
+                    prop.put("type", paramType);
+                    if (param.has("description")) {
+                        prop.put("description", param.get("description").asText());
+                    }
+
+                    if (isRequired) {
+                        required.add(paramName);
+                    }
+                }
+            }
+
+            defs.add(ToolDefinition.function(name, description, parametersSchema));
+        }
+        return defs;
+    }
+
+    private ToolSelectionResult parseNativeToolCallResponse(ChatResponse response) {
+        if (!response.hasToolCalls()) {
+            return new ToolSelectionResult(null, 0.0, new HashMap<>(),
+                    response.hasContent() ? response.content() : "No tool selected", List.of());
+        }
+
+        ToolCall toolCall = response.toolCalls().get(0);
+        String toolName = toolCall.function().name();
+        Map<String, Object> parameters = new HashMap<>();
+
+        try {
+            if (toolCall.function().arguments() != null && !toolCall.function().arguments().isBlank()) {
+                parameters = objectMapper.readValue(toolCall.function().arguments(),
+                        new TypeReference<Map<String, Object>>() {});
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse tool call arguments: {}", toolCall.function().arguments(), e);
+        }
+
+        // Native tool calling implies high confidence since the model chose to call the tool
+        return new ToolSelectionResult(toolName, 0.9, parameters,
+                "Selected via native tool calling", List.of());
     }
 
     private String buildToolSelectionPrompt(String userMessage, List<JsonNode> tools) {

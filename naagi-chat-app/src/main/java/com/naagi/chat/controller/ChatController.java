@@ -1,11 +1,13 @@
 package com.naagi.chat.controller;
 
+import com.naagi.chat.config.ContextChatProperties;
 import com.naagi.chat.entity.ChatSessionEntity;
 import com.naagi.chat.model.ChatMessage;
 import com.naagi.chat.model.ChatSession;
 import com.naagi.chat.service.AuditService;
 import com.naagi.chat.service.ChatHistoryService;
 import com.naagi.chat.service.ChatService;
+import com.naagi.chat.service.ContextCompactionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,8 @@ public class ChatController {
     private final ChatService chatService;
     private final ChatHistoryService historyService;
     private final AuditService auditService;
+    private final ContextCompactionService contextCompactionService;
+    private final ContextChatProperties contextChatProperties;
     private final String orchestratorUrl;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -48,11 +52,15 @@ public class ChatController {
             ChatService chatService,
             ChatHistoryService historyService,
             AuditService auditService,
+            ContextCompactionService contextCompactionService,
+            ContextChatProperties contextChatProperties,
             ObjectMapper objectMapper,
             @Value("${naagi.services.orchestrator.url:http://localhost:8086}") String orchestratorUrl) {
         this.chatService = chatService;
         this.historyService = historyService;
         this.auditService = auditService;
+        this.contextCompactionService = contextCompactionService;
+        this.contextChatProperties = contextChatProperties;
         this.objectMapper = objectMapper;
         this.orchestratorUrl = orchestratorUrl;
         this.httpClient = HttpClient.newBuilder()
@@ -104,8 +112,8 @@ public class ChatController {
     }
 
     /**
-     * Streaming chat endpoint - streams response tokens through orchestrator
-     * This supports both RAG queries and tool calls
+     * Streaming chat endpoint - streams response tokens through orchestrator.
+     * Supports reply-to context anchoring and automatic context compaction.
      */
     @PostMapping(value = "/api/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @ResponseBody
@@ -116,6 +124,7 @@ public class ChatController {
         String message = (String) request.get("message");
         String categoryId = (String) request.get("categoryId");
         String categoryName = (String) request.get("categoryName");
+        String replyToMessageId = (String) request.get("replyToMessageId");
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
 
@@ -133,12 +142,64 @@ public class ChatController {
             final String[] errorMessage = {null};
 
             try {
+                // Context-driven chat: check for compaction or reply-to mode
+                if (replyToMessageId == null && contextChatProperties.getCompaction().isEnabled()) {
+                    // Normal mode: check if compaction is needed before sending
+                    if (contextCompactionService.needsCompaction(sessionId)) {
+                        try {
+                            emitter.send(SseEmitter.event().name("context_compacting")
+                                    .data("{\"sessionId\":\"" + sessionId + "\",\"reason\":\"threshold_exceeded\"}"));
+                            String summary = contextCompactionService.compactContext(sessionId);
+                            if (summary != null) {
+                                emitter.send(SseEmitter.event().name("context_compacted")
+                                        .data("{\"sessionId\":\"" + sessionId + "\",\"summaryTokens\":"
+                                                + ContextCompactionService.estimateTokens(summary) + "}"));
+                            }
+                        } catch (Exception e) {
+                            log.warn("Context compaction failed, proceeding without: {}", e.getMessage());
+                        }
+                    }
+                }
+
                 // Build request to orchestrator streaming endpoint
                 var orchestratorRequest = objectMapper.createObjectNode();
                 orchestratorRequest.put("message", message);
                 orchestratorRequest.put("sessionId", sessionId);
                 if (categoryId != null) {
                     orchestratorRequest.put("categoryId", categoryId);
+                }
+
+                // Reply-to mode: inject focused context into the orchestrator request
+                if (replyToMessageId != null && contextChatProperties.getReplyTo().isEnabled()) {
+                    log.info("[REPLY-TO] Building context for session={}, replyToMessageId={}", sessionId, replyToMessageId);
+                    var replyContext = contextCompactionService.buildReplyToContext(sessionId, replyToMessageId);
+                    log.info("[REPLY-TO] Context built: {} entries", replyContext.size());
+                    if (!replyContext.isEmpty()) {
+                        var contextArray = objectMapper.createArrayNode();
+                        for (var ctx : replyContext) {
+                            var ctxNode = objectMapper.createObjectNode();
+                            ctxNode.put("role", ctx.role());
+                            ctxNode.put("content", ctx.content());
+                            contextArray.add(ctxNode);
+                            log.info("[REPLY-TO] Context entry: role={}, contentLength={}, preview={}",
+                                    ctx.role(), ctx.content().length(),
+                                    ctx.content().substring(0, Math.min(200, ctx.content().length())));
+                        }
+                        orchestratorRequest.set("conversationContext", contextArray);
+                        orchestratorRequest.put("replyToMode", true);
+                        log.info("[REPLY-TO] Orchestrator request includes conversationContext={} entries, replyToMode=true",
+                                replyContext.size());
+                    } else {
+                        log.warn("[REPLY-TO] No context built for replyToMessageId={}", replyToMessageId);
+                    }
+                } else if (replyToMessageId != null) {
+                    log.warn("[REPLY-TO] replyToMessageId={} provided but reply-to is disabled", replyToMessageId);
+                }
+
+                // Pass agent mode flag for multi-step tool chaining
+                Object useAgentObj = request.get("useAgent");
+                if (useAgentObj instanceof Boolean b && b) {
+                    orchestratorRequest.put("useAgent", true);
                 }
 
                 HttpRequest httpReq = HttpRequest.newBuilder()
@@ -156,8 +217,9 @@ public class ChatController {
                     emitter.complete();
                     success[0] = false;
                     errorMessage[0] = "Orchestrator error: HTTP " + response.statusCode();
-                    logStreamingAudit(sessionId, message, fullResponse.toString(), categoryId, categoryName,
-                            selectedTool[0], llmPrompt[0], startTime, success[0], errorMessage[0], clientIp, userAgent);
+                    saveMessagesAndGetAssistantId(sessionId, message, fullResponse.toString(), categoryId, categoryName,
+                            selectedTool[0], llmPrompt[0], startTime, success[0], errorMessage[0], clientIp, userAgent,
+                            replyToMessageId);
                     return;
                 }
 
@@ -190,6 +252,32 @@ public class ChatController {
                                     } catch (Exception e) {
                                         // Not JSON, append as-is
                                         fullResponse.append(data);
+                                    }
+                                } else if ("agent_step".equals(eventName)) {
+                                    // Capture tool call details for reply-to context
+                                    try {
+                                        var stepNode = objectMapper.readTree(data);
+                                        String toolName = stepNode.has("tool") ? stepNode.get("tool").asText() : "";
+                                        String args = stepNode.has("args") ? stepNode.get("args").asText() : "";
+                                        if (!toolName.isEmpty()) {
+                                            fullResponse.append("\n[Tool call: ").append(toolName);
+                                            if (!args.isEmpty()) fullResponse.append("(").append(args).append(")");
+                                            fullResponse.append("]\n");
+                                        }
+                                    } catch (Exception e) {
+                                        log.debug("Failed to parse agent_step event", e);
+                                    }
+                                } else if ("tool_result".equals(eventName)) {
+                                    // Capture tool results for reply-to context
+                                    try {
+                                        var resultNode = objectMapper.readTree(data);
+                                        String result = resultNode.has("result") ? resultNode.get("result").asText() : "";
+                                        if (!result.isEmpty()) {
+                                            String truncated = result.length() > 500 ? result.substring(0, 500) + "..." : result;
+                                            fullResponse.append("[Result: ").append(truncated).append("]\n");
+                                        }
+                                    } catch (Exception e) {
+                                        log.debug("Failed to parse tool_result event", e);
                                     }
                                 } else if ("tool".equals(eventName)) {
                                     try {
@@ -226,43 +314,72 @@ public class ChatController {
                         }
                     }
                 }
+
+                // Save messages to DB BEFORE completing emitter, so we can emit the DB message ID
+                String assistantDbId = saveMessagesAndGetAssistantId(
+                        sessionId, message, fullResponse.toString(), categoryId, categoryName,
+                        selectedTool[0], llmPrompt[0], startTime, success[0], errorMessage[0],
+                        clientIp, userAgent, replyToMessageId);
+
+                // Emit the assistant message's DB ID so frontend can use it for reply-to
+                if (assistantDbId != null) {
+                    try {
+                        emitter.send(SseEmitter.event().name("message_saved")
+                                .data("{\"assistantMessageId\":\"" + assistantDbId + "\"}"));
+                    } catch (Exception e) {
+                        log.debug("Failed to send message_saved event", e);
+                    }
+                }
+
                 emitter.complete();
 
             } catch (Exception e) {
                 log.error("Streaming error", e);
                 success[0] = false;
                 errorMessage[0] = e.getMessage();
+                // Still try to save audit on error
+                saveMessagesAndGetAssistantId(
+                        sessionId, message, fullResponse.toString(), categoryId, categoryName,
+                        selectedTool[0], llmPrompt[0], startTime, success[0], errorMessage[0],
+                        clientIp, userAgent, replyToMessageId);
                 try {
                     emitter.send(SseEmitter.event().name("error").data("Error: " + e.getMessage()));
                     emitter.complete();
                 } catch (Exception ex) {
                     emitter.completeWithError(ex);
                 }
-            } finally {
-                // Log to audit trail
-                logStreamingAudit(sessionId, message, fullResponse.toString(), categoryId, categoryName,
-                        selectedTool[0], llmPrompt[0], startTime, success[0], errorMessage[0], clientIp, userAgent);
             }
         }).start();
 
         return emitter;
     }
 
-    private void logStreamingAudit(String sessionId, String userMessage, String assistantResponse,
-                                    String categoryId, String categoryName, String selectedTool,
-                                    String llmPrompt, long startTime, boolean success, String errorMessage,
-                                    String clientIp, String userAgent) {
+    /**
+     * Save user and assistant messages to DB, log audit, return the assistant message's DB ID.
+     * The returned ID can be used by the frontend for reply-to references.
+     */
+    private String saveMessagesAndGetAssistantId(String sessionId, String userMessage, String assistantResponse,
+                                                  String categoryId, String categoryName, String selectedTool,
+                                                  String llmPrompt, long startTime, boolean success, String errorMessage,
+                                                  String clientIp, String userAgent, String replyToMessageId) {
         try {
             long processingTime = System.currentTimeMillis() - startTime;
             String messageId = UUID.randomUUID().toString();
 
             // Save messages to chat history for sidebar display
-            historyService.addMessage(sessionId, "user", userMessage, Map.of());
-            historyService.addMessage(sessionId, "assistant", assistantResponse, Map.of(
+            java.util.HashMap<String, Object> userMeta = new java.util.HashMap<>();
+            if (replyToMessageId != null) {
+                userMeta.put("replyToMessageId", replyToMessageId);
+            }
+            historyService.addMessage(sessionId, "user", userMessage, userMeta);
+            var assistantMsg = historyService.addMessage(sessionId, "assistant", assistantResponse, Map.of(
                     "selectedTool", selectedTool != null ? selectedTool : "",
                     "processingTimeMs", processingTime,
                     "success", success
             ));
+
+            String assistantDbId = assistantMsg != null ? assistantMsg.getId() : null;
+            log.info("[AUDIT] Saved messages for session {}. Assistant DB id: {}", sessionId, assistantDbId);
 
             // Update session title based on first message
             historyService.updateSessionTitle(sessionId, userMessage);
@@ -281,11 +398,13 @@ public class ChatController {
             log.debug("Streaming audit logged for session {}", sessionId);
 
             // Track user question for FAQ analytics (async, non-blocking)
-            // Note: Full audit data is already stored above. This only tracks for FAQ deduplication/frequency.
             trackQuestionForFaqAnalytics(userMessage, categoryId);
 
+            return assistantDbId;
+
         } catch (Exception e) {
-            log.warn("Failed to log streaming audit: {}", e.getMessage());
+            log.warn("Failed to save messages/audit: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -474,6 +593,46 @@ public class ChatController {
                         .map(historyService::toDto)
                         .collect(Collectors.toList())
         );
+    }
+
+    // ==================== Context Management APIs ====================
+
+    /**
+     * Manually trigger context compaction for a session.
+     */
+    @PostMapping("/api/sessions/{sessionId}/compact")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> compactContext(@PathVariable String sessionId) {
+        if (!contextChatProperties.getCompaction().isEnabled()) {
+            return ResponseEntity.ok(Map.of("compacted", false, "reason", "compaction_disabled"));
+        }
+
+        String summary = contextCompactionService.compactContext(sessionId);
+        if (summary != null) {
+            return ResponseEntity.ok(Map.of(
+                    "compacted", true,
+                    "summaryTokens", ContextCompactionService.estimateTokens(summary)
+            ));
+        } else {
+            return ResponseEntity.ok(Map.of("compacted", false, "reason", "nothing_to_compact"));
+        }
+    }
+
+    /**
+     * Get context info for a session (message count, token estimate, compaction status).
+     */
+    @GetMapping("/api/sessions/{sessionId}/context")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getContextInfo(@PathVariable String sessionId) {
+        var info = contextCompactionService.getContextInfo(sessionId);
+        return ResponseEntity.ok(Map.of(
+                "messageCount", info.messageCount(),
+                "approximateTokens", info.approximateTokens(),
+                "hasSummary", info.hasSummary(),
+                "canCompact", info.canCompact(),
+                "compactionEnabled", contextChatProperties.getCompaction().isEnabled(),
+                "replyToEnabled", contextChatProperties.getReplyTo().isEnabled()
+        ));
     }
 
     // ==================== Health Check ====================

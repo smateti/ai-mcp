@@ -1,0 +1,7 @@
+com\cobol\analyzer\model\FileDefinition.class
+com\cobol\analyzer\CobolAnalyzerApplication.class
+com\cobol\analyzer\model\AnalysisResult.class
+com\cobol\analyzer\config\LlmConfig.class
+com\cobol\analyzer\controller\AnalyzerController.class
+com\cobol\analyzer\service\LlmAnalysisService.class
+com\cobol\analyzer\model\ParagraphAnalysis.class

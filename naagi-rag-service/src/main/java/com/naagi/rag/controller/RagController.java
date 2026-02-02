@@ -268,13 +268,35 @@ public class RagController {
                         .data(new com.fasterxml.jackson.databind.ObjectMapper()
                                 .writeValueAsString(cragMetadata)));
 
-                // CRAG: Check if we should refuse to answer due to low relevance
-                if (cragService.isEnabled() &&
-                        topRelevanceScore < minRelevanceForAnswer &&
-                        evaluation.category() != ConfidenceCategory.CORRECT) {
+                // CRAG: Check if we should refuse to answer
+                // 1. Check keyword overlap - if key terms from question aren't in context, refuse
+                String contextText = sources.stream()
+                        .map(RagService.SourceChunk::text)
+                        .collect(java.util.stream.Collectors.joining(" ")).toLowerCase();
 
-                    System.out.println("[RAG API] CRAG refusing stream answer due to low relevance: topScore=" +
-                            String.format("%.3f", topRelevanceScore) + " < " + minRelevanceForAnswer);
+                System.out.println("[RAG API] === ANTI-HALLUCINATION CHECK v2 ===");
+                System.out.println("[RAG API] Question: " + request.question());
+                System.out.println("[RAG API] CRAG enabled: " + cragService.isEnabled());
+                System.out.println("[RAG API] Context length: " + contextText.length() + " chars");
+
+                boolean hasKeywordOverlap = checkKeywordOverlap(request.question(), contextText);
+
+                System.out.println("[RAG API] Keyword overlap result: " + hasKeywordOverlap);
+
+                boolean shouldRefuse = cragService.isEnabled() && (
+                        // Original check: low relevance score
+                        (topRelevanceScore < minRelevanceForAnswer && evaluation.category() != ConfidenceCategory.CORRECT) ||
+                        // NEW: Even for CORRECT, refuse if key question terms aren't in context
+                        !hasKeywordOverlap
+                );
+
+                if (shouldRefuse) {
+                    String refuseReason = !hasKeywordOverlap
+                            ? "Key terms from question not found in context"
+                            : "Low relevance score";
+                    System.out.println("[RAG API] CRAG refusing stream answer: " + refuseReason +
+                            ", topScore=" + String.format("%.3f", topRelevanceScore) +
+                            ", keywordOverlap=" + hasKeywordOverlap);
 
                     // Stream refusal message token by token for consistent UX
                     String refusalMessage = "I don't have specific information about that in the knowledge base. " +
@@ -452,6 +474,11 @@ public class RagController {
         }
     }
 
+    @GetMapping("/default-prompt-template")
+    public ResponseEntity<java.util.Map<String, String>> getDefaultPromptTemplate() {
+        return ResponseEntity.ok(java.util.Map.of("template", RagService.DEFAULT_PROMPT_TEMPLATE));
+    }
+
     @GetMapping("/documents")
     public ResponseEntity<List<java.util.Map<String, Object>>> getDocuments(
             @RequestParam(required = false) String categoryId) {
@@ -585,6 +612,9 @@ public class RagController {
                     if (payload != null) {
                         if (payload.has("title")) {
                             docInfo.put("title", payload.get("title").asText());
+                        }
+                        if (payload.has("systemPrompt")) {
+                            docInfo.put("systemPrompt", payload.get("systemPrompt").asText());
                         }
                         if (payload.has("categories")) {
                             var categories = new java.util.ArrayList<String>();
@@ -772,6 +802,136 @@ public class RagController {
             System.err.println("[RAG API] Collection exists check failed: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Check if key terms from the question appear in the context.
+     * This helps detect when the context is about a related topic but doesn't actually
+     * contain information to answer the specific question.
+     *
+     * CRITICAL: Technical/specific terms (like "async", "synchronous", "api", "rest")
+     * must ALL be found in context. These are the terms that make the question specific.
+     *
+     * For example: Question about "Nimbus async function call" but context only has
+     * generic "Spring Batch" info - the critical term "async" won't be found.
+     */
+    private boolean checkKeywordOverlap(String question, String contextLower) {
+        // Common words to exclude
+        java.util.Set<String> stopWords = java.util.Set.of(
+                "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+                "have", "has", "had", "do", "does", "did", "will", "would", "could",
+                "should", "may", "might", "must", "shall", "can", "need", "dare",
+                "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+                "into", "through", "during", "before", "after", "above", "below",
+                "between", "under", "again", "further", "then", "once", "here",
+                "there", "when", "where", "why", "how", "all", "each", "few",
+                "more", "most", "other", "some", "such", "no", "nor", "not",
+                "only", "own", "same", "so", "than", "too", "very", "just",
+                "and", "but", "if", "or", "because", "until", "while", "what",
+                "which", "who", "whom", "this", "that", "these", "those", "i",
+                "me", "my", "myself", "we", "our", "ours", "you", "your", "it",
+                "call", "calling", "use", "using", "get", "set", "create", "make"
+        );
+
+        // Technical/specific terms that MUST be found in context if present in question
+        // These are the terms that make a question specific vs generic
+        java.util.Set<String> criticalTechnicalTerms = java.util.Set.of(
+                "async", "asynchronous", "synchronous", "sync",
+                "api", "rest", "soap", "grpc", "graphql",
+                "stream", "streaming", "batch", "realtime", "real-time",
+                "parallel", "concurrent", "thread", "multithreaded",
+                "callback", "promise", "future", "await",
+                "queue", "kafka", "rabbitmq", "jms", "mq",
+                "cache", "redis", "memcache",
+                "database", "sql", "nosql", "mongodb", "postgres",
+                "transaction", "rollback", "commit",
+                "authentication", "authorization", "oauth", "jwt", "token",
+                "encrypt", "decrypt", "ssl", "tls", "https",
+                "deploy", "kubernetes", "docker", "container",
+                "schedule", "cron", "timer", "trigger",
+                "error", "exception", "retry", "timeout", "fallback"
+        );
+
+        String questionLower = question.toLowerCase();
+        String[] words = questionLower.split("\\W+");
+
+        java.util.List<String> allKeyTerms = new java.util.ArrayList<>();
+        java.util.List<String> criticalTermsInQuestion = new java.util.ArrayList<>();
+
+        for (String word : words) {
+            if (word.length() < 3 || word.matches("\\d+")) {
+                continue;
+            }
+
+            // Check if this is a critical technical term
+            if (criticalTechnicalTerms.contains(word)) {
+                criticalTermsInQuestion.add(word);
+                allKeyTerms.add(word);
+            } else if (!stopWords.contains(word)) {
+                allKeyTerms.add(word);
+            }
+        }
+
+        // Also check for compound critical terms
+        if (questionLower.contains("async") && !criticalTermsInQuestion.contains("async")) {
+            criticalTermsInQuestion.add("async");
+        }
+        if (questionLower.contains("synchronous") && !criticalTermsInQuestion.contains("synchronous")) {
+            criticalTermsInQuestion.add("synchronous");
+        }
+
+        System.out.println("[RAG API] Keyword analysis: allKeyTerms=" + allKeyTerms +
+                ", criticalTerms=" + criticalTermsInQuestion);
+
+        // STRICT CHECK: ALL critical technical terms MUST be found in context
+        if (!criticalTermsInQuestion.isEmpty()) {
+            java.util.List<String> missingCriticalTerms = new java.util.ArrayList<>();
+            for (String term : criticalTermsInQuestion) {
+                // Check for the term or common variants
+                boolean found = contextLower.contains(term);
+
+                // Also check synonyms for async
+                if (term.equals("async") && !found) {
+                    found = contextLower.contains("asynchronous") ||
+                            contextLower.contains("asynchronously");
+                }
+                if (term.equals("synchronous") && !found) {
+                    found = contextLower.contains("synchronously") ||
+                            contextLower.contains("sync ");
+                }
+
+                if (!found) {
+                    missingCriticalTerms.add(term);
+                }
+            }
+
+            if (!missingCriticalTerms.isEmpty()) {
+                System.out.println("[RAG API] CRITICAL TERMS MISSING: " + missingCriticalTerms +
+                        " - Context does NOT contain information about these specific topics. REFUSING to answer.");
+                return false;
+            }
+
+            System.out.println("[RAG API] All critical terms found in context.");
+            return true;
+        }
+
+        // If no critical terms, fall back to general overlap check
+        if (allKeyTerms.isEmpty()) {
+            return true;
+        }
+
+        int foundCount = 0;
+        for (String term : allKeyTerms) {
+            if (contextLower.contains(term)) {
+                foundCount++;
+            }
+        }
+
+        double overlapRatio = (double) foundCount / allKeyTerms.size();
+        System.out.println("[RAG API] General keyword overlap: found=" + foundCount + "/" + allKeyTerms.size() +
+                ", ratio=" + String.format("%.2f", overlapRatio));
+
+        return overlapRatio >= 0.5;
     }
 
     private String escapeJson(String s) {

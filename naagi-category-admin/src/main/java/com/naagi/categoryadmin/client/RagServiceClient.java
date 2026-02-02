@@ -35,6 +35,26 @@ public class RagServiceClient {
                 .build();
     }
 
+    public String getDefaultPromptTemplate() {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/rag/default-prompt-template"))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                JsonNode result = objectMapper.readTree(response.body());
+                return result.has("template") ? result.get("template").asText() : "";
+            }
+        } catch (Exception e) {
+            log.error("Error fetching default prompt template", e);
+        }
+        return "";
+    }
+
     public JsonNode ingestDocument(String docId, String text, String categoryId, Map<String, Object> metadata) {
         try {
             Map<String, Object> body = Map.of(
@@ -160,13 +180,16 @@ public class RagServiceClient {
 
     // Enhanced Document Upload API Methods
 
-    public JsonNode uploadDocumentWithPreview(String docId, String title, String content, String categoryId) {
+    public JsonNode uploadDocumentWithPreview(String docId, String title, String content, String categoryId, String systemPrompt) {
         try {
             Map<String, Object> body = new java.util.HashMap<>();
             body.put("docId", docId);
             body.put("title", title != null ? title : "");
             body.put("content", content);
             body.put("categoryId", categoryId != null ? categoryId : "");
+            if (systemPrompt != null && !systemPrompt.isBlank()) {
+                body.put("systemPrompt", systemPrompt);
+            }
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/documents/upload"))
@@ -798,6 +821,34 @@ public class RagServiceClient {
         } catch (Exception e) {
             log.error("Error updating title for upload {}", uploadId, e);
             throw new RuntimeException("Error updating title: " + e.getMessage(), e);
+        }
+    }
+
+    public JsonNode updateUploadSystemPrompt(String uploadId, String systemPrompt) {
+        try {
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("systemPrompt", systemPrompt);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/api/documents/uploads/" + uploadId + "/system-prompt"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return objectMapper.readTree(response.body());
+            } else {
+                log.error("Failed to update system prompt: HTTP {} - {}", response.statusCode(), response.body());
+                throw new RuntimeException("Failed to update system prompt: " + extractErrorMessage(response.body()));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error updating system prompt for upload {}", uploadId, e);
+            throw new RuntimeException("Error updating system prompt: " + e.getMessage(), e);
         }
     }
 

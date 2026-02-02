@@ -3,6 +3,9 @@ package com.naagi.rag.service;
 import com.naagi.rag.chunk.HybridChunker;
 import com.naagi.rag.entity.DocumentUpload;
 import com.naagi.rag.llm.ChatClient;
+import com.naagi.rag.llm.ChatMessage;
+import com.naagi.rag.llm.ChatRequest;
+import com.naagi.rag.llm.ChatResponse;
 import com.naagi.rag.llm.EmbeddingsClient;
 import com.naagi.rag.metrics.RagMetrics;
 import com.naagi.rag.qdrant.QdrantClient;
@@ -12,6 +15,8 @@ import com.naagi.rag.rerank.RerankerService;
 import com.naagi.rag.rerank.RerankerService.Document;
 import com.naagi.rag.rerank.RerankerService.RerankResult;
 import com.naagi.rag.repository.DocumentUploadRepository;
+import com.naagi.rag.retrieval.HyDeService;
+import com.naagi.rag.cache.SemanticCacheService;
 import com.naagi.rag.search.BM25Index;
 import com.naagi.rag.search.HybridSearchService;
 import com.naagi.rag.search.HybridSearchService.HybridResult;
@@ -36,6 +41,51 @@ public class RagService {
 
     private static final Logger log = LoggerFactory.getLogger(RagService.class);
 
+    /**
+     * Default prompt template using the ICE Method (Instructions, Constraints, Escalation).
+     * Uses {context} and {question} as dynamic placeholders.
+     * Per-document custom prompts can override this entirely.
+     */
+    public static final String DEFAULT_PROMPT_TEMPLATE = """
+            You are a documentation assistant that ONLY answers from the provided context.
+
+            INSTRUCTIONS:
+            Answer the user's question using ONLY information explicitly stated in the context below.
+
+            CONSTRAINTS:
+            - You may ONLY use facts, terms, method names, class names, and details that appear VERBATIM in the context.
+            - If the context discusses a RELATED topic but does NOT contain the SPECIFIC answer, you MUST say: "I don't have specific information about that in the knowledge base."
+            - Do NOT invent, infer, or guess ANY technical details (method names, parameters, class names, steps) that are not explicitly written in the context.
+            - Do NOT combine information from different parts of the context to create new conclusions.
+
+            ESCALATION:
+            If you cannot find an EXPLICIT answer in the context, respond with:
+            "I don't have specific information about that in the knowledge base. The documentation covers [brief description of what IS in the context], but doesn't address your specific question about [topic]."
+
+            ---
+            CONTEXT:
+            {context}
+            ---
+
+            QUESTION: {question}
+
+            ANSWER (remember: only use information explicitly stated above):""";
+
+    /**
+     * Shared system instruction for standard RAG queries (non-template paths).
+     */
+    private static final String RAG_SYSTEM_INSTRUCTION = """
+            You are a helpful assistant answering questions based on the provided documentation.
+
+            RULES:
+            1. Use the information from the context below to answer the question.
+            2. Do not make up information that is not in the context.
+            3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
+
+            FORMAT:
+            - Respond in plain, natural language.
+            - If asked about steps or processes, use numbered steps.""";
+
     public record QueryResult(
             String question,
             String answer,
@@ -47,7 +97,8 @@ public class RagService {
             int chunkIndex,
             double relevanceScore,
             String text,
-            String title
+            String title,
+            String systemPrompt
     ) {}
 
     private final HybridChunker chunker;
@@ -80,6 +131,12 @@ public class RagService {
     // Reranking service
     private final RerankerService rerankerService;
 
+    // HyDE service for hypothetical document embeddings
+    private final HyDeService hydeService;
+
+    // Semantic cache service
+    private final SemanticCacheService semanticCache;
+
     // Document upload repository for title lookup
     private final DocumentUploadRepository documentUploadRepository;
 
@@ -100,6 +157,8 @@ public class RagService {
             QdrantClient qdrant,
             RagMetrics metrics,
             RerankerService rerankerService,
+            HyDeService hydeService,
+            SemanticCacheService semanticCache,
             DocumentUploadRepository documentUploadRepository
     ) {
         this.chunker = new HybridChunker(maxChars, overlap, minChars);
@@ -122,11 +181,24 @@ public class RagService {
         // Initialize reranker
         this.rerankerService = rerankerService;
 
+        // Initialize HyDE
+        this.hydeService = hydeService;
+
+        // Initialize semantic cache
+        this.semanticCache = semanticCache;
+
         // Initialize document upload repository for title lookup
         this.documentUploadRepository = documentUploadRepository;
 
-        log.info("[RAG] Initialized with minRelevanceScore={}, hybridSearch={}, denseWeight={}, sparseWeight={}, reranker={}",
-                minRelevanceScore, hybridSearchEnabled, hybridDenseWeight, hybridSparseWeight, rerankerService.isEnabled());
+        log.info("[RAG] Initialized with minRelevanceScore={}, hybridSearch={}, denseWeight={}, sparseWeight={}, reranker={}, hyde={}",
+                minRelevanceScore, hybridSearchEnabled, hybridDenseWeight, hybridSparseWeight, rerankerService.isEnabled(), hydeService.isEnabled());
+    }
+
+    /**
+     * Embed a query using HyDE when enabled, otherwise standard embedding.
+     */
+    private List<Double> embedQuery(String question) {
+        return hydeService.embedWithHyDE(question);
     }
 
     public int ingest(String docId, String text) {
@@ -207,25 +279,13 @@ public class RagService {
 
         String contextBlock = String.join("\n\n---\n\n", ctx);
 
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
+        String systemMsg = RAG_SYSTEM_INSTRUCTION;
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
-                RULES:
-                1. Use the information from the context below to answer the question.
-                2. Do not make up information that is not in the context.
-                3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
-
-                FORMAT:
-                - Respond in plain, natural language.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(contextBlock, question);
-
-        return chat.chatOnce(prompt, 0.2, 512);
+        ChatResponse resp = chat.chat(ChatRequest.of(
+                List.of(ChatMessage.system(systemMsg), ChatMessage.user(userMsg)),
+                0.2, 512));
+        return resp.content();
     }
 
     public QueryResult askWithSources(String question, int topK) {
@@ -244,12 +304,23 @@ public class RagService {
             metrics.recordCacheHit();
             return cached;
         }
+
+        // Semantic cache: check for semantically similar past queries
+        var semanticHit = semanticCache.lookup(question, category);
+        if (semanticHit.isPresent()) {
+            var hit = semanticHit.get();
+            long cacheTime = System.currentTimeMillis() - totalStart;
+            log.info("[TIMING] Semantic cache HIT (similarity={}) in {}ms", String.format("%.4f", hit.similarity()), cacheTime);
+            metrics.recordCacheHit();
+            return new QueryResult(question, hit.answer(), List.of());
+        }
+
         metrics.recordCacheMiss();
 
         long embedStart = System.currentTimeMillis();
-        List<Double> qVec = embed.embed(question);
+        List<Double> qVec = embedQuery(question);
         long embedTime = System.currentTimeMillis() - embedStart;
-        log.info("[TIMING] Embedding generation: {}ms", embedTime);
+        log.info("[TIMING] Embedding generation (hyde={}): {}ms", hydeService.isEnabled(), embedTime);
         metrics.recordEmbeddingTime(embedTime);
 
         long searchStart = System.currentTimeMillis();
@@ -259,7 +330,7 @@ public class RagService {
         metrics.recordVectorSearchTime(searchTime);
 
         List<SourceChunk> sources = results.stream()
-                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title()))
+                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title(), r.systemPrompt()))
                 .collect(Collectors.toList());
 
         // Check if top result meets minimum relevance threshold
@@ -274,27 +345,13 @@ public class RagService {
                 .map(SearchResultWithScore::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
-
-                RULES:
-                1. Use the information from the context below to answer the question.
-                2. Do not make up information that is not in the context.
-                3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
-
-                FORMAT:
-                - Respond in plain, natural language.
-                - If asked about steps or processes, use numbered steps.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(contextBlock, question);
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
         long llmStart = System.currentTimeMillis();
-        String answer = chat.chatOnce(prompt, 0.2, 256);
+        ChatResponse resp = chat.chat(ChatRequest.of(
+                List.of(ChatMessage.system(RAG_SYSTEM_INSTRUCTION), ChatMessage.user(userMsg)),
+                0.2, 256));
+        String answer = resp.content();
         long llmTime = System.currentTimeMillis() - llmStart;
         log.info("[TIMING] LLM answer generation: {}ms", llmTime);
         metrics.recordLlmChatTime(llmTime);
@@ -307,6 +364,8 @@ public class RagService {
 
         if (shouldCache && queryCache.size() < MAX_CACHE_SIZE) {
             queryCache.put(cacheKey, result);
+            // Also store in semantic cache for cross-query deduplication
+            semanticCache.store(question, answer, category);
             log.info("[CACHE] Cached result for question: {} (score: {})", question, sources.get(0).relevanceScore());
         } else if (!shouldCache) {
             log.info("[CACHE] Skipped caching low-quality result - score: {}, isNoInfo: {}, question: {}",
@@ -355,11 +414,11 @@ public class RagService {
                                       java.util.function.Consumer<StreamEvent> onEvent) {
         long totalStart = System.currentTimeMillis();
 
-        // Embedding
+        // Embedding (with HyDE if enabled)
         long embedStart = System.currentTimeMillis();
-        List<Double> qVec = embed.embed(question);
+        List<Double> qVec = embedQuery(question);
         long embedTime = System.currentTimeMillis() - embedStart;
-        log.info("[TIMING] Embedding generation: {}ms", embedTime);
+        log.info("[TIMING] Embedding generation (hyde={}): {}ms", hydeService.isEnabled(), embedTime);
         metrics.recordEmbeddingTime(embedTime);
 
         // Vector search
@@ -371,7 +430,7 @@ public class RagService {
 
         // Send sources event first
         List<SourceChunk> sources = results.stream()
-                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title()))
+                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title(), r.systemPrompt()))
                 .collect(Collectors.toList());
         onEvent.accept(new StreamEvent("sources", null, sources));
 
@@ -392,31 +451,16 @@ public class RagService {
                 .map(SearchResultWithScore::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
-
-                RULES:
-                1. Use the information from the context below to answer the question.
-                2. Do not make up information that is not in the context.
-                3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
-
-                FORMAT:
-                - Respond in plain, natural language.
-                - If asked about steps or processes, use numbered steps.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(contextBlock, question);
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
         // Send prompt event for audit trail
-        onEvent.accept(new StreamEvent("prompt", null, null, prompt));
+        onEvent.accept(new StreamEvent("prompt", null, null, userMsg));
 
         // Stream LLM response
         long llmStart = System.currentTimeMillis();
-        chat.chatStream(prompt, 0.2, 256, token -> {
+        chat.chatStream(ChatRequest.stream(
+                List.of(ChatMessage.system(RAG_SYSTEM_INSTRUCTION), ChatMessage.user(userMsg)),
+                0.2, 256), token -> {
             onEvent.accept(new StreamEvent("token", token, null));
         });
         long llmTime = System.currentTimeMillis() - llmStart;
@@ -466,46 +510,20 @@ public class RagService {
                 .map(SourceChunk::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        // Build prompt with CRAG-aware instructions
-        String confidenceHint = switch (confidenceCategory) {
-            case CORRECT -> "The retrieved context appears highly relevant. Answer confidently based on the context.";
-            case AMBIGUOUS -> """
-                WARNING: The retrieved context may only be PARTIALLY relevant to the question.
-                - If the context does not DIRECTLY address the specific question asked, say "I don't have specific information about that in the knowledge base."
-                - Do NOT extrapolate or combine unrelated information to construct an answer.
-                - Only answer if you find EXPLICIT information about what was asked.""";
-            case INCORRECT -> "The retrieved context has LOW relevance. Say 'I don't have information about that in the knowledge base.' unless you find exact matches.";
-        };
-
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
-
-                RELEVANCE NOTE: %s
-
-                RULES:
-                1. ONLY use information that is EXPLICITLY stated in the context below.
-                2. Do NOT make up, infer, or extrapolate information that is not directly in the context.
-                3. If the context does not contain information that DIRECTLY answers the question, say "I don't have information about that in the knowledge base."
-                4. If the context talks about a RELATED but DIFFERENT topic, acknowledge this limitation.
-                5. Be conservative - it's better to say you don't know than to provide incorrect information.
-
-                FORMAT:
-                - Respond in plain, natural language.
-                - If asked about steps or processes, use numbered steps.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(confidenceHint, contextBlock, question);
+        // Resolve prompt template: use document-specific template if available, otherwise default
+        String template = resolvePromptTemplate(sources);
+        String prompt = buildPromptFromTemplate(template, contextBlock, question);
 
         // Send prompt event for audit trail
         onEvent.accept(new StreamEvent("prompt", null, null, prompt));
 
-        // Stream LLM response
+        // Stream LLM response with very low temperature (0.1) for conservative responses
         long llmStart = System.currentTimeMillis();
-        chat.chatStream(prompt, 0.2, 256, token -> {
+        chat.chatStream(ChatRequest.stream(
+                List.of(ChatMessage.system("You are a documentation assistant. Answer ONLY using information explicitly stated in the provided context. "
+                        + "Respond in plain natural language ONLY. NEVER output JSON, function calls, code blocks, or tool invocations."),
+                        ChatMessage.user(prompt)),
+                0.1, 256), token -> {
             onEvent.accept(new StreamEvent("token", token, null));
         });
         long llmTime = System.currentTimeMillis() - llmStart;
@@ -535,9 +553,9 @@ public class RagService {
 
         long startTime = System.currentTimeMillis();
 
-        // 1. Dense search (semantic)
+        // 1. Dense search (semantic, with HyDE if enabled)
         long denseStart = System.currentTimeMillis();
-        List<Double> qVec = embed.embed(question);
+        List<Double> qVec = embedQuery(question);
         List<SearchResultWithScore> denseResults = qdrant.searchWithScores(qVec, topK * 2, category);
         long denseTime = System.currentTimeMillis() - denseStart;
 
@@ -548,7 +566,8 @@ public class RagService {
                         r.chunkIndex(),
                         r.text(),
                         r.title(),
-                        r.score()))
+                        r.score(),
+                        r.systemPrompt()))
                 .toList();
 
         // 2. Sparse search (BM25)
@@ -562,7 +581,7 @@ public class RagService {
         long sparseTime = System.currentTimeMillis() - sparseStart;
 
         List<SearchHit> sparseHits = sparseResults.stream()
-                .map(r -> new SearchHit(r.id(), r.docId(), r.chunkIndex(), r.text(), r.title(), r.score()))
+                .map(r -> new SearchHit(r.id(), r.docId(), r.chunkIndex(), r.text(), r.title(), r.score(), null))
                 .toList();
 
         // 3. Fuse with weighted RRF
@@ -585,7 +604,7 @@ public class RagService {
                 bothCount, denseOnlyCount, sparseOnlyCount);
 
         return fusedResults.stream()
-                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.rrfScore(), r.text(), r.title()))
+                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.rrfScore(), r.text(), r.title(), r.systemPrompt()))
                 .toList();
     }
 
@@ -593,10 +612,10 @@ public class RagService {
      * Fallback to dense-only search when hybrid is disabled
      */
     private List<SourceChunk> denseOnlySearch(String question, int topK, String category) {
-        List<Double> qVec = embed.embed(question);
+        List<Double> qVec = embedQuery(question);
         List<SearchResultWithScore> results = qdrant.searchWithScores(qVec, topK, category);
         return results.stream()
-                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title()))
+                .map(r -> enrichWithTitle(r.docId(), r.chunkIndex(), r.score(), r.text(), r.title(), r.systemPrompt()))
                 .toList();
     }
 
@@ -620,27 +639,13 @@ public class RagService {
                 .map(SourceChunk::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
-
-                RULES:
-                1. Use the information from the context below to answer the question.
-                2. Do not make up information that is not in the context.
-                3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
-
-                FORMAT:
-                - Respond in plain, natural language.
-                - If asked about steps or processes, use numbered steps.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(contextBlock, question);
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
         long llmStart = System.currentTimeMillis();
-        String answer = chat.chatOnce(prompt, 0.2, 256);
+        ChatResponse resp = chat.chat(ChatRequest.of(
+                List.of(ChatMessage.system(RAG_SYSTEM_INSTRUCTION), ChatMessage.user(userMsg)),
+                0.2, 256));
+        String answer = resp.content();
         long llmTime = System.currentTimeMillis() - llmStart;
 
         long totalTime = System.currentTimeMillis() - totalStart;
@@ -731,6 +736,7 @@ public class RagService {
             metadata.put("docId", chunk.docId());
             metadata.put("chunkIndex", chunk.chunkIndex());
             metadata.put("title", chunk.title());
+            metadata.put("systemPrompt", chunk.systemPrompt());
             documents.add(new Document(
                     stableId(chunk.docId() + ":" + chunk.chunkIndex()),
                     chunk.text(),
@@ -762,7 +768,8 @@ public class RagService {
                         (Integer) r.metadata().get("chunkIndex"),
                         r.rerankScore(),
                         r.text(),
-                        (String) r.metadata().get("title")
+                        (String) r.metadata().get("title"),
+                        (String) r.metadata().get("systemPrompt")
                 ))
                 .toList();
     }
@@ -785,27 +792,13 @@ public class RagService {
                 .map(SourceChunk::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        String prompt = """
-                You are a helpful assistant answering questions based on the provided documentation.
-
-                RULES:
-                1. Use the information from the context below to answer the question.
-                2. Do not make up information that is not in the context.
-                3. If the context does not contain relevant information, say "I don't have information about that in the knowledge base."
-
-                FORMAT:
-                - Respond in plain, natural language.
-                - If asked about steps or processes, use numbered steps.
-
-                Context:
-                %s
-
-                Question: %s
-
-                Answer:""".formatted(contextBlock, question);
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
         long llmStart = System.currentTimeMillis();
-        String answer = chat.chatOnce(prompt, 0.2, 256);
+        ChatResponse resp = chat.chat(ChatRequest.of(
+                List.of(ChatMessage.system(RAG_SYSTEM_INSTRUCTION), ChatMessage.user(userMsg)),
+                0.2, 256));
+        String answer = resp.content();
         long llmTime = System.currentTimeMillis() - llmStart;
 
         long totalTime = System.currentTimeMillis() - totalStart;
@@ -832,17 +825,58 @@ public class RagService {
      * Enrich a source chunk with title from the database if missing.
      * This is needed for documents that were ingested before the title field was added to Qdrant.
      */
-    private SourceChunk enrichWithTitle(String docId, int chunkIndex, double score, String text, String title) {
+    private SourceChunk enrichWithTitle(String docId, int chunkIndex, double score, String text, String title, String systemPrompt) {
         String enrichedTitle = title;
-        if (enrichedTitle == null || enrichedTitle.isBlank()) {
+        String enrichedSystemPrompt = systemPrompt;
+        if (enrichedTitle == null || enrichedTitle.isBlank() || enrichedSystemPrompt == null) {
             try {
-                enrichedTitle = documentUploadRepository.findByDocId(docId)
-                        .map(DocumentUpload::getTitle)
-                        .orElse(null);
+                var uploadOpt = documentUploadRepository.findByDocId(docId);
+                if (uploadOpt.isPresent()) {
+                    DocumentUpload upload = uploadOpt.get();
+                    if (enrichedTitle == null || enrichedTitle.isBlank()) {
+                        enrichedTitle = upload.getTitle();
+                    }
+                    if (enrichedSystemPrompt == null) {
+                        enrichedSystemPrompt = upload.getSystemPrompt();
+                    }
+                }
             } catch (Exception e) {
-                log.debug("Could not lookup title for docId {}: {}", docId, e.getMessage());
+                log.debug("Could not lookup metadata for docId {}: {}", docId, e.getMessage());
             }
         }
-        return new SourceChunk(docId, chunkIndex, score, text, enrichedTitle);
+        return new SourceChunk(docId, chunkIndex, score, text, enrichedTitle, enrichedSystemPrompt);
+    }
+
+    /**
+     * Resolve which prompt template to use based on the source chunks.
+     * Uses the custom prompt from the highest-scoring source document if available and valid.
+     * Falls back to DEFAULT_PROMPT_TEMPLATE if none set or if missing required placeholders.
+     */
+    public static String resolvePromptTemplate(List<SourceChunk> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return DEFAULT_PROMPT_TEMPLATE;
+        }
+        // Sources are sorted by score (highest first).
+        // Use the prompt from the first source that has a non-blank systemPrompt.
+        for (SourceChunk s : sources) {
+            if (s.systemPrompt() != null && !s.systemPrompt().isBlank()) {
+                String template = s.systemPrompt().trim();
+                if (template.contains("{context}") && template.contains("{question}")) {
+                    return template;
+                } else {
+                    log.warn("[RAG] Document {} has systemPrompt but missing {{context}} or {{question}} placeholders. Using default.", s.docId());
+                }
+            }
+        }
+        return DEFAULT_PROMPT_TEMPLATE;
+    }
+
+    /**
+     * Build the final LLM prompt by replacing {context} and {question} in the template.
+     */
+    public static String buildPromptFromTemplate(String template, String contextBlock, String question) {
+        return template
+                .replace("{context}", contextBlock)
+                .replace("{question}", question);
     }
 }

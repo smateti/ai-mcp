@@ -92,6 +92,7 @@ public class ChatHistoryService {
             }
             message.setSuccess((Boolean) metadata.getOrDefault("success", true));
             message.setErrorMessage((String) metadata.get("errorMessage"));
+            message.setReplyToMessageId((String) metadata.get("replyToMessageId"));
         }
 
         // Save message directly (avoid collection issues with orphan removal)
@@ -230,13 +231,15 @@ public class ChatHistoryService {
         if (entity.getRequiresConfirmation() != null) metadata.put("requiresConfirmation", entity.getRequiresConfirmation());
         if (entity.getProcessingTimeMs() != null) metadata.put("processingTimeMs", entity.getProcessingTimeMs());
 
-        return new ChatMessage(
+        ChatMessage msg = new ChatMessage(
                 entity.getId(),
                 entity.getRole(),
                 entity.getContent(),
                 entity.getTimestamp(),
                 metadata.isEmpty() ? null : metadata
         );
+        msg.setReplyToMessageId(entity.getReplyToMessageId());
+        return msg;
     }
 
     public long getSessionCount(String userId) {

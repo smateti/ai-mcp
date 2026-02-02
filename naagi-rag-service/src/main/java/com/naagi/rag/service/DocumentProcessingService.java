@@ -9,6 +9,9 @@ import com.naagi.rag.entity.GeneratedQA;
 import com.naagi.rag.entity.GeneratedQA.QuestionType;
 import com.naagi.rag.entity.GeneratedQA.ValidationStatus;
 import com.naagi.rag.llm.ChatClient;
+import com.naagi.rag.llm.ChatMessage;
+import com.naagi.rag.llm.ChatRequest;
+import com.naagi.rag.llm.ChatResponse;
 import com.naagi.rag.llm.EmbeddingsClient;
 import com.naagi.rag.qdrant.QdrantClient;
 import com.naagi.rag.qdrant.QdrantClient.Point;
@@ -66,9 +69,20 @@ public class DocumentProcessingService {
 
     @Transactional
     public DocumentUpload initiateUpload(String title, String content, String categoryId) {
+        return initiateUpload(title, content, categoryId, null);
+    }
+
+    @Transactional
+    public DocumentUpload initiateUpload(String title, String content, String categoryId, String systemPrompt) {
         String uploadId = UUID.randomUUID().toString();
         // Generate sequential document ID
         String generatedDocId = documentSequenceService.generateDocId();
+
+        // Normalize: if prompt matches default template, store null to avoid redundancy
+        String promptToStore = systemPrompt;
+        if (promptToStore != null && promptToStore.trim().equals(RagService.DEFAULT_PROMPT_TEMPLATE.trim())) {
+            promptToStore = null;
+        }
 
         DocumentUpload upload = DocumentUpload.builder()
                 .id(uploadId)
@@ -76,6 +90,7 @@ public class DocumentProcessingService {
                 .title(title)
                 .originalContent(content)
                 .categoryId(categoryId)
+                .systemPrompt(promptToStore)
                 .status(ProcessingStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -185,7 +200,11 @@ public class DocumentProcessingService {
         log.info("Generating {} fine-grain Q&A pairs for upload {}", fineGrainCount, upload.getId());
         String fineGrainPrompt = buildFineGrainPrompt(upload.getOriginalContent(), fineGrainCount);
         try {
-            String fineGrainResponse = chatClient.chatOnce(fineGrainPrompt, 0.3, 2048);
+            ChatResponse fineGrainResp = chatClient.chat(ChatRequest.of(
+                    List.of(ChatMessage.system("You are a Q&A generation assistant. Generate detailed question-answer pairs from documents. Respond with ONLY valid JSON arrays."),
+                            ChatMessage.user(fineGrainPrompt)),
+                    0.3, 2048));
+            String fineGrainResponse = fineGrainResp.content();
             log.info("LLM fine-grain response length: {} chars", fineGrainResponse != null ? fineGrainResponse.length() : 0);
             List<GeneratedQA> fineGrainQA = parseQAFromLLM(fineGrainResponse, upload.getId(), QuestionType.FINE_GRAIN);
             allQA.addAll(fineGrainQA);
@@ -197,7 +216,11 @@ public class DocumentProcessingService {
         log.info("Generating {} summary Q&A pairs for upload {}", summaryCount, upload.getId());
         String summaryPrompt = buildSummaryPrompt(upload.getOriginalContent(), summaryCount);
         try {
-            String summaryResponse = chatClient.chatOnce(summaryPrompt, 0.3, 2048);
+            ChatResponse summaryResp = chatClient.chat(ChatRequest.of(
+                    List.of(ChatMessage.system("You are a Q&A generation assistant. Generate high-level question-answer pairs from documents. Respond with ONLY valid JSON arrays."),
+                            ChatMessage.user(summaryPrompt)),
+                    0.3, 2048));
+            String summaryResponse = summaryResp.content();
             log.info("LLM summary response length: {} chars", summaryResponse != null ? summaryResponse.length() : 0);
             List<GeneratedQA> summaryQA = parseQAFromLLM(summaryResponse, upload.getId(), QuestionType.SUMMARY);
             allQA.addAll(summaryQA);
@@ -613,7 +636,11 @@ public class DocumentProcessingService {
             log.info("Generating {} additional fine-grain Q&A pairs for upload {}", fineGrainCount, uploadId);
             String prompt = buildAdditionalFineGrainPrompt(content, fineGrainCount, existingQuestions);
             try {
-                String response = chatClient.chatOnce(prompt, 0.5, 2048); // Higher temperature for variety
+                ChatResponse resp = chatClient.chat(ChatRequest.of(
+                        List.of(ChatMessage.system("You are a Q&A generation assistant. Generate NEW detailed question-answer pairs that are different from existing ones. Respond with ONLY valid JSON arrays."),
+                                ChatMessage.user(prompt)),
+                        0.5, 2048));
+                String response = resp.content(); // Higher temperature for variety
                 List<GeneratedQA> fineGrainQA = parseQAFromLLM(response, uploadId, QuestionType.FINE_GRAIN);
                 newQA.addAll(fineGrainQA);
             } catch (Exception e) {
@@ -626,7 +653,11 @@ public class DocumentProcessingService {
             log.info("Generating {} additional summary Q&A pairs for upload {}", summaryCount, uploadId);
             String prompt = buildAdditionalSummaryPrompt(content, summaryCount, existingQuestions);
             try {
-                String response = chatClient.chatOnce(prompt, 0.5, 2048); // Higher temperature for variety
+                ChatResponse resp = chatClient.chat(ChatRequest.of(
+                        List.of(ChatMessage.system("You are a Q&A generation assistant. Generate NEW high-level question-answer pairs that are different from existing ones. Respond with ONLY valid JSON arrays."),
+                                ChatMessage.user(prompt)),
+                        0.5, 2048));
+                String response = resp.content(); // Higher temperature for variety
                 List<GeneratedQA> summaryQA = parseQAFromLLM(response, uploadId, QuestionType.SUMMARY);
                 newQA.addAll(summaryQA);
             } catch (Exception e) {
@@ -716,7 +747,11 @@ public class DocumentProcessingService {
         String prompt = buildDocumentChatPrompt(truncatedContent, question);
 
         log.info("Document-scoped chat for upload {}: {}", uploadId, question);
-        return chatClient.chatOnce(prompt, 0.3, 1024);
+        ChatResponse resp = chatClient.chat(ChatRequest.of(
+                List.of(ChatMessage.system("You are a document assistant. Answer questions using ONLY information explicitly stated in the provided document. Do NOT infer or extrapolate."),
+                        ChatMessage.user(prompt)),
+                0.3, 1024));
+        return resp.content();
     }
 
     /**
@@ -733,7 +768,10 @@ public class DocumentProcessingService {
         String prompt = buildDocumentChatPrompt(truncatedContent, question);
 
         log.info("Document-scoped streaming chat for upload {}: {}", uploadId, question);
-        chatClient.chatStream(prompt, 0.3, 1024, onToken);
+        chatClient.chatStream(ChatRequest.stream(
+                List.of(ChatMessage.system("You are a document assistant. Answer questions using ONLY information explicitly stated in the provided document. Do NOT infer or extrapolate."),
+                        ChatMessage.user(prompt)),
+                0.3, 1024), onToken);
     }
 
     private String buildDocumentChatPrompt(String content, String question) {

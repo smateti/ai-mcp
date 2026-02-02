@@ -5,6 +5,9 @@ import com.naagi.rag.entity.DocumentUpload;
 import com.naagi.rag.http.Http;
 import com.naagi.rag.json.Json;
 import com.naagi.rag.llm.ChatClient;
+import com.naagi.rag.llm.ChatMessage;
+import com.naagi.rag.llm.ChatRequest;
+import com.naagi.rag.llm.ChatResponse;
 import com.naagi.rag.llm.EmbeddingsClient;
 import com.naagi.rag.qdrant.QdrantClient;
 import com.naagi.rag.qdrant.QdrantClient.Point;
@@ -139,16 +142,14 @@ public class TempCollectionService {
                 .map(SearchResultWithScore::text)
                 .collect(Collectors.joining("\n\n---\n\n"));
 
-        String prompt = """
-                Answer using ONLY the context below. Be concise and accurate.
+        String userMsg = "Context:\n%s\n\nQuestion: %s\n\nAnswer:".formatted(contextBlock, question);
 
-                Context:
-                %s
-
-                Question: %s
-                Answer:""".formatted(contextBlock, question);
-
-        return chatClient.chatOnce(prompt, 0.2, 256);
+        ChatResponse resp = chatClient.chat(ChatRequest.of(
+                java.util.List.of(
+                        ChatMessage.system("Answer using ONLY the context provided. Be concise and accurate. If the context does not contain relevant information, say so."),
+                        ChatMessage.user(userMsg)),
+                0.2, 256));
+        return resp.content();
     }
 
     /**
@@ -337,6 +338,9 @@ public class TempCollectionService {
             }
             if (upload.getTitle() != null) {
                 payload.put("title", upload.getTitle());
+            }
+            if (upload.getSystemPrompt() != null && !upload.getSystemPrompt().isBlank()) {
+                payload.put("systemPrompt", upload.getSystemPrompt());
             }
 
             String text = (String) payload.get("text");
@@ -555,6 +559,7 @@ public class TempCollectionService {
                 JsonNode textNode = payload.get("text");
                 JsonNode titleNode = payload.get("title");
                 JsonNode scoreNode = hit.get("score");
+                JsonNode systemPromptNode = payload.get("systemPrompt");
 
                 if (docIdNode != null && chunkIndexNode != null && textNode != null && scoreNode != null) {
                     out.add(new SearchResultWithScore(
@@ -562,7 +567,8 @@ public class TempCollectionService {
                             chunkIndexNode.asInt(),
                             textNode.asText(),
                             titleNode != null ? titleNode.asText() : null,
-                            scoreNode.asDouble()
+                            scoreNode.asDouble(),
+                            systemPromptNode != null ? systemPromptNode.asText() : null
                     ));
                 }
             }
@@ -589,6 +595,14 @@ public class TempCollectionService {
      * Uses Qdrant's set_payload API with a filter to update all points matching the docId.
      */
     public void updateTitleInMainCollection(String docId, String title) {
+        updatePayloadFieldInMainCollection(docId, "title", title);
+    }
+
+    public void updateSystemPromptInMainCollection(String docId, String systemPrompt) {
+        updatePayloadFieldInMainCollection(docId, "systemPrompt", systemPrompt);
+    }
+
+    private void updatePayloadFieldInMainCollection(String docId, String fieldName, String fieldValue) {
         try {
             // Build filter for docId
             ObjectNode matchVal = Json.MAPPER.createObjectNode();
@@ -603,7 +617,7 @@ public class TempCollectionService {
 
             // Build payload to set
             ObjectNode payload = Json.MAPPER.createObjectNode();
-            payload.put("title", title);
+            payload.put(fieldName, fieldValue);
 
             // Build request body
             ObjectNode body = Json.MAPPER.createObjectNode();
@@ -620,15 +634,15 @@ public class TempCollectionService {
             HttpResponse<String> resp = Http.CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
 
             if (resp.statusCode() / 100 != 2) {
-                log.error("Failed to update title in Qdrant for docId {}: HTTP {} - {}",
-                        docId, resp.statusCode(), resp.body());
-                throw new RuntimeException("Failed to update title in Qdrant: HTTP " + resp.statusCode());
+                log.error("Failed to update {} in Qdrant for docId {}: HTTP {} - {}",
+                        fieldName, docId, resp.statusCode(), resp.body());
+                throw new RuntimeException("Failed to update " + fieldName + " in Qdrant: HTTP " + resp.statusCode());
             }
 
-            log.info("Updated title to '{}' for all chunks of docId {} in main collection", title, docId);
+            log.info("Updated {} for all chunks of docId {} in main collection", fieldName, docId);
         } catch (Exception e) {
-            log.error("Error updating title in main collection for docId {}", docId, e);
-            throw new RuntimeException("Failed to update title in Qdrant", e);
+            log.error("Error updating {} in main collection for docId {}", fieldName, docId, e);
+            throw new RuntimeException("Failed to update " + fieldName + " in Qdrant", e);
         }
     }
 }

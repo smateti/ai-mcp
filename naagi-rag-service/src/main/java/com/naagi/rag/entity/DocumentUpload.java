@@ -59,6 +59,10 @@ public class DocumentUpload {
 
     private String sourceUrl; // Original URL if document was fetched from web
 
+    @Lob
+    @Column(columnDefinition = "CLOB")
+    private String systemPrompt; // Custom system prompt to use when answering questions from this document
+
     public enum ProcessingStatus {
         PENDING,
         GENERATING_QA,

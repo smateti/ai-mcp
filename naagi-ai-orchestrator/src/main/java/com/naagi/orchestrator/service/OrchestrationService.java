@@ -2,6 +2,7 @@ package com.naagi.orchestrator.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.naagi.orchestrator.entity.AgentSession;
 import com.naagi.orchestrator.llm.LlmClient;
 import com.naagi.orchestrator.metrics.OrchestratorMetrics;
 import com.naagi.orchestrator.model.*;
@@ -22,19 +23,25 @@ public class OrchestrationService {
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
     private final OrchestratorMetrics metrics;
+    private final AgentExecutor agentExecutor;
+    private final GuardrailsService guardrails;
 
     public OrchestrationService(ToolSelectionService toolSelectionService,
                                 ToolRegistryClient toolRegistryClient,
                                 McpGatewayClient mcpGatewayClient,
                                 LlmClient llmClient,
                                 ObjectMapper objectMapper,
-                                OrchestratorMetrics metrics) {
+                                OrchestratorMetrics metrics,
+                                AgentExecutor agentExecutor,
+                                GuardrailsService guardrails) {
         this.toolSelectionService = toolSelectionService;
         this.toolRegistryClient = toolRegistryClient;
         this.mcpGatewayClient = mcpGatewayClient;
         this.llmClient = llmClient;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
+        this.agentExecutor = agentExecutor;
+        this.guardrails = guardrails;
     }
 
     public OrchestrationResponse orchestrate(OrchestrationRequest request) {
@@ -42,6 +49,27 @@ public class OrchestrationService {
         log.info("Orchestrating request: {} (category: {})", request.getMessage(), request.getCategoryId());
 
         try {
+            // Input guardrails
+            GuardrailsService.GuardrailResult inputCheck = guardrails.validateInput(request.getMessage());
+            if (!inputCheck.passed()) {
+                log.warn("[GUARDRAILS] Input rejected: {}", inputCheck.violations());
+                return OrchestrationResponse.builder()
+                        .intent(Intent.UNKNOWN)
+                        .response("I'm unable to process this request. " + String.join("; ", inputCheck.violations()))
+                        .build();
+            }
+
+            // Pre-route: if the question is clearly a knowledge/conceptual question,
+            // go straight to RAG tool execution without LLM tool selection
+            if (isKnowledgeQuestion(request.getMessage())) {
+                log.info("Pre-routing to RAG for knowledge question: {}", request.getMessage());
+                ToolSelectionResult ragSelection = new ToolSelectionResult(
+                        "rag_query", 0.95,
+                        Map.of("question", request.getMessage()),
+                        "Knowledge question pre-routed to RAG", List.of());
+                return executeToolAndRespond(request, ragSelection);
+            }
+
             // Get available tools from registry - prefer category-specific tools
             List<JsonNode> availableTools;
             if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
@@ -72,20 +100,55 @@ public class OrchestrationService {
             boolean isLow = toolSelectionService.isLowConfidence(selection.getConfidence());
             metrics.recordConfidence(selection.getConfidence(), isHigh, isLow);
 
+            // Auto-route: if a non-RAG tool is selected with high confidence,
+            // delegate to agent executor for multi-step tool chaining
+            String selectedTool = selection.getSelectedTool();
+            boolean isRagTool = selectedTool != null && selectedTool.startsWith("rag_query");
+            if (selectedTool != null && !isRagTool && isHigh) {
+                log.info("Auto-routing to agent executor for non-RAG tool: {}", selectedTool);
+                AgentSession session = agentExecutor.execute(request.getMessage(), request.getCategoryId());
+                return OrchestrationResponse.builder()
+                        .intent(Intent.TOOL_CALL)
+                        .selectedTool("agent")
+                        .confidence(selection.getConfidence())
+                        .response(session.getFinalAnswer())
+                        .build();
+            }
+
+            // Fallback: if no tool was selected (LLM hallucinated or no match),
+            // default to RAG query instead of showing an error
+            if (selection.getSelectedTool() == null) {
+                log.info("No valid tool selected, falling back to RAG for: {}", request.getMessage());
+                ToolSelectionResult ragFallback = new ToolSelectionResult(
+                        "rag_query", 0.9,
+                        Map.of("question", request.getMessage()),
+                        "Fallback to RAG - no valid tool matched", List.of());
+                return executeToolAndRespond(request, ragFallback);
+            }
+
             OrchestrationResponse response;
             // Handle based on confidence level
-            if (selection.getSelectedTool() == null || isLow) {
+            if (isLow) {
                 response = handleLowConfidence(request, selection);
             } else if (!isHigh) {
                 response = handleMediumConfidence(request, selection);
             } else {
-                // High confidence - execute the tool
+                // High confidence RAG query - execute single tool
                 response = executeToolAndRespond(request, selection);
             }
 
             long orchestrationTime = System.currentTimeMillis() - orchestrationStart;
             metrics.recordOrchestrationTime(orchestrationTime);
             log.info("[TIMING] Orchestration completed: {}ms (selection={}ms)", orchestrationTime, selectionTime);
+
+            // Output guardrails — sanitize PII in response
+            if (response.getResponse() != null) {
+                GuardrailsService.GuardrailResult outputCheck = guardrails.validateOutput(response.getResponse());
+                if (!outputCheck.passed()) {
+                    log.warn("[GUARDRAILS] Output sanitized: {}", outputCheck.violations());
+                    response.setResponse(guardrails.sanitizeOutput(response.getResponse()));
+                }
+            }
 
             return response;
         } catch (Exception e) {
@@ -475,6 +538,66 @@ public class OrchestrationService {
 
         // Fallback: return pretty-printed JSON
         return jsonAnswer.toPrettyString();
+    }
+
+    /**
+     * Detect knowledge/conceptual questions that should go directly to RAG
+     * without tool selection (which may misroute to action tools).
+     */
+    private boolean isKnowledgeQuestion(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.trim().toLowerCase();
+
+        // If the message contains specific entity IDs (APP-XXX, OP-XXX, etc.),
+        // it's an action/lookup question, not a knowledge question
+        if (message.matches(".*\\b[A-Z]{2,}-[A-Z0-9-]+\\b.*")) {
+            return false;
+        }
+
+        // If the message contains UUIDs, it's likely a lookup for a specific instance
+        if (lower.matches(".*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*")) {
+            return false;
+        }
+
+        // Patterns that indicate a knowledge/conceptual question
+        // Starts-with patterns
+        boolean startsWithKnowledge =
+               lower.startsWith("what is ") ||
+               lower.startsWith("what are ") ||
+               lower.startsWith("how do ") ||
+               lower.startsWith("how does ") ||
+               lower.startsWith("how to ") ||
+               lower.startsWith("how many ") ||
+               lower.startsWith("explain ") ||
+               lower.startsWith("describe ") ||
+               lower.startsWith("why ") ||
+               lower.startsWith("tell me about ") ||
+               lower.startsWith("can you explain ") ||
+               lower.startsWith("can you give ") ||
+               lower.startsWith("can you show ") ||
+               lower.startsWith("can you provide ") ||
+               lower.startsWith("give me ") ||
+               lower.startsWith("show me ") ||
+               lower.startsWith("provide ") ||
+               lower.startsWith("what does ") ||
+               lower.startsWith("where is ") ||
+               lower.startsWith("where are ") ||
+               lower.startsWith("when do ") ||
+               lower.startsWith("when does ") ||
+               lower.startsWith("which ") ||
+               lower.startsWith("is there ");
+
+        if (startsWithKnowledge) return true;
+
+        // Contains patterns — phrases that strongly suggest knowledge retrieval
+        return lower.contains("sample ") ||
+               lower.contains("example ") ||
+               lower.contains("template ") ||
+               lower.contains("documentation ") ||
+               lower.contains("how can i ") ||
+               lower.contains("what is the ") ||
+               lower.contains("what are the ") ||
+               lower.contains("best practice");
     }
 
     private String formatTitle(String text) {

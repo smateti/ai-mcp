@@ -9,6 +9,7 @@ com\example\servicedep\entity\Application.class
 com\example\servicedep\repository\ServiceRepository.class
 com\example\servicedep\controller\ApplicationController.class
 com\example\servicedep\entity\OperationDependency.class
+com\example\servicedep\controller\ServiceController.class
 com\example\servicedep\entity\Operation.class
 com\example\servicedep\dto\ApplicationDto.class
 com\example\servicedep\repository\ApplicationRepository.class

@@ -7,6 +7,7 @@
         const uploadId = /*[[${uploadId}]]*/ '';
         const sseEndpoint = /*[[${sseEndpoint}]]*/ '';
         const currentStatus = /*[[${status}]]*/ '';
+        const defaultPromptTemplate = /*[[${defaultPromptTemplate}]]*/ '';
 
         // Initialize all functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -309,6 +310,47 @@
                     showNotification('Title updated successfully', 'success');
                 } else {
                     showNotification('Error: ' + (data.error || 'Failed to update title'), 'danger');
+                }
+            } catch (error) {
+                showNotification('Error: ' + error.message, 'danger');
+            }
+        }
+
+        // Prompt Template editing
+        function showSystemPromptEdit() {
+            document.getElementById('systemPromptDisplay').classList.add('d-none');
+            document.getElementById('systemPromptEdit').classList.remove('d-none');
+            document.getElementById('systemPromptInput').focus();
+        }
+
+        function cancelSystemPromptEdit() {
+            document.getElementById('systemPromptEdit').classList.add('d-none');
+            document.getElementById('systemPromptDisplay').classList.remove('d-none');
+        }
+
+        function resetPromptToDefault() {
+            document.getElementById('systemPromptInput').value = defaultPromptTemplate;
+        }
+
+        async function saveSystemPrompt() {
+            const input = document.getElementById('systemPromptInput');
+            const newPrompt = input.value.trim();
+
+            try {
+                const response = await fetch(`/documents/uploads/${uploadId}/system-prompt`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ systemPrompt: newPrompt })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    const textEl = document.getElementById('systemPromptText');
+                    textEl.textContent = newPrompt ? '(Custom template set)' : '(Using default)';
+                    cancelSystemPromptEdit();
+                    showNotification('Prompt template updated successfully', 'success');
+                } else {
+                    showNotification('Error: ' + (data.error || 'Failed to update prompt template'), 'danger');
                 }
             } catch (error) {
                 showNotification('Error: ' + error.message, 'danger');

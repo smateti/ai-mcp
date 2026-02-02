@@ -53,69 +53,51 @@
         </div>
     </div>
 
-    <!-- Tools Section -->
+    <!-- Agents Section -->
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-tools me-2"></i>Tools</h5>
-            <div>
-                <form th:action="@{/categories/{id}/tools/reset-priorities(id=${category.id})}" method="post" class="d-inline"
-                      th:if="${categoryTools != null && !categoryTools.isEmpty()}">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Reset tool priorities to alphabetical order?');">
-                        <i class="bi bi-arrow-repeat me-1"></i>Reset Priorities
-                    </button>
-                </form>
-            </div>
+            <h5 class="mb-0"><i class="bi bi-robot me-2"></i>Agents <span class="badge bg-primary ms-1" th:text="${categoryAgents != null ? categoryAgents.size() : 0}">0</span></h5>
+            <a th:href="@{/agents/new}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>New Agent
+            </a>
         </div>
-        <div class="card-body">
-            <!-- Add Tool Form -->
-            <form th:action="@{/categories/{id}/tools/add(id=${category.id})}" method="post" class="mb-4">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-8">
-                        <label class="form-label">Add Tool to Category</label>
-                        <select name="toolId" class="form-select" required>
-                            <option value="">Select a tool...</option>
-                            <th:block th:each="tool : ${allTools}">
-                                <option th:value="${tool.id}" th:text="${tool.name}"
-                                        th:disabled="${category.toolIds != null && category.toolIds.contains(tool.id)}">Tool Name</option>
-                            </th:block>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-plus-circle me-1"></i>Add Tool
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            <!-- Tools List -->
-            <div class="table-responsive" th:if="${categoryTools != null && !categoryTools.isEmpty()}">
+        <div class="card-body p-0">
+            <div class="table-responsive" th:if="${categoryAgents != null && !categoryAgents.isEmpty()}">
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            <th style="width: 50px;">#</th>
                             <th>Name</th>
-                            <th>Description</th>
+                            <th>Agent ID</th>
+                            <th>Type</th>
+                            <th>Tools</th>
+                            <th>Status</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="tool, stat : ${categoryTools}">
-                            <td class="text-muted" th:text="${stat.index + 1}">1</td>
+                        <tr th:each="agent : ${categoryAgents}">
+                            <td><strong th:text="${agent['name']}">Agent Name</strong></td>
+                            <td><code th:text="${agent['agentId']}">50001</code></td>
                             <td>
-                                <strong th:text="${tool.name}">Tool Name</strong>
+                                <span class="badge"
+                                      th:classappend="${agent['agentType'] == 'INTERNAL'} ? 'bg-primary' : (${agent['agentType'] == 'EXTERNAL'} ? 'bg-purple' : 'bg-warning text-dark')"
+                                      th:text="${agent['agentType']}">INTERNAL</span>
                             </td>
-                            <td th:text="${#strings.abbreviate(tool.description, 50)}" class="text-muted">Description</td>
+                            <td><span class="badge bg-info" th:text="${agent['tools'] != null ? agent['tools'].size() : 0}">0</span></td>
+                            <td>
+                                <span class="badge"
+                                      th:classappend="${agent['status'] == 'ACTIVE'} ? 'badge-active' : (${agent['status'] == 'MAINTENANCE'} ? 'bg-warning text-dark' : 'badge-inactive')"
+                                      th:text="${agent['status']}">ACTIVE</span>
+                            </td>
                             <td class="text-end">
-                                <a th:href="@{/categories/{catId}/tools/{toolId}/overrides(catId=${category.id}, toolId=${tool.id})}"
-                                   class="btn btn-sm btn-outline-primary me-1" title="Parameter Overrides">
-                                    <i class="bi bi-sliders"></i>
+                                <a th:href="@{/agents/{id}(id=${agent['agentId']})}" class="btn btn-sm btn-outline-primary me-1" title="View Agent">
+                                    <i class="bi bi-eye me-1"></i>View
                                 </a>
-                                <form th:action="@{/categories/{catId}/tools/{toolId}/remove(catId=${category.id}, toolId=${tool.id})}"
-                                      method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('Remove this tool from the category?');">
-                                        <i class="bi bi-x-circle"></i>
+                                <form th:action="@{/agents/{id}/delete(id=${agent['agentId']})}" method="post" style="display:inline"
+                                      onsubmit="return confirm('Delete agent ' + this.closest('tr').querySelector('code').textContent + '?');">
+                                    <input type="hidden" name="redirectTo" th:value="@{/categories/{cid}(cid=${category.id})}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Agent">
+                                        <i class="bi bi-trash me-1"></i>Delete
                                     </button>
                                 </form>
                             </td>
@@ -123,9 +105,10 @@
                     </tbody>
                 </table>
             </div>
-            <div class="text-center py-4 text-muted" th:if="${categoryTools == null || categoryTools.isEmpty()}">
-                <i class="bi bi-tools fs-1"></i>
-                <p>No tools assigned to this category</p>
+            <div th:if="${categoryAgents == null || categoryAgents.isEmpty()}" class="text-center py-4 text-muted">
+                <i class="bi bi-robot fs-1"></i>
+                <p>No agents assigned to this category</p>
+                <a th:href="@{/agents/new}" class="btn btn-sm btn-outline-primary">Create an Agent</a>
             </div>
         </div>
     </div>

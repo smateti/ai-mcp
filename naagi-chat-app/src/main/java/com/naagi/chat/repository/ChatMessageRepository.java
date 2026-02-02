@@ -25,4 +25,11 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessageEntity, 
 
     @Query("SELECT m FROM ChatMessageEntity m WHERE m.session.userId = :userId AND LOWER(m.content) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY m.timestamp DESC")
     List<ChatMessageEntity> searchByContent(@Param("userId") String userId, @Param("query") String query);
+
+    /**
+     * Find the most recent user message before a given timestamp in a session.
+     * Used for reply-to context: find the original question that produced a referenced answer.
+     */
+    @Query("SELECT m FROM ChatMessageEntity m WHERE m.session.id = :sessionId AND m.role = 'user' AND m.timestamp < :beforeTimestamp ORDER BY m.timestamp DESC")
+    List<ChatMessageEntity> findPreviousUserMessages(@Param("sessionId") String sessionId, @Param("beforeTimestamp") LocalDateTime beforeTimestamp);
 }

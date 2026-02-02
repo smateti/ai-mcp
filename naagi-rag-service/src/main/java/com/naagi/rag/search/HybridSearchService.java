@@ -47,7 +47,8 @@ public class HybridSearchService {
             int chunkIndex,
             String text,
             String title,
-            double score
+            double score,
+            String systemPrompt
     ) {}
 
     /**
@@ -63,7 +64,8 @@ public class HybridSearchService {
             double denseScore,    // Original dense/semantic score
             double sparseScore,   // Original sparse/BM25 score
             boolean inDense,      // Was found in dense results
-            boolean inSparse      // Was found in sparse results
+            boolean inSparse,     // Was found in sparse results
+            String systemPrompt
     ) {}
 
     /**
@@ -128,7 +130,8 @@ public class HybridSearchService {
                             denseScoreMap.getOrDefault(id, 0.0),
                             sparseScoreMap.getOrDefault(id, 0.0),
                             inDenseSet.contains(id),
-                            inSparseSet.contains(id)
+                            inSparseSet.contains(id),
+                            hit.systemPrompt()
                     );
                 })
                 .collect(Collectors.toList());
@@ -208,7 +211,8 @@ public class HybridSearchService {
                             denseScoreMap.getOrDefault(id, 0.0),
                             sparseScoreMap.getOrDefault(id, 0.0),
                             inDenseSet.contains(id),
-                            inSparseSet.contains(id)
+                            inSparseSet.contains(id),
+                            hit.systemPrompt()
                     );
                 })
                 .collect(Collectors.toList());
@@ -291,7 +295,8 @@ public class HybridSearchService {
                             denseScoreMap.getOrDefault(id, 0.0),
                             sparseScoreMap.getOrDefault(id, 0.0),
                             inDenseSet.contains(id),
-                            inSparseSet.contains(id)
+                            inSparseSet.contains(id),
+                            hit.systemPrompt()
                     );
                 })
                 .collect(Collectors.toList());

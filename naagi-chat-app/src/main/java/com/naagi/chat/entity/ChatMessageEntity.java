@@ -39,6 +39,9 @@ public class ChatMessageEntity {
     private Double confidence;
     private Boolean requiresConfirmation;
 
+    // Reply-to context anchoring
+    private String replyToMessageId;
+
     // Audit fields
     private Long processingTimeMs;
     private Boolean success;

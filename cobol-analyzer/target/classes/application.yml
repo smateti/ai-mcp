@@ -1,0 +1,22 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: cobol-analyzer
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# LLM Configuration (llama-cpp server)
+llm:
+  base-url: http://localhost:8000
+  model: granite-code
+  max-tokens: 4096
+  temperature: 0.1
+
+# Logging
+logging:
+  level:
+    com.cobol.analyzer: DEBUG

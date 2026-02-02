@@ -40,7 +40,8 @@ public final class QdrantClient {
             int chunkIndex,
             String text,
             String title,
-            double score
+            double score,
+            String systemPrompt
     ) {}
 
     public void ensureCollectionExists() {
@@ -273,6 +274,7 @@ public final class QdrantClient {
                 JsonNode textNode = payload.get("text");
                 JsonNode titleNode = payload.get("title");
                 JsonNode scoreNode = hit.get("score");
+                JsonNode systemPromptNode = payload.get("systemPrompt");
 
                 if (docIdNode != null && chunkIndexNode != null && textNode != null && scoreNode != null) {
                     out.add(new SearchResultWithScore(
@@ -280,7 +282,8 @@ public final class QdrantClient {
                             chunkIndexNode.asInt(),
                             textNode.asText(),
                             titleNode != null ? titleNode.asText() : null,
-                            scoreNode.asDouble()
+                            scoreNode.asDouble(),
+                            systemPromptNode != null ? systemPromptNode.asText() : null
                     ));
                 }
             }

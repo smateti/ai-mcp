@@ -132,6 +132,11 @@ public class ApplicationController {
             .map(app -> {
                 List<ServiceDto> services = app.getServices().stream()
                     .map(mappingService::toServiceDto)
+                    .map(svc -> {
+                        // Strip operations — use GET /api/services/{serviceId}/operations to get them
+                        svc.setOperations(null);
+                        return svc;
+                    })
                     .collect(Collectors.toList());
                 ApplicationServicesDto dto = new ApplicationServicesDto(
                     app.getApplicationId(),
@@ -175,6 +180,10 @@ public class ApplicationController {
             .map(app -> {
                 List<ServiceDto> services = app.getServices().stream()
                     .map(mappingService::toServiceDto)
+                    .map(svc -> {
+                        svc.setOperations(null);
+                        return svc;
+                    })
                     .collect(Collectors.toList());
                 ApplicationServicesDto dto = new ApplicationServicesDto(
                     app.getApplicationId(),

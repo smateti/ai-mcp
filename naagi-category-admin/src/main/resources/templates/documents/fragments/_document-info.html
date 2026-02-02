@@ -31,6 +31,35 @@
                             </span>
                         </dd>
 
+                        <dt class="col-sm-3">Prompt Template</dt>
+                        <dd class="col-sm-9">
+                            <span id="systemPromptDisplay">
+                                <span id="systemPromptText"
+                                      th:text="${upload?.get('systemPrompt')?.asText() != null ? '(Custom template set)' : '(Using default)'}"
+                                      class="text-muted">Prompt Template</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="showSystemPromptEdit()" title="Edit prompt template">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </span>
+                            <span id="systemPromptEdit" class="d-none">
+                                <textarea id="systemPromptInput" class="form-control form-control-sm font-monospace" rows="12"
+                                          style="font-size: 0.85rem;"
+                                          th:text="${upload?.get('systemPrompt')?.asText() ?: defaultPromptTemplate}"></textarea>
+                                <small class="text-muted">
+                                    Use <code>{context}</code> and <code>{question}</code> as placeholders.
+                                    <button type="button" class="btn btn-link btn-sm p-0 ms-1" onclick="resetPromptToDefault()">Reset to default</button>
+                                </small>
+                                <div class="mt-1">
+                                    <button type="button" class="btn btn-sm btn-success" onclick="saveSystemPrompt()">
+                                        <i class="bi bi-check me-1"></i>Save
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary ms-1" onclick="cancelSystemPromptEdit()">
+                                        <i class="bi bi-x me-1"></i>Cancel
+                                    </button>
+                                </div>
+                            </span>
+                        </dd>
+
                         <dt class="col-sm-3">Category</dt>
                         <dd class="col-sm-9" th:text="${upload?.get('categoryId')?.asText() ?: '(None)'}">Category</dd>
 

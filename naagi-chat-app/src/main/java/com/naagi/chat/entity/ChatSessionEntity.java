@@ -42,6 +42,15 @@ public class ChatSessionEntity {
     @Builder.Default
     private int messageCount = 0;
 
+    // Context compaction fields
+    @Column(columnDefinition = "TEXT")
+    private String contextSummary;
+
+    private String summarizedUpToMessageId;
+
+    @Builder.Default
+    private int approximateContextTokens = 0;
+
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("timestamp ASC")
     @Builder.Default
