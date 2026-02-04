@@ -142,25 +142,6 @@ public class ChatController {
             final String[] errorMessage = {null};
 
             try {
-                // Context-driven chat: check for compaction or reply-to mode
-                if (replyToMessageId == null && contextChatProperties.getCompaction().isEnabled()) {
-                    // Normal mode: check if compaction is needed before sending
-                    if (contextCompactionService.needsCompaction(sessionId)) {
-                        try {
-                            emitter.send(SseEmitter.event().name("context_compacting")
-                                    .data("{\"sessionId\":\"" + sessionId + "\",\"reason\":\"threshold_exceeded\"}"));
-                            String summary = contextCompactionService.compactContext(sessionId);
-                            if (summary != null) {
-                                emitter.send(SseEmitter.event().name("context_compacted")
-                                        .data("{\"sessionId\":\"" + sessionId + "\",\"summaryTokens\":"
-                                                + ContextCompactionService.estimateTokens(summary) + "}"));
-                            }
-                        } catch (Exception e) {
-                            log.warn("Context compaction failed, proceeding without: {}", e.getMessage());
-                        }
-                    }
-                }
-
                 // Build request to orchestrator streaming endpoint
                 var orchestratorRequest = objectMapper.createObjectNode();
                 orchestratorRequest.put("message", message);
@@ -328,6 +309,24 @@ public class ChatController {
                                 .data("{\"assistantMessageId\":\"" + assistantDbId + "\"}"));
                     } catch (Exception e) {
                         log.debug("Failed to send message_saved event", e);
+                    }
+                }
+
+                // Context compaction AFTER Q&A round completes — check size and compact if needed
+                if (replyToMessageId == null && contextChatProperties.getCompaction().isEnabled()) {
+                    if (contextCompactionService.needsCompaction(sessionId)) {
+                        try {
+                            emitter.send(SseEmitter.event().name("context_compacting")
+                                    .data("{\"sessionId\":\"" + sessionId + "\",\"reason\":\"threshold_exceeded\"}"));
+                            String summary = contextCompactionService.compactContext(sessionId);
+                            if (summary != null) {
+                                emitter.send(SseEmitter.event().name("context_compacted")
+                                        .data("{\"sessionId\":\"" + sessionId + "\",\"summaryTokens\":"
+                                                + ContextCompactionService.estimateTokens(summary) + "}"));
+                            }
+                        } catch (Exception e) {
+                            log.warn("Context compaction failed after response: {}", e.getMessage());
+                        }
                     }
                 }
 

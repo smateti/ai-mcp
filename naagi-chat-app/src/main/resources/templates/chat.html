@@ -1032,6 +1032,7 @@
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let fullContent = '';
+                let answerContent = '';  // Only the final answer tokens (no step/tool UI text)
                 let currentEventType = '';
                 let selectedTool = null;
                 let sources = [];
@@ -1125,6 +1126,7 @@
                                         const parsed = JSON.parse(data);
                                         if (parsed.t !== undefined) {
                                             fullContent += parsed.t;
+                                            answerContent += parsed.t;
                                             updateStreamingMessage(streamingMessageId, fullContent);
                                         }
                                     } catch (e) {
@@ -1138,7 +1140,7 @@
                 }
 
                 const processingTime = Date.now() - startTime;
-                finalizeStreamingMessage(streamingMessageId, fullContent, processingTime, selectedTool, sources);
+                finalizeStreamingMessage(streamingMessageId, fullContent, processingTime, selectedTool, sources, answerContent);
 
                 document.getElementById('processingTime').textContent = `Last: ${processingTime}ms`;
 
@@ -1184,7 +1186,7 @@
             }
         }
 
-        function finalizeStreamingMessage(messageId, content, processingTimeMs, selectedTool = null, sources = []) {
+        function finalizeStreamingMessage(messageId, content, processingTimeMs, selectedTool = null, sources = [], answerOnly = null) {
             const element = document.getElementById(messageId);
             if (element) {
                 const cursor = element.querySelector('.streaming-cursor');
@@ -1236,7 +1238,7 @@
                 element.dataset.question = element.dataset.userQuestion || '';
                 element.dataset.answer = content;
                 element.dataset.source = selectedTool || '';
-                element.dataset.msgContent = content;
+                element.dataset.msgContent = answerOnly || content;
             }
         }
 

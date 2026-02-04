@@ -12,13 +12,21 @@ public record ChatRequest(
         int maxTokens,
         boolean stream,
         List<ToolDefinition> tools,
-        String toolChoice
+        String toolChoice,
+        String grammar
 ) {
     /**
      * Create a simple chat request without tools.
      */
     public static ChatRequest of(List<ChatMessage> messages, double temperature, int maxTokens) {
-        return new ChatRequest(messages, temperature, maxTokens, false, null, null);
+        return new ChatRequest(messages, temperature, maxTokens, false, null, null, null);
+    }
+
+    /**
+     * Create a chat request with GBNF grammar constraint (llama.cpp).
+     */
+    public static ChatRequest withGrammar(List<ChatMessage> messages, double temperature, int maxTokens, String grammar) {
+        return new ChatRequest(messages, temperature, maxTokens, false, null, null, grammar);
     }
 
     /**
@@ -28,10 +36,14 @@ public record ChatRequest(
      */
     public static ChatRequest withTools(List<ChatMessage> messages, List<ToolDefinition> tools,
                                         String toolChoice, double temperature, int maxTokens) {
-        return new ChatRequest(messages, temperature, maxTokens, false, tools, toolChoice);
+        return new ChatRequest(messages, temperature, maxTokens, false, tools, toolChoice, null);
     }
 
     public boolean hasTools() {
         return tools != null && !tools.isEmpty();
+    }
+
+    public boolean hasGrammar() {
+        return grammar != null && !grammar.isBlank();
     }
 }

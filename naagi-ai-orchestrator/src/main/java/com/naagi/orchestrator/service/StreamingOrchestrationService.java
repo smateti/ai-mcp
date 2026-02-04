@@ -99,19 +99,8 @@ public class StreamingOrchestrationService {
                 return;
             }
 
-            // 1. Pre-route knowledge questions directly to RAG (fast path, no agent needed)
-            if (isKnowledgeQuestion(request.getMessage())) {
-                log.info("[COORDINATOR] Pre-routing to RAG for knowledge question: {}", request.getMessage());
-                Map<String, Object> ragParams = new HashMap<>();
-                ragParams.put("question", request.getMessage());
-                if (request.getCategoryId() != null) {
-                    ragParams.put("category", request.getCategoryId());
-                }
-                streamRagQuery(ragParams, emitter);
-                return;
-            }
-
-            // 2. Action queries — coordinator selects the right agent
+            // 1. Coordinator selects the right agent — let the LLM decide RAG vs agent.
+            //    No hardcoded pattern matching; the coordinator and agent handle routing.
             coordinateAndDelegate(request, emitter, orchestrationStart);
 
         } catch (Exception e) {
@@ -193,17 +182,6 @@ public class StreamingOrchestrationService {
         }
 
         try {
-            if (isKnowledgeQuestion(request.getMessage())) {
-                log.info("Pre-routing to RAG for knowledge question: {}", request.getMessage());
-                Map<String, Object> ragParams = new HashMap<>();
-                ragParams.put("question", request.getMessage());
-                if (request.getCategoryId() != null) {
-                    ragParams.put("category", request.getCategoryId());
-                }
-                streamRagQuery(ragParams, emitter);
-                return;
-            }
-
             List<JsonNode> availableTools;
             if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
                 availableTools = toolRegistryClient.getToolsByCategory(request.getCategoryId());
@@ -643,65 +621,6 @@ public class StreamingOrchestrationService {
         }
         // No agent registered — use global defaults
         agentStreamExecutor.executeStream(message, categoryId, sessionId, conversationContext, emitter);
-    }
-
-    /**
-     * Detect knowledge/conceptual questions that should go directly to RAG
-     * without tool selection (which may misroute to action tools).
-     */
-    private boolean isKnowledgeQuestion(String message) {
-        if (message == null || message.isBlank()) return false;
-        String lower = message.trim().toLowerCase();
-
-        // If the message contains specific entity IDs (APP-XXX, OP-XXX, etc.),
-        // it's an action/lookup question, not a knowledge question
-        if (message.matches(".*\\b[A-Z]{2,}-[A-Z0-9-]+\\b.*")) {
-            return false;
-        }
-
-        // If the message contains UUIDs, it's likely a lookup for a specific instance
-        if (lower.matches(".*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}.*")) {
-            return false;
-        }
-
-        // Starts-with patterns that indicate a knowledge/conceptual question
-        boolean startsWithKnowledge =
-               lower.startsWith("what is ") ||
-               lower.startsWith("what are ") ||
-               lower.startsWith("how do ") ||
-               lower.startsWith("how does ") ||
-               lower.startsWith("how to ") ||
-               lower.startsWith("how many ") ||
-               lower.startsWith("explain ") ||
-               lower.startsWith("describe ") ||
-               lower.startsWith("why ") ||
-               lower.startsWith("tell me about ") ||
-               lower.startsWith("can you explain ") ||
-               lower.startsWith("can you give ") ||
-               lower.startsWith("can you show ") ||
-               lower.startsWith("can you provide ") ||
-               lower.startsWith("give me ") ||
-               lower.startsWith("show me ") ||
-               lower.startsWith("provide ") ||
-               lower.startsWith("what does ") ||
-               lower.startsWith("where is ") ||
-               lower.startsWith("where are ") ||
-               lower.startsWith("when do ") ||
-               lower.startsWith("when does ") ||
-               lower.startsWith("which ") ||
-               lower.startsWith("is there ");
-
-        if (startsWithKnowledge) return true;
-
-        // Contains patterns — phrases that strongly suggest knowledge retrieval
-        return lower.contains("sample ") ||
-               lower.contains("example ") ||
-               lower.contains("template ") ||
-               lower.contains("documentation ") ||
-               lower.contains("how can i ") ||
-               lower.contains("what is the ") ||
-               lower.contains("what are the ") ||
-               lower.contains("best practice");
     }
 
     private String escapeJson(String s) {

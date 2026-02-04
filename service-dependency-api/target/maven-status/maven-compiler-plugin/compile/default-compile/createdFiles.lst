@@ -1,5 +1,7 @@
+com\example\servicedep\controller\BatchJobController.class
 com\example\servicedep\dto\ServiceDto.class
 com\example\servicedep\service\ApplicationService.class
+com\example\servicedep\controller\LogSearchController.class
 com\example\servicedep\ServiceDependencyApiApplication.class
 com\example\servicedep\dto\ApplicationServicesDto.class
 com\example\servicedep\repository\OperationRepository.class

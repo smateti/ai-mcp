@@ -149,8 +149,8 @@ public class RerankerService {
         }
         requestBody.set("documents", docsArray);
 
-        // Try /v1/rerank first, then /rerank
-        String[] endpoints = {"/v1/rerank", "/rerank"};
+        // Try /v1/reranking (llama.cpp), /v1/rerank, /rerank
+        String[] endpoints = {"/v1/reranking", "/v1/rerank", "/rerank"};
         HttpResponse<String> response = null;
 
         for (String endpoint : endpoints) {

@@ -99,7 +99,16 @@ public class ToolSelectionService {
 
         log.debug("Tool selection prompt (prompt-based): {}", prompt);
 
-        String llmResponse = llmClient.chat(prompt, 0.2, 512);
+        // Use JSON grammar to force valid JSON output (eliminates markdown wrapping, natural language, etc.)
+        ChatRequest request = ChatRequest.withGrammar(
+                List.of(
+                        ChatMessage.system("You are a tool selection assistant. Follow the user's instructions exactly."),
+                        ChatMessage.user(prompt)
+                ),
+                0.2, 512, Grammars.JSON_OBJECT
+        );
+        ChatResponse response = llmClient.chat(request);
+        String llmResponse = response.content();
 
         log.debug("LLM response (prompt-based): {}", llmResponse);
 

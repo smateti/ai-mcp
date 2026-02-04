@@ -77,7 +77,7 @@ public final class LlamaCppOpenAIChatClient implements ChatClient {
             // Ensure stream flag is set
             ChatRequest streamReq = new ChatRequest(
                     request.messages(), request.temperature(), request.maxTokens(),
-                    true, request.tools(), request.toolChoice());
+                    true, request.tools(), request.toolChoice(), request.grammar());
 
             ObjectNode body = buildRequestBody(streamReq);
 
@@ -162,6 +162,11 @@ public final class LlamaCppOpenAIChatClient implements ChatClient {
                     fnNode.put("arguments", tc.function().arguments());
                 }
             }
+        }
+
+        // GBNF grammar constraint (llama.cpp specific — forces output format)
+        if (request.hasGrammar()) {
+            body.put("grammar", request.grammar());
         }
 
         // Tools array (OpenAI function calling format)

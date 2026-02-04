@@ -118,6 +118,11 @@ public class LlamaCppClient implements LlmClient {
             }
         }
 
+        // GBNF grammar constraint (llama.cpp specific — forces output format)
+        if (request.hasGrammar()) {
+            body.put("grammar", request.grammar());
+        }
+
         // Tools array (OpenAI function calling format)
         if (request.hasTools()) {
             ArrayNode toolsNode = body.putArray("tools");

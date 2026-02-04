@@ -44,17 +44,17 @@ naagi:
       # Provider type: ollama-native | ollama-openai | llamacpp | llamacpp-openai
       provider: llamacpp-openai
 
-    # Ollama configuration
+    # Ollama configuration (inactive - kept for fallback)
     ollama:
       baseUrl: http://localhost:11434
       embedModel: nomic-embed-text
       chatModel: llama3.1
 
-    # llama.cpp configuration
+    # llama.cpp multi-model server (single port, all models)
     llama:
       baseUrl: http://localhost:8000
       embedModel: nomic-embed-text
-      chatModel: llama3.1
+      chatModel: llama3.1-8b-instruct
 
     # Qdrant vector database
     qdrant:
@@ -94,7 +94,7 @@ naagi:
     rerank:
       enabled: true                 # Set to true to enable re-ranking
       provider: local               # local uses llama.cpp /rerank endpoint
-      base-url: http://localhost:8001  # Separate llama.cpp server for reranker
+      base-url: http://localhost:8000  # llama.cpp multi-model server (single port)
       model: bge-reranker-v2-m3     # BGE multilingual reranker model
       api-key:                      # API key for Cohere/Jina
       candidate-count: 50           # Initial retrieval count before re-ranking

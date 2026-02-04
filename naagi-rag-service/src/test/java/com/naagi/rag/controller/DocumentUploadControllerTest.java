@@ -284,7 +284,7 @@ class DocumentUploadControllerTest {
                     .build();
 
             when(uploadRepository.existsByTitle("Test Title")).thenReturn(false);
-            when(processingService.initiateUpload("Test Title", "Test content", "cat-1"))
+            when(processingService.initiateUpload(eq("Test Title"), eq("Test content"), eq("cat-1"), any()))
                     .thenReturn(upload);
 
             // When/Then

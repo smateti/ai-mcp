@@ -7,6 +7,8 @@ import com.naagi.rag.entity.GeneratedQA;
 import com.naagi.rag.entity.GeneratedQA.QuestionType;
 import com.naagi.rag.entity.GeneratedQA.ValidationStatus;
 import com.naagi.rag.llm.ChatClient;
+import com.naagi.rag.llm.ChatRequest;
+import com.naagi.rag.llm.ChatResponse;
 import com.naagi.rag.llm.EmbeddingsClient;
 import com.naagi.rag.repository.DocumentUploadRepository;
 import com.naagi.rag.repository.GeneratedQARepository;
@@ -104,8 +106,8 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("[{\"question\": \"What is the test about?\", \"answer\": \"It is about testing.\"}]");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"What is the test about?\", \"answer\": \"It is about testing.\"}]"));
             when(qaRepository.save(any(GeneratedQA.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -132,8 +134,8 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("[{\"question\": \"What is the main theme?\", \"answer\": \"The theme is testing.\"}]");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"What is the main theme?\", \"answer\": \"The theme is testing.\"}]"));
             when(qaRepository.save(any(GeneratedQA.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -154,9 +156,9 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("[{\"question\": \"Q1?\", \"answer\": \"A1\"}]")
-                    .thenReturn("[{\"question\": \"Q2?\", \"answer\": \"A2\"}]");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"Q1?\", \"answer\": \"A1\"}]"))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"Q2?\", \"answer\": \"A2\"}]"));
             when(qaRepository.save(any(GeneratedQA.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -164,7 +166,7 @@ class DocumentProcessingServiceTest {
 
             // Then
             assertThat(result).hasSize(2);
-            verify(chatClient, times(2)).chatOnce(anyString(), eq(0.5), eq(2048));
+            verify(chatClient, times(2)).chat(any(ChatRequest.class));
         }
 
         @Test
@@ -189,7 +191,7 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
+            when(chatClient.chat(any(ChatRequest.class)))
                     .thenThrow(new RuntimeException("LLM service unavailable"));
 
             // When
@@ -210,8 +212,8 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("This is not valid JSON");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("This is not valid JSON"));
 
             // When
             List<GeneratedQA> result = processingService.generateAdditionalQA(uploadId, 1, 0);
@@ -231,8 +233,8 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("[{\"question\": \"Q1?\", \"answer\": \"A1\"}, {\"question\": \"Q2?\", \"answer\": \"A2\"}]");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"Q1?\", \"answer\": \"A1\"}, {\"question\": \"Q2?\", \"answer\": \"A2\"}]"));
             when(qaRepository.save(any(GeneratedQA.class))).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -255,8 +257,8 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             when(qaRepository.findByUploadIdOrderByIdAsc(uploadId)).thenReturn(Collections.emptyList());
-            when(chatClient.chatOnce(anyString(), eq(0.5), eq(2048)))
-                    .thenReturn("[{\"question\": \"What is the test?\", \"answer\": \"It is testing.\"}]");
+            when(chatClient.chat(any(ChatRequest.class)))
+                    .thenReturn(ChatResponse.text("[{\"question\": \"What is the test?\", \"answer\": \"It is testing.\"}]"));
             when(qaRepository.save(any(GeneratedQA.class))).thenAnswer(inv -> inv.getArgument(0));
             when(ragService.ask(anyString(), eq("test-category"))).thenReturn("The RAG answer about testing.");
             when(embeddingsClient.embed(anyString())).thenReturn(List.of(1.0, 0.0, 0.0)); // Mock embeddings
@@ -288,7 +290,7 @@ class DocumentProcessingServiceTest {
             DocumentUpload upload = createUpload(uploadId, documentContent);
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
-            when(chatClient.chatOnce(anyString(), eq(0.3), eq(1024))).thenReturn(expectedAnswer);
+            when(chatClient.chat(any(ChatRequest.class))).thenReturn(ChatResponse.text(expectedAnswer));
 
             // When
             String result = processingService.documentScopedChat(uploadId, question);
@@ -296,11 +298,11 @@ class DocumentProcessingServiceTest {
             // Then
             assertThat(result).isEqualTo(expectedAnswer);
 
-            // Verify the prompt contains both document content and question
-            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-            verify(chatClient).chatOnce(promptCaptor.capture(), eq(0.3), eq(1024));
+            // Verify the request contains both document content and question
+            ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+            verify(chatClient).chat(requestCaptor.capture());
 
-            String capturedPrompt = promptCaptor.getValue();
+            String capturedPrompt = requestCaptor.getValue().messages().get(1).content();
             assertThat(capturedPrompt).contains(documentContent);
             assertThat(capturedPrompt).contains(question);
             assertThat(capturedPrompt).contains("ONLY use information that is EXPLICITLY stated");
@@ -328,18 +330,19 @@ class DocumentProcessingServiceTest {
             DocumentUpload upload = createUpload(uploadId, longContent);
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
-            when(chatClient.chatOnce(anyString(), eq(0.3), eq(1024))).thenReturn("Answer");
+            when(chatClient.chat(any(ChatRequest.class))).thenReturn(ChatResponse.text("Answer"));
 
             // When
             processingService.documentScopedChat(uploadId, "question");
 
             // Then
-            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-            verify(chatClient).chatOnce(promptCaptor.capture(), eq(0.3), eq(1024));
+            ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+            verify(chatClient).chat(requestCaptor.capture());
 
+            String capturedPrompt = requestCaptor.getValue().messages().get(1).content();
             // The prompt should not contain the full 10000 characters
-            assertThat(promptCaptor.getValue().length()).isLessThan(10000);
-            assertThat(promptCaptor.getValue()).contains("[truncated]");
+            assertThat(capturedPrompt.length()).isLessThan(10000);
+            assertThat(capturedPrompt).contains("[truncated]");
         }
     }
 
@@ -359,12 +362,12 @@ class DocumentProcessingServiceTest {
 
             when(uploadRepository.findById(uploadId)).thenReturn(Optional.of(upload));
             doAnswer(invocation -> {
-                Consumer<String> onToken = invocation.getArgument(3);
+                Consumer<String> onToken = invocation.getArgument(1);
                 onToken.accept("Hello");
                 onToken.accept(" ");
                 onToken.accept("World");
                 return null;
-            }).when(chatClient).chatStream(anyString(), eq(0.3), eq(1024), any());
+            }).when(chatClient).chatStream(any(ChatRequest.class), any());
 
             StringBuilder result = new StringBuilder();
 
@@ -375,11 +378,12 @@ class DocumentProcessingServiceTest {
             assertThat(result.toString()).isEqualTo("Hello World");
 
             // Verify prompt was built correctly
-            ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
-            verify(chatClient).chatStream(promptCaptor.capture(), eq(0.3), eq(1024), any());
+            ArgumentCaptor<ChatRequest> requestCaptor = ArgumentCaptor.forClass(ChatRequest.class);
+            verify(chatClient).chatStream(requestCaptor.capture(), any());
 
-            assertThat(promptCaptor.getValue()).contains(documentContent);
-            assertThat(promptCaptor.getValue()).contains(question);
+            String capturedPrompt = requestCaptor.getValue().messages().get(1).content();
+            assertThat(capturedPrompt).contains(documentContent);
+            assertThat(capturedPrompt).contains(question);
         }
 
         @Test

@@ -99,7 +99,25 @@ public class ContextCompactionService {
         List<ChatMessageEntity> messages = messageRepository.findBySessionIdOrderByTimestampAsc(sessionId);
 
         // Not enough messages to compact
-        if (messages.size() <= properties.getCompaction().getKeepRecent()) return false;
+        int keepRecent = properties.getCompaction().getKeepRecent();
+        if (messages.size() <= keepRecent) return false;
+
+        // Skip if we just compacted and haven't accumulated enough new messages since then
+        String summarizedUpTo = session.getSummarizedUpToMessageId();
+        if (summarizedUpTo != null) {
+            int newMessagesSinceCompaction = 0;
+            boolean foundMarker = false;
+            for (ChatMessageEntity msg : messages) {
+                if (foundMarker) newMessagesSinceCompaction++;
+                if (msg.getId().equals(summarizedUpTo)) foundMarker = true;
+            }
+            // Need at least keepRecent new messages beyond the compaction point before re-compacting
+            if (foundMarker && newMessagesSinceCompaction <= keepRecent + 2) {
+                log.debug("[CONTEXT] Skipping compaction for session {} - only {} new messages since last compaction",
+                        sessionId, newMessagesSinceCompaction);
+                return false;
+            }
+        }
 
         // Estimate token count for messages beyond the keep-recent window
         int totalTokens = estimateContextTokens(messages, session.getContextSummary());

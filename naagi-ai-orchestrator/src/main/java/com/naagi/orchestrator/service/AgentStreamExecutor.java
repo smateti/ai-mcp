@@ -167,7 +167,7 @@ public class AgentStreamExecutor {
                             + "Based on the data you already received, provide your final answer NOW. "
                             + "If the first tool call returned data, summarize it. "
                             + "If it returned empty results, tell the user no results were found."));
-                    ChatRequest forceRequest = ChatRequest.of(messages, 0.2, 1024);
+                    ChatRequest forceRequest = ChatRequest.of(messages, 0.2, 2048);
                     ChatResponse forceResponse = llmClient.chat(forceRequest);
                     String forcedAnswer = forceResponse.content();
                     session.addStep(AgentStep.finalAnswer(step + 1, forcedAnswer));
@@ -177,7 +177,7 @@ public class AgentStreamExecutor {
                     break;
                 }
 
-                ChatRequest request = ChatRequest.withTools(messages, tools, "auto", 0.2, 1024);
+                ChatRequest request = ChatRequest.withTools(messages, tools, "auto", 0.2, 2048);
                 ChatResponse response = llmClient.chat(request);
 
                 if (response.hasToolCalls()) {
@@ -262,7 +262,7 @@ public class AgentStreamExecutor {
                                 "WRONG. You already called tools and received results. "
                                 + "Do NOT say 'not available'. Summarize the actual tool results you received. "
                                 + "If the results were empty, say 'No results were found' with specifics."));
-                        ChatRequest correctionReq = ChatRequest.of(messages, 0.2, 1024);
+                        ChatRequest correctionReq = ChatRequest.of(messages, 0.2, 2048);
                         ChatResponse correctionResp = llmClient.chat(correctionReq);
                         answer = correctionResp.content();
                     }
@@ -404,7 +404,7 @@ public class AgentStreamExecutor {
                             + "Based on the data you already received, provide your final answer NOW. "
                             + "If the first tool call returned data, summarize it. "
                             + "If it returned empty results, tell the user no results were found."));
-                    ChatRequest forceRequest = ChatRequest.of(messages, 0.2, 1024);
+                    ChatRequest forceRequest = ChatRequest.of(messages, 0.2, 2048);
                     ChatResponse forceResponse = llmClient.chat(forceRequest);
                     String forcedAnswer = forceResponse.content();
                     session.addStep(AgentStep.finalAnswer(step + 1, forcedAnswer));
@@ -415,7 +415,7 @@ public class AgentStreamExecutor {
                 }
 
                 // Call LLM with tools
-                ChatRequest request = ChatRequest.withTools(messages, tools, "auto", 0.2, 1024);
+                ChatRequest request = ChatRequest.withTools(messages, tools, "auto", 0.2, 2048);
                 ChatResponse response = llmClient.chat(request);
 
                 if (response.hasToolCalls()) {
@@ -533,7 +533,7 @@ public class AgentStreamExecutor {
                                 "WRONG. You already called tools and received results. "
                                 + "Do NOT say 'not available'. Summarize the actual tool results you received. "
                                 + "If the results were empty, say 'No results were found' with specifics."));
-                        ChatRequest correctionReq = ChatRequest.of(messages, 0.2, 1024);
+                        ChatRequest correctionReq = ChatRequest.of(messages, 0.2, 2048);
                         ChatResponse correctionResp = llmClient.chat(correctionReq);
                         answer = correctionResp.content();
                     }
@@ -832,15 +832,18 @@ public class AgentStreamExecutor {
             sb.append("[").append(entry.getRole()).append("]: ").append(entry.getContent()).append("\n");
         }
         sb.append("=== END CONTEXT ===\n\n");
-        sb.append("IMPORTANT: The user's question below references the conversation above. ");
-        sb.append("When the user says \"this application\", \"that job\", \"it\", etc., resolve these ");
-        sb.append("to the ACTUAL names/IDs from the context above. Use the concrete values ");
-        sb.append("(e.g. actual application names, job IDs, container names) in your tool calls, ");
-        sb.append("NOT the pronouns.\n\n");
-        sb.append("Also resolve relative time references like \"this month\", \"today\", \"last week\", ");
-        sb.append("\"yesterday\" into ACTUAL date ranges using the current date from the system prompt. ");
-        sb.append("For example, \"this month\" should become startTime/endTime parameters spanning the current calendar month. ");
-        sb.append("Never pass relative time phrases as literal query text.\n\n");
+        sb.append("IMPORTANT: The user's question below is a FOLLOW-UP to the conversation above.\n\n");
+        sb.append("1. PRESERVE TIME RANGE & PARAMETERS: If the previous tool call used specific parameters ");
+        sb.append("(e.g. startTime, endTime, appName), use the SAME values in follow-up tool calls. ");
+        sb.append("Look at the tool call details in the context above to find the exact parameters used. ");
+        sb.append("Only change the parameter the user is explicitly asking about (e.g. change status filter).\n\n");
+        sb.append("2. RESOLVE REFERENCES: When the user says \"those\", \"it\", \"them\", \"other instances\", ");
+        sb.append("\"this application\", etc., resolve these to the ACTUAL names/IDs from the context above. ");
+        sb.append("Use concrete values (e.g. actual application names, job IDs, container names) in your tool calls.\n\n");
+        sb.append("3. STAY IN THE SAME DOMAIN: If the previous conversation was about batch job runs, ");
+        sb.append("the follow-up is almost certainly about batch job runs too — NOT about application services, ");
+        sb.append("service operations, or unrelated tools. Use the SAME type of tool that was used previously. ");
+        sb.append("Only switch to a different tool if the user explicitly asks about something different.\n\n");
         sb.append("User question: ");
         return sb.toString();
     }
@@ -856,10 +859,38 @@ public class AgentStreamExecutor {
             if (prev.isPresent() && prev.get().getFinalAnswer() != null) {
                 AgentSession prevSession = prev.get();
                 log.info("[AGENT-STREAM] Found previous session {} for context", previousSessionId);
+
+                // Build tool call summary with full arguments from previous session steps
+                StringBuilder toolSummary = new StringBuilder();
+                if (prevSession.getSteps() != null && !prevSession.getSteps().isEmpty()) {
+                    toolSummary.append("Tool calls made in previous interaction:\n");
+                    for (var step : prevSession.getSteps()) {
+                        if (step.getToolName() != null && !step.getToolName().isBlank()) {
+                            toolSummary.append("  - ").append(step.getToolName());
+                            if (step.getToolArguments() != null && !step.getToolArguments().isBlank()) {
+                                toolSummary.append("(").append(truncate(step.getToolArguments(), 500)).append(")");
+                            }
+                            toolSummary.append("\n");
+                        }
+                    }
+                }
+
                 return "Previous question: \"" + prevSession.getUserMessage() + "\"\n"
-                        + "Previous answer (summary): \"" + truncate(prevSession.getFinalAnswer(), 500) + "\"\n\n"
-                        + "The user is continuing the conversation. Unless they mention a different application or entity, "
-                        + "scope all tool calls to the same context as the previous question.\n\n"
+                        + toolSummary
+                        + "Previous answer (summary): \"" + truncate(prevSession.getFinalAnswer(), 1500) + "\"\n\n"
+                        + "The user is continuing the conversation. Follow these rules:\n"
+                        + "1. PRESERVE TIME RANGE: If the previous tool call used a specific date range "
+                        + "(e.g. startTime/endTime for \"this month\"), use the SAME date range in follow-up "
+                        + "tool calls. Look at the tool arguments above to find the exact dates used.\n"
+                        + "2. Stay in the SAME domain — if the previous question was about batch jobs, "
+                        + "the follow-up is about batch jobs too. Do NOT switch to unrelated tools.\n"
+                        + "3. Resolve references like \"those\", \"other instances\", \"it\" to the actual "
+                        + "entities from the previous answer.\n"
+                        + "4. REUSE PARAMETERS: Copy the same appName, date range, and other parameters "
+                        + "from the previous tool call. Only change the parameter the user is asking about "
+                        + "(e.g. change status from FAILED to SUCCESS).\n"
+                        + "5. Use the SAME tools listed above for follow-up queries unless the user "
+                        + "explicitly asks about something different.\n\n"
                         + "Current question: ";
             }
         } catch (Exception e) {

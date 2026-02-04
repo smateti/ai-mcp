@@ -12,6 +12,7 @@ import com.naagi.rag.llm.ChatClient;
 import com.naagi.rag.llm.ChatMessage;
 import com.naagi.rag.llm.ChatRequest;
 import com.naagi.rag.llm.ChatResponse;
+import com.naagi.rag.llm.Grammars;
 import com.naagi.rag.llm.EmbeddingsClient;
 import com.naagi.rag.qdrant.QdrantClient;
 import com.naagi.rag.qdrant.QdrantClient.Point;
@@ -200,10 +201,10 @@ public class DocumentProcessingService {
         log.info("Generating {} fine-grain Q&A pairs for upload {}", fineGrainCount, upload.getId());
         String fineGrainPrompt = buildFineGrainPrompt(upload.getOriginalContent(), fineGrainCount);
         try {
-            ChatResponse fineGrainResp = chatClient.chat(ChatRequest.of(
+            ChatResponse fineGrainResp = chatClient.chat(ChatRequest.withGrammar(
                     List.of(ChatMessage.system("You are a Q&A generation assistant. Generate detailed question-answer pairs from documents. Respond with ONLY valid JSON arrays."),
                             ChatMessage.user(fineGrainPrompt)),
-                    0.3, 2048));
+                    0.3, 2048, Grammars.JSON_ARRAY));
             String fineGrainResponse = fineGrainResp.content();
             log.info("LLM fine-grain response length: {} chars", fineGrainResponse != null ? fineGrainResponse.length() : 0);
             List<GeneratedQA> fineGrainQA = parseQAFromLLM(fineGrainResponse, upload.getId(), QuestionType.FINE_GRAIN);
@@ -216,10 +217,10 @@ public class DocumentProcessingService {
         log.info("Generating {} summary Q&A pairs for upload {}", summaryCount, upload.getId());
         String summaryPrompt = buildSummaryPrompt(upload.getOriginalContent(), summaryCount);
         try {
-            ChatResponse summaryResp = chatClient.chat(ChatRequest.of(
+            ChatResponse summaryResp = chatClient.chat(ChatRequest.withGrammar(
                     List.of(ChatMessage.system("You are a Q&A generation assistant. Generate high-level question-answer pairs from documents. Respond with ONLY valid JSON arrays."),
                             ChatMessage.user(summaryPrompt)),
-                    0.3, 2048));
+                    0.3, 2048, Grammars.JSON_ARRAY));
             String summaryResponse = summaryResp.content();
             log.info("LLM summary response length: {} chars", summaryResponse != null ? summaryResponse.length() : 0);
             List<GeneratedQA> summaryQA = parseQAFromLLM(summaryResponse, upload.getId(), QuestionType.SUMMARY);
@@ -636,10 +637,10 @@ public class DocumentProcessingService {
             log.info("Generating {} additional fine-grain Q&A pairs for upload {}", fineGrainCount, uploadId);
             String prompt = buildAdditionalFineGrainPrompt(content, fineGrainCount, existingQuestions);
             try {
-                ChatResponse resp = chatClient.chat(ChatRequest.of(
+                ChatResponse resp = chatClient.chat(ChatRequest.withGrammar(
                         List.of(ChatMessage.system("You are a Q&A generation assistant. Generate NEW detailed question-answer pairs that are different from existing ones. Respond with ONLY valid JSON arrays."),
                                 ChatMessage.user(prompt)),
-                        0.5, 2048));
+                        0.5, 2048, Grammars.JSON_ARRAY));
                 String response = resp.content(); // Higher temperature for variety
                 List<GeneratedQA> fineGrainQA = parseQAFromLLM(response, uploadId, QuestionType.FINE_GRAIN);
                 newQA.addAll(fineGrainQA);
@@ -653,10 +654,10 @@ public class DocumentProcessingService {
             log.info("Generating {} additional summary Q&A pairs for upload {}", summaryCount, uploadId);
             String prompt = buildAdditionalSummaryPrompt(content, summaryCount, existingQuestions);
             try {
-                ChatResponse resp = chatClient.chat(ChatRequest.of(
+                ChatResponse resp = chatClient.chat(ChatRequest.withGrammar(
                         List.of(ChatMessage.system("You are a Q&A generation assistant. Generate NEW high-level question-answer pairs that are different from existing ones. Respond with ONLY valid JSON arrays."),
                                 ChatMessage.user(prompt)),
-                        0.5, 2048));
+                        0.5, 2048, Grammars.JSON_ARRAY));
                 String response = resp.content(); // Higher temperature for variety
                 List<GeneratedQA> summaryQA = parseQAFromLLM(response, uploadId, QuestionType.SUMMARY);
                 newQA.addAll(summaryQA);

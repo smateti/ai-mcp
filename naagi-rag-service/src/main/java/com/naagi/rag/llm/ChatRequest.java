@@ -12,20 +12,29 @@ public record ChatRequest(
         int maxTokens,
         boolean stream,
         List<ToolDefinition> tools,
-        String toolChoice
+        String toolChoice,
+        String grammar
 ) {
     /**
      * Create a simple chat request without tools.
      */
     public static ChatRequest of(List<ChatMessage> messages, double temperature, int maxTokens) {
-        return new ChatRequest(messages, temperature, maxTokens, false, null, null);
+        return new ChatRequest(messages, temperature, maxTokens, false, null, null, null);
+    }
+
+    /**
+     * Create a chat request with GBNF grammar constraint (llama.cpp).
+     * Grammar forces the LLM output to match a structural format (e.g., valid JSON).
+     */
+    public static ChatRequest withGrammar(List<ChatMessage> messages, double temperature, int maxTokens, String grammar) {
+        return new ChatRequest(messages, temperature, maxTokens, false, null, null, grammar);
     }
 
     /**
      * Create a streaming chat request without tools.
      */
     public static ChatRequest stream(List<ChatMessage> messages, double temperature, int maxTokens) {
-        return new ChatRequest(messages, temperature, maxTokens, true, null, null);
+        return new ChatRequest(messages, temperature, maxTokens, true, null, null, null);
     }
 
     /**
@@ -35,10 +44,14 @@ public record ChatRequest(
      */
     public static ChatRequest withTools(List<ChatMessage> messages, List<ToolDefinition> tools,
                                         String toolChoice, double temperature, int maxTokens) {
-        return new ChatRequest(messages, temperature, maxTokens, false, tools, toolChoice);
+        return new ChatRequest(messages, temperature, maxTokens, false, tools, toolChoice, null);
     }
 
     public boolean hasTools() {
         return tools != null && !tools.isEmpty();
+    }
+
+    public boolean hasGrammar() {
+        return grammar != null && !grammar.isBlank();
     }
 }

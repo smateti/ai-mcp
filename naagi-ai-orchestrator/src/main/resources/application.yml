@@ -30,11 +30,11 @@ naagi:
     category-admin:
       url: http://localhost:8085
 
-  # LLM Configuration
+  # LLM Configuration (llama.cpp multi-model server, single port)
   llm:
-    provider: llamacpp-openai
+    provider: llamacpp
     baseUrl: http://localhost:8000
-    model: llama3.1
+    model: llama3.1-8b-instruct
     timeout: 60000
 
   # Tool selection thresholds
@@ -61,8 +61,8 @@ naagi:
   # Input/output guardrails
   guardrails:
     enabled: true
-    max-input-length: 4000
-    max-output-length: 8000
+    max-input-length: 16000
+    max-output-length: 16000
     pii-detection:
       enabled: true
     injection-detection:
