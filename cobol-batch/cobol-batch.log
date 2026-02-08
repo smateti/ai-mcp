@@ -1,0 +1,358 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+18:49:36.653 [main] INFO  c.e.cobol.CobolBatchApplication - Starting CobolBatchApplication v1.0.0-SNAPSHOT using Java 21.0.9 with PID 2224 (D:\apps\ws\ws12\cobol-batch\target\cobol-batch-1.0.0-SNAPSHOT.jar started by smate in D:\apps\ws\ws12\cobol-batch)
+18:49:36.656 [main] DEBUG c.e.cobol.CobolBatchApplication - Running with Spring Boot v3.2.5, Spring v6.1.6
+18:49:36.657 [main] INFO  c.e.cobol.CobolBatchApplication - No active profile set, falling back to 1 default profile: "default"
+18:49:37.647 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Elasticsearch repositories in DEFAULT mode.
+18:49:37.742 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 91 ms. Found 3 Elasticsearch repository interfaces.
+18:49:37.746 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Reactive Elasticsearch repositories in DEFAULT mode.
+18:49:37.748 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 1 ms. Found 0 Reactive Elasticsearch repository interfaces.
+18:49:37.937 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'org.springframework.boot.autoconfigure.jdbc.DataSourceConfiguration$Hikari' of type [org.springframework.boot.autoconfigure.jdbc.DataSourceConfiguration$Hikari] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.955 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'spring.datasource-org.springframework.boot.autoconfigure.jdbc.DataSourceProperties' of type [org.springframework.boot.autoconfigure.jdbc.DataSourceProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.956 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration$PooledDataSourceConfiguration' of type [org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration$PooledDataSourceConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.957 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'jdbcConnectionDetails' of type [org.springframework.boot.autoconfigure.jdbc.PropertiesJdbcConnectionDetails] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.969 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'dataSource' of type [com.zaxxer.hikari.HikariDataSource] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.973 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration$JdbcTransactionManagerConfiguration' of type [org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration$JdbcTransactionManagerConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.986 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizationAutoConfiguration' of type [org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizationAutoConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:37.995 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'transactionExecutionListeners' of type [org.springframework.boot.autoconfigure.transaction.ExecutionListenersTransactionManagerCustomizer] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:38.001 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'spring.transaction-org.springframework.boot.autoconfigure.transaction.TransactionProperties' of type [org.springframework.boot.autoconfigure.transaction.TransactionProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:38.002 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'platformTransactionManagerCustomizers' of type [org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizers] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:38.020 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'transactionManager' of type [org.springframework.jdbc.support.JdbcTransactionManager] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:38.031 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'spring.batch-org.springframework.boot.autoconfigure.batch.BatchProperties' of type [org.springframework.boot.autoconfigure.batch.BatchProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [jobRegistryBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+18:49:38.043 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker - Bean 'org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration$SpringBootBatchConfiguration' of type [org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration$SpringBootBatchConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). The currently created BeanPostProcessor [jobRegistryBeanPostProcessor] is declared through a non-static factory method on that class; consider declaring it as static instead.
+18:49:38.466 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8081 (http)
+18:49:38.478 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+18:49:38.478 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.20]
+18:49:38.515 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+18:49:38.516 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1807 ms
+18:49:39.637 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+18:49:39.799 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection conn0: url=jdbc:h2:mem:batchdb user=SA
+18:49:39.802 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+18:49:40.426 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 1 endpoint(s) beneath base path '/actuator'
+18:49:40.488 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8081 (http) with context path ''
+18:49:40.494 [main] INFO  c.e.cobol.CobolBatchApplication - Started CobolBatchApplication in 4.221 seconds (process running for 4.732)
+18:49:43.780 [http-nio-8081-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+18:49:43.781 [http-nio-8081-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+18:49:43.781 [http-nio-8081-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 0 ms
+18:51:59.089 [SimpleAsyncTaskExecutor-1] INFO  o.s.b.c.l.support.SimpleJobLauncher - Job: [SimpleJob: [name=cobolAnalysisJob]] launched with the following parameters: [{'folderPath':'{value=D:/apps/ws/ws12/carddemo/programs, type=class java.lang.String, identifying=true}','serviceJobId':'{value=163, type=class java.lang.String, identifying=true}','batchRunId':'{value=49d400a1-a307-4e74-9641-2d6c9b60a1cb, type=class java.lang.String, identifying=true}','copybookPath':'{value=D:/apps/ws/ws12/carddemo/copybooks, type=class java.lang.String, identifying=true}','projectId':'{value=2, type=class java.lang.String, identifying=true}','timestamp':'{value=1770594719061, type=class java.lang.Long, identifying=true}'}]
+18:51:59.106 [SimpleAsyncTaskExecutor-1] INFO  o.s.batch.core.job.SimpleStepHandler - Executing step: [parseStep]
+18:51:59.113 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Step 1: PARSE - folder=D:/apps/ws/ws12/carddemo/programs, copybook=D:/apps/ws/ws12/carddemo/copybooks, batchRunId=49d400a1-a307-4e74-9641-2d6c9b60a1cb, projectId=2
+18:51:59.371 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 0%
+18:51:59.372 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.CopybookResolver - Built copybook map with 30 entries from 1 directories
+18:51:59.372 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Found 31 COBOL files in D:/apps/ws/ws12/carddemo/programs
+18:51:59.380 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 5%
+18:51:59.380 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [1/31]: CBACT01C.cbl
+18:51:59.393 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:51:59.393 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:51:59.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 5%
+18:51:59.798 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [2/31]: CBACT02C.cbl
+18:51:59.799 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:51:59.921 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 6%
+18:51:59.921 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [3/31]: CBACT03C.cbl
+18:51:59.926 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:00.051 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 7%
+18:52:00.051 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [4/31]: CBACT04C.cbl
+18:52:00.056 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:00.476 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 8%
+18:52:00.477 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [5/31]: CBCUS01C.cbl
+18:52:00.478 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:00.594 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 9%
+18:52:00.594 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [6/31]: CBEXPORT.cbl
+18:52:00.597 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:01.003 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 9%
+18:52:01.003 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [7/31]: CBIMPORT.cbl
+18:52:01.006 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:01.365 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 10%
+18:52:01.365 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [8/31]: CBSTM03A.CBL
+18:52:01.372 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:01.372 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:01.972 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 11%
+18:52:01.972 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [9/31]: CBSTM03B.CBL
+18:52:01.973 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:02.190 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 12%
+18:52:02.190 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [10/31]: CBTRN01C.cbl
+18:52:02.193 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:02.562 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 13%
+18:52:02.562 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [11/31]: CBTRN02C.cbl
+18:52:02.569 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.022 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 13%
+18:52:03.022 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [12/31]: CBTRN03C.cbl
+18:52:03.029 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.453 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 14%
+18:52:03.453 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [13/31]: COACTUPC.cbl
+18:52:03.483 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COACTUP
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.484 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.485 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:03.485 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: REPLACING
+18:52:03.485 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.926 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 15%
+18:52:04.926 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [14/31]: COACTVWC.cbl
+18:52:04.939 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.939 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.939 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:04.939 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:04.939 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.940 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COACTVW
+18:52:04.940 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.940 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.940 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:04.940 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.707 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 16%
+18:52:05.707 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [15/31]: COADM01C.cbl
+18:52:05.716 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.716 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COADM01
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:05.717 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:06.023 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 17%
+18:52:06.023 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [16/31]: COBIL00C.cbl
+18:52:06.029 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.030 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.030 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COBIL00
+18:52:06.030 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.030 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.030 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.031 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:06.031 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:06.468 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 17%
+18:52:06.468 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [17/31]: COBSWAIT.cbl
+18:52:06.469 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.504 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 18%
+18:52:06.505 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [18/31]: COCRDLIC.cbl
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COCRDSL
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COCRDLI
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:06.518 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.371 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 19%
+18:52:07.371 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [19/31]: COCRDSLC.cbl
+18:52:07.378 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COCRDSL
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:07.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.043 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 20%
+18:52:08.043 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [20/31]: COCRDUPC.cbl
+18:52:08.063 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COCRDUP
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.064 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.837 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 21%
+18:52:08.837 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [21/31]: COMEN01C.cbl
+18:52:08.841 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COMEN01
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.842 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.843 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:08.843 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:08.843 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:09.131 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 21%
+18:52:09.132 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [22/31]: CORPT00C.cbl
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: CORPT00
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:09.134 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:09.429 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 22%
+18:52:09.430 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [23/31]: COSGN00C.cbl
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COSGN00
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:09.433 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHATTR
+18:52:09.729 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 23%
+18:52:09.729 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [24/31]: COTRN00C.cbl
+18:52:09.732 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.732 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.732 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COTRN00
+18:52:09.732 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.732 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.733 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:09.733 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:09.733 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:10.095 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 24%
+18:52:10.095 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [25/31]: COTRN01C.cbl
+18:52:10.097 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.097 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.097 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COTRN01
+18:52:10.097 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.098 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.098 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.098 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:10.098 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:10.329 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 25%
+18:52:10.329 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [26/31]: COTRN02C.cbl
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COTRN02
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:10.333 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:10.793 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 25%
+18:52:10.793 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [27/31]: COUSR00C.cbl
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COUSR00
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:10.797 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:11.214 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 26%
+18:52:11.214 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [28/31]: COUSR01C.cbl
+18:52:11.215 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COUSR01
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:11.216 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHATTR
+18:52:11.556 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 27%
+18:52:11.557 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [29/31]: COUSR02C.cbl
+18:52:11.559 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.559 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.559 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COUSR02
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:11.560 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:11.831 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 28%
+18:52:11.832 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [30/31]: COUSR03C.cbl
+18:52:11.833 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.834 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.834 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: COUSR03
+18:52:11.834 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.834 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.835 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.835 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:11.835 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHAID
+18:52:11.835 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: DFHBMSCA
+18:52:12.131 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 29%
+18:52:12.131 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Parsing [31/31]: CSUTLDTC.cbl
+18:52:12.133 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.CopybookResolver - Copybook not found: OF
+18:52:12.193 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: PARSING progress: 30%
+18:52:12.193 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.CobolParseTasklet - Step 1 complete: parsed 31 programs, stored in ES
+18:52:12.195 [SimpleAsyncTaskExecutor-1] INFO  o.s.batch.core.step.AbstractStep - Step: [parseStep] executed in 13s88ms
+18:52:12.198 [SimpleAsyncTaskExecutor-1] INFO  o.s.batch.core.job.SimpleStepHandler - Executing step: [llmAnalysisStep]
+18:52:12.199 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet - Step 2: LLM ANALYSIS - 31 programs to analyze
+18:52:12.205 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: LLM_ANALYSIS progress: 30%
+18:52:12.205 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet - Analyzing [1/31]: CBACT01C
+18:52:18.796 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet -   Program summary generated for CBACT01C
+18:52:18.796 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   Calling LLM for business rules extraction: CBACT01C (custom prompt: false)
+18:52:22.626 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   LLM business rules raw response for CBACT01C (820 chars): [VALIDATION] ACCT-ID must be numeric and non-zero
+[CALCULATION] ACCT-CURR-BAL is moved to OUT-ACCT-CURR-BAL
+[LIMIT_CHECK] ACCT-CREDIT-LIMIT is moved to OUT-ACCT-CREDIT-LIMIT
+[CALCULATION] OUT-ACCT-CURR-CYC-DEBIT is calculated as 2525.00 if ACCT-CURR-CYC-DEBIT equals zero
+[VALIDATION] ACCT-REISSUE-DATE is formatted using an assembler program
+[CALCULATION] OUT-ACCT-CURR-CYC-CREDIT is moved from ACCT-CURR-CYC-CREDIT
+[VALIDATION] ACCT-GROUP-ID is moved to OUT-ACCT-GROUP-ID
+
+This program appears to handle account data, including reading from an ACCTFILE, processing account records, and writing to output files. It includes validations for ACCT-ID, calculations for ACCT-CURR-BAL and OUT-ACCT-CURR-CYC-DEBIT, and limit checks for ACCT-CREDIT-LIMIT. The program also formats ACCT-REISSUE-DATE using an assembler program.
+18:52:22.627 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   Extracted 7 business rules for CBACT01C
+18:52:22.657 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet -   Business rules extracted for CBACT01C (7 rules)
+18:52:31.739 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [1/16]: 1000-ACCTFILE-GET-NEXT done
+18:52:38.618 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [2/16]: 1550-WRITE-VB1-RECORD done
+18:52:44.838 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [3/16]: 1575-WRITE-VB2-RECORD done
+18:52:49.768 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [4/16]: 1450-WRITE-ARRY-RECORD done
+18:52:55.606 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [5/16]: 1350-WRITE-ACCT-RECORD done
+18:53:06.972 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [6/16]: 1300-POPUL-ACCT-RECORD done
+18:53:13.532 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [7/16]: 1100-DISPLAY-ACCT-RECORD done
+18:53:19.970 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [8/16]: 1400-POPUL-ARRAY-RECORD done
+18:53:26.844 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [9/16]: 1500-POPUL-VBRC-RECORD done
+18:53:32.927 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [10/16]: 9000-ACCTFILE-CLOSE done
+18:53:38.584 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [11/16]: 3000-ARRFILE-OPEN done
+18:53:47.122 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [12/16]: 4000-VBRFILE-OPEN done
+18:53:53.379 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [13/16]: 2000-OUTFILE-OPEN done
+18:54:00.237 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [14/16]: 0000-ACCTFILE-OPEN done
+18:54:07.262 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [15/16]: 9910-DISPLAY-IO-STATUS done
+18:54:12.402 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.batch.LlmAnalysisTasklet -   Paragraph [16/16]: 9999-ABEND-PROGRAM done
+18:54:12.415 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.ServiceClient - Updated job 163 status: RUNNING step: LLM_ANALYSIS progress: 31%
+18:54:12.415 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet - Analyzing [2/31]: CBACT02C
+18:54:18.523 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet -   Program summary generated for CBACT02C
+18:54:18.523 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   Calling LLM for business rules extraction: CBACT02C (custom prompt: false)
+18:54:23.317 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   LLM business rules raw response for CBACT02C (1165 chars): [VALIDATION] CARDFILE-STATUS must be '00' for successful read operation
+[CALCULATION] APPL-RESULT is calculated based on CARDFILE-STATUS
+[LIMIT_CHECK] Transaction rejected if CARDFILE-STATUS is '10'
+[STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+[VALIDATION] IO-STATUS must be numeric
+[DISPLAY] IO-STATUS is displayed in 'NNNN' format
+[CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS and IO-STATUS
+[LIMIT_CHECK] Transaction rejected if IO-STATUS is '9'
+[STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+[VALIDATION] IO-STATUS must be numeric
+[DISPLAY] IO-STATUS is displayed in 'NNNN' format
+[CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS and IO-STATUS
+[LIMIT_CHECK] Transaction rejected if IO-STATUS is '9'
+[STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+[CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS
+[LIMIT_CHECK] Transaction rejected if CARDFILE-STATUS is not '00'
+[STATUS_TRANSITION] END-OF-FILE flag i...
+18:54:23.317 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [VALIDATION] CARDFILE-STATUS must be '00' for successful read operation
+18:54:23.317 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [CALCULATION] APPL-RESULT is calculated based on CARDFILE-STATUS
+18:54:23.317 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [LIMIT_CHECK] Transaction rejected if CARDFILE-STATUS is '10'
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS and IO-STATUS
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS and IO-STATUS
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [CALCULATION] APPL-RESULT is adjusted based on CARDFILE-STATUS
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [LIMIT_CHECK] Transaction rejected if CARDFILE-STATUS is not '00'
+18:54:23.318 [SimpleAsyncTaskExecutor-1] DEBUG c.e.cobol.service.LlmAnalysisService -     Filtered technical noise: [STATUS_TRANSITION] END-OF-FILE flag is set if APPL-EOF is true
+18:54:23.318 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.service.LlmAnalysisService -   Extracted 4 business rules for CBACT02C
+18:54:23.338 [SimpleAsyncTaskExecutor-1] INFO  c.e.cobol.batch.LlmAnalysisTasklet -   Business rules extracted for CBACT02C (4 rules)
