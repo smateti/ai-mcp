@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="JMS Queue Application">
+
+    <featureManager>
+        <feature>restfulWS-3.0</feature>
+        <feature>jsonb-2.0</feature>
+        <feature>mpHealth-4.0</feature>
+        <feature>mpConfig-3.0</feature>
+        <feature>cdi-3.0</feature>
+        <feature>mdb-4.0</feature>
+        <feature>messagingClient-3.0</feature>
+        <feature>messagingServer-3.0</feature>
+        <feature>mpOpenAPI-3.0</feature>
+        <feature>restConnector-2.0</feature>
+    </featureManager>
+
+    <!-- Admin credentials for JMX REST connector -->
+    <quickStartSecurity userName="admin" userPassword="admin123" />
+
+    <!-- Keystore for HTTPS (required by restConnector) -->
+    <keyStore id="defaultKeyStore" password="liberty123" />
+
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="${default.http.port}"
+                  httpsPort="${default.https.port}" />
+
+    <!-- Embedded Messaging Engine -->
+    <messagingEngine>
+        <queue id="simpleQueue" />
+    </messagingEngine>
+
+    <!-- JMS Queue Definition -->
+    <jmsQueue id="simpleJmsQueue" jndiName="jms/SimpleQueue">
+        <properties.wasJms queueName="simpleQueue" />
+    </jmsQueue>
+
+    <!-- JMS Connection Factory -->
+    <jmsConnectionFactory id="simpleJmsCF" jndiName="jms/SimpleConnectionFactory">
+        <properties.wasJms />
+    </jmsConnectionFactory>
+
+    <!-- JMS Activation Spec for MDB (maxConcurrency = number of concurrent consumer threads) -->
+    <jmsActivationSpec id="jms-microprofile-app/JmsConsumerMDB" maxEndpoints="10">
+        <properties.wasJms destinationRef="simpleJmsQueue"
+                           destinationType="jakarta.jms.Queue"
+                           maxConcurrency="10" />
+    </jmsActivationSpec>
+
+    <webApplication location="jms-microprofile-app.war" contextRoot="/" />
+</server>
