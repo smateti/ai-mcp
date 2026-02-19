@@ -7,14 +7,17 @@ set -euo pipefail
 # Merge order (last wins):
 #   values.yaml                                              (defaults)
 #   environments/<env>/values.yaml                           (environment)
-#   environments/<env>/namespaces/<ns>/values.yaml           (namespace)
+#   environments/<env>/products/<product>/values.yaml        (product)
 #   environments/<env>/applications/<app>/values.yaml        (application)
 #
+# Not every layer needs a values file — missing layers are silently skipped.
+# Only the base values.yaml (defaults) is required.
+#
 # Usage:
-#   ./deploy.sh <environment> <namespace> <application> [helm-extra-args...]
+#   ./deploy.sh <environment> <product> <application> [helm-extra-args...]
 #
 # Output:
-#   output/<environment>/<namespace>/<application>.yaml
+#   output/<environment>/<product>/<application>.yaml
 #
 # Examples:
 #   ./deploy.sh dev team-alpha backend
@@ -26,54 +29,47 @@ CHART_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_DIR="${CHART_DIR}/environments"
 OUTPUT_DIR="${CHART_DIR}/output"
 
-ENV="${1:?Usage: $0 <environment> <namespace> <application> [helm-args...]}"
-NS="${2:?Usage: $0 <environment> <namespace> <application> [helm-args...]}"
-APP="${3:?Usage: $0 <environment> <namespace> <application> [helm-args...]}"
+ENV="${1:?Usage: $0 <environment> <product> <application> [helm-args...]}"
+PRODUCT="${2:?Usage: $0 <environment> <product> <application> [helm-args...]}"
+APP="${3:?Usage: $0 <environment> <product> <application> [helm-args...]}"
 shift 3
 
-RELEASE_NAME="${APP}-${NS}-${ENV}"
+RELEASE_NAME="${APP}-${PRODUCT}-${ENV}"
 
-# Build the -f chain: defaults → environment → namespace → application
+# Build the -f chain: defaults → environment → product → application
+# Missing layers are silently skipped (only defaults is required)
 VALUE_FILES=("-f" "${CHART_DIR}/values.yaml")
+LAYERS_USED=("defaults")
 
-ENV_VALUES="${ENV_DIR}/${ENV}/values.yaml"
-if [[ -f "${ENV_VALUES}" ]]; then
-  VALUE_FILES+=("-f" "${ENV_VALUES}")
-else
-  echo "WARNING: No values file at ${ENV_VALUES}" >&2
-fi
+CANDIDATES=(
+  "${ENV_DIR}/${ENV}/values.yaml|${ENV}"
+  "${ENV_DIR}/${ENV}/products/${PRODUCT}/values.yaml|${ENV}/${PRODUCT}"
+  "${ENV_DIR}/${ENV}/applications/${APP}/values.yaml|${ENV}/${APP}"
+)
 
-NS_VALUES="${ENV_DIR}/${ENV}/namespaces/${NS}/values.yaml"
-if [[ -f "${NS_VALUES}" ]]; then
-  VALUE_FILES+=("-f" "${NS_VALUES}")
-else
-  echo "WARNING: No values file at ${NS_VALUES}" >&2
-fi
-
-APP_VALUES="${ENV_DIR}/${ENV}/applications/${APP}/values.yaml"
-if [[ -f "${APP_VALUES}" ]]; then
-  VALUE_FILES+=("-f" "${APP_VALUES}")
-else
-  echo "WARNING: No values file at ${APP_VALUES}" >&2
-fi
+for entry in "${CANDIDATES[@]}"; do
+  file="${entry%%|*}"
+  label="${entry##*|}"
+  if [[ -f "${file}" ]]; then
+    VALUE_FILES+=("-f" "${file}")
+    LAYERS_USED+=("${label}")
+  fi
+done
 
 # Create output directory
-OUT_PATH="${OUTPUT_DIR}/${ENV}/${NS}"
+OUT_PATH="${OUTPUT_DIR}/${ENV}/${PRODUCT}"
 mkdir -p "${OUT_PATH}"
 OUT_FILE="${OUT_PATH}/${APP}.yaml"
 
 echo "=== Generating: ${RELEASE_NAME} ==="
 echo "  Environment : ${ENV}"
-echo "  Namespace   : ${NS}"
+echo "  Product     : ${PRODUCT}"
 echo "  Application : ${APP}"
-echo "  Value chain :"
-for f in "${VALUE_FILES[@]}"; do
-  [[ "$f" != "-f" ]] && echo "    - ${f}"
-done
+echo "  Layers      : ${LAYERS_USED[*]}"
 echo ""
 
 helm template "${RELEASE_NAME}" "${CHART_DIR}" \
-  --namespace "${NS}" \
+  --namespace "${PRODUCT}" \
   "${VALUE_FILES[@]}" \
   "$@" > "${OUT_FILE}"
 

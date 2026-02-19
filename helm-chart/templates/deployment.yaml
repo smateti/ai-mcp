@@ -4,8 +4,19 @@ metadata:
   name: {{ include "app.fullname" . }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
+    {{- with .Values.deploymentLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.deploymentAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "app.selectorLabels" . | nindent 6 }}
@@ -13,7 +24,21 @@ spec:
     metadata:
       labels:
         {{- include "app.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccountName }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -22,6 +47,17 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort }}
               protocol: TCP
+          {{- if .Values.env }}
+          env:
+            {{- range $name, $val := .Values.env }}
+            - name: {{ $name }}
+              {{- if kindIs "map" $val }}
+              {{- toYaml $val | nindent 14 }}
+              {{- else }}
+              value: {{ $val | quote }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
           envFrom:
             {{- range $name, $opts := .Values.configMapRefs }}
             - configMapRef:
@@ -37,6 +73,18 @@ spec:
                 optional: {{ $opts.optional | default false }}
                 {{- end }}
             {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- if or .Values.configMapFiles .Values.secretFiles .Values.pvcMounts }}
           volumeMounts:
             {{- range $name, $items := .Values.configMapFiles }}
@@ -64,9 +112,10 @@ spec:
               readOnly: {{ $opts.readOnly | default false }}
             {{- end }}
           {{- end }}
-          {{- with .Values.resources }}
+          {{- $res := include "app.resources" . -}}
+          {{- if $res }}
           resources:
-            {{- toYaml . | nindent 12 }}
+            {{- $res | nindent 12 }}
           {{- end }}
       {{- if or .Values.configMapFiles .Values.secretFiles .Values.pvcMounts }}
       volumes:

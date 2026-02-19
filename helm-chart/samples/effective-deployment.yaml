@@ -4,7 +4,7 @@
 # helm template backend-dev ./helm-chart \
 #   -f values.yaml \
 #   -f environments/dev/values.yaml \
-#   -f environments/dev/namespaces/team-alpha/values.yaml \
+#   -f environments/dev/products/team-alpha/values.yaml \
 #   -f environments/dev/applications/backend/values.yaml
 #
 # Merge trace:

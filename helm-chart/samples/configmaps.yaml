@@ -30,14 +30,14 @@ data:
   DEBUG: "true"
   OTEL_EXPORTER: "jaeger-dev.monitoring:4317"
 
-# From: namespaces/team-alpha
+# From: products/team-alpha
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: team-alpha-config
   labels:
-    layer: namespace
+    layer: product
     team: alpha
 data:
   TEAM: "alpha"

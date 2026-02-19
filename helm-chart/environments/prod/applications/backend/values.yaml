@@ -5,13 +5,8 @@ image:
 
 containerPort: 8080
 
-resources:
-  limits:
-    cpu: "1"
-    memory: 1Gi
-  requests:
-    cpu: 500m
-    memory: 512Mi
+# t-shirt size (or set custom `resources` to override)
+resourceSize: xlarge
 
 configMapRefs:
   backend-config: {}

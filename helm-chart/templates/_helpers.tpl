@@ -44,3 +44,18 @@ Selector labels.
 app.kubernetes.io/name: {{ include "app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Resolve resources: custom `resources` wins, otherwise look up `resourceSize` from `resourceSizes`.
+Usage: include "app.resources" .
+*/}}
+{{- define "app.resources" -}}
+{{- if .Values.resources -}}
+  {{- toYaml .Values.resources -}}
+{{- else if and .Values.resourceSize .Values.resourceSizes -}}
+  {{- $size := index .Values.resourceSizes .Values.resourceSize -}}
+  {{- if $size -}}
+    {{- toYaml $size -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
