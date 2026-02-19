@@ -1,0 +1,3 @@
+# Environment: staging | Namespace: team-alpha
+configMapRefs:
+  team-alpha-config: {}

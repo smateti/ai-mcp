@@ -1,0 +1,15 @@
+# Environment: prod | Application: frontend
+image:
+  repository: myregistry/frontend
+  tag: "2.1.0"
+
+containerPort: 3000
+
+service:
+  port: 3000
+
+configMapRefs:
+  frontend-config: {}
+
+secretRefs:
+  frontend-secrets: {}

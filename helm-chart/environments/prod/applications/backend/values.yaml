@@ -1,0 +1,22 @@
+# Environment: prod | Application: backend
+image:
+  repository: myregistry/backend
+  tag: "3.4.1"
+
+containerPort: 8080
+
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+configMapRefs:
+  backend-config: {}
+  db-config: {}
+
+secretRefs:
+  backend-secrets: {}
+  db-secrets: {}

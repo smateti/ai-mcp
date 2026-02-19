@@ -1,0 +1,19 @@
+# Environment: prod
+replicaCount: 3
+
+image:
+  pullPolicy: Always
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+configMapRefs:
+  prod-config: {}
+
+secretRefs:
+  prod-secrets: {}

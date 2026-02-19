@@ -1,0 +1,3 @@
+# Environment: dev | Namespace: team-beta
+configMapRefs:
+  team-beta-config: {}

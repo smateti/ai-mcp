@@ -1,0 +1,6 @@
+# Environment: dev
+configMapRefs:
+  dev-config: {}
+
+secretRefs:
+  dev-secrets: {}

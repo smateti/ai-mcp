@@ -1,0 +1,9 @@
+# Environment: staging | Application: frontend
+image:
+  repository: myregistry/frontend
+  tag: "1.9.0-rc1"
+
+containerPort: 3000
+
+configMapRefs:
+  frontend-config: {}

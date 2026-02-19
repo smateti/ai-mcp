@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          envFrom:
+            {{- range $name, $opts := .Values.configMapRefs }}
+            - configMapRef:
+                name: {{ $name }}
+                {{- if $opts }}
+                optional: {{ $opts.optional | default false }}
+                {{- end }}
+            {{- end }}
+            {{- range $name, $opts := .Values.secretRefs }}
+            - secretRef:
+                name: {{ $name }}
+                {{- if $opts }}
+                optional: {{ $opts.optional | default false }}
+                {{- end }}
+            {{- end }}
+          {{- if or .Values.configMapFiles .Values.secretFiles .Values.pvcMounts }}
+          volumeMounts:
+            {{- range $name, $items := .Values.configMapFiles }}
+            {{- range $key, $mountPath := $items }}
+            - name: cm-{{ $name }}
+              mountPath: {{ $mountPath }}
+              subPath: {{ $key }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- range $name, $items := .Values.secretFiles }}
+            {{- range $key, $mountPath := $items }}
+            - name: sec-{{ $name }}
+              mountPath: {{ $mountPath }}
+              subPath: {{ $key }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- range $name, $opts := .Values.pvcMounts }}
+            - name: pvc-{{ $name }}
+              mountPath: {{ $opts.mountPath }}
+              {{- if $opts.subPath }}
+              subPath: {{ $opts.subPath }}
+              {{- end }}
+              readOnly: {{ $opts.readOnly | default false }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if or .Values.configMapFiles .Values.secretFiles .Values.pvcMounts }}
+      volumes:
+        {{- range $name, $_ := .Values.configMapFiles }}
+        - name: cm-{{ $name }}
+          configMap:
+            name: {{ $name }}
+        {{- end }}
+        {{- range $name, $_ := .Values.secretFiles }}
+        - name: sec-{{ $name }}
+          secret:
+            secretName: {{ $name }}
+        {{- end }}
+        {{- range $name, $opts := .Values.pvcMounts }}
+        - name: pvc-{{ $name }}
+          persistentVolumeClaim:
+            claimName: {{ $name }}
+            {{- if $opts.readOnly }}
+            readOnly: true
+            {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,34 @@
+# Environment: dev | Application: backend
+image:
+  repository: myregistry/backend
+  tag: "dev-latest"
+
+containerPort: 8080
+
+configMapRefs:
+  backend-config: {}
+  db-config: {}
+
+secretRefs:
+  backend-secrets: {}
+  db-secrets: {}
+
+# Mount specific keys as files
+configMapFiles:
+  backend-config:
+    application.yml: /etc/app/application.yml
+    logback.xml: /etc/app/logback.xml
+  db-config:
+    db-migration.sql: /etc/db/db-migration.sql
+
+secretFiles:
+  db-secrets:
+    ca.crt: /etc/ssl/db/ca.crt
+
+# PVC mounts
+pvcMounts:
+  backend-data-pvc:
+    mountPath: /data
+  backend-logs-pvc:
+    mountPath: /var/log/app
+    subPath: backend

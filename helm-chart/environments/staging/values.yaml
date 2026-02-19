@@ -1,0 +1,8 @@
+# Environment: staging
+replicaCount: 2
+
+configMapRefs:
+  staging-config: {}
+
+secretRefs:
+  staging-secrets: {}

@@ -1,0 +1,3 @@
+# Environment: prod | Namespace: team-alpha
+configMapRefs:
+  team-alpha-config: {}

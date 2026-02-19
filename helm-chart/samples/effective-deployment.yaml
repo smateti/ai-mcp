@@ -1,0 +1,121 @@
+# =============================================================================
+# EFFECTIVE RENDERED OUTPUT — ./deploy.sh dev team-alpha backend
+# =============================================================================
+# helm template backend-dev ./helm-chart \
+#   -f values.yaml \
+#   -f environments/dev/values.yaml \
+#   -f environments/dev/namespaces/team-alpha/values.yaml \
+#   -f environments/dev/applications/backend/values.yaml
+#
+# Merge trace:
+#   Layer 1 (defaults)    → configMapRefs: {app-config}          secretRefs: {app-secrets}
+#   Layer 2 (dev)         → configMapRefs: + {dev-config}        secretRefs: + {dev-secrets}
+#   Layer 3 (team-alpha)  → configMapRefs: + {team-alpha-config}
+#   Layer 4 (backend)     → configMapRefs: + {backend-config, db-config}
+#                           secretRefs:    + {backend-secrets, db-secrets}
+#                           configMapFiles: backend-config → 2 files, db-config → 1 file
+#                           secretFiles:   db-secrets → 1 file
+#                           pvcMounts:     backend-data-pvc → /data
+#                                          backend-logs-pvc → /var/log/app (subPath: backend)
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-dev-app
+  labels:
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: backend-dev
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+      app.kubernetes.io/instance: backend-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app
+        app.kubernetes.io/instance: backend-dev
+    spec:
+      containers:
+        - name: app
+          image: "myregistry/backend:dev-latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # ---- env vars from configmaps & secrets (envFrom) ----
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - configMapRef:
+                name: backend-config
+            - configMapRef:
+                name: db-config
+            - configMapRef:
+                name: dev-config
+            - configMapRef:
+                name: team-alpha-config
+            - secretRef:
+                name: app-secrets
+            - secretRef:
+                name: backend-secrets
+            - secretRef:
+                name: db-secrets
+            - secretRef:
+                name: dev-secrets
+
+          # ---- all volume mounts ----
+          volumeMounts:
+            # configmap key → file
+            - name: cm-backend-config
+              mountPath: /etc/app/application.yml
+              subPath: application.yml
+              readOnly: true
+            - name: cm-backend-config
+              mountPath: /etc/app/logback.xml
+              subPath: logback.xml
+              readOnly: true
+            - name: cm-db-config
+              mountPath: /etc/db/db-migration.sql
+              subPath: db-migration.sql
+              readOnly: true
+            # secret key → file
+            - name: sec-db-secrets
+              mountPath: /etc/ssl/db/ca.crt
+              subPath: ca.crt
+              readOnly: true
+            # PVC mounts
+            - name: pvc-backend-data-pvc
+              mountPath: /data
+              readOnly: false
+            - name: pvc-backend-logs-pvc
+              mountPath: /var/log/app
+              subPath: backend
+              readOnly: false
+
+      # ---- volumes ----
+      volumes:
+        # configmap volumes
+        - name: cm-backend-config
+          configMap:
+            name: backend-config
+        - name: cm-db-config
+          configMap:
+            name: db-config
+        # secret volumes
+        - name: sec-db-secrets
+          secret:
+            secretName: db-secrets
+        # PVC volumes
+        - name: pvc-backend-data-pvc
+          persistentVolumeClaim:
+            claimName: backend-data-pvc
+        - name: pvc-backend-logs-pvc
+          persistentVolumeClaim:
+            claimName: backend-logs-pvc
