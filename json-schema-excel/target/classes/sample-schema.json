@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Order",
+  "description": "An e-commerce order",
+  "type": "object",
+  "required": ["orderId", "customer", "items"],
+  "properties": {
+    "orderId": {
+      "type": "string",
+      "description": "Unique order identifier"
+    },
+    "orderDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Date and time the order was placed"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+      "description": "Current order status"
+    },
+    "totalAmount": {
+      "type": "number",
+      "description": "Total order amount"
+    },
+    "customer": {
+      "type": "object",
+      "description": "Customer who placed the order",
+      "required": ["customerId", "name", "email"],
+      "properties": {
+        "customerId": {
+          "type": "string",
+          "description": "Unique customer identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the customer"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Customer phone number"
+        }
+      }
+    },
+    "shippingAddress": {
+      "$ref": "#/definitions/Address"
+    },
+    "billingAddress": {
+      "$ref": "#/definitions/Address"
+    },
+    "items": {
+      "type": "array",
+      "description": "List of items in the order",
+      "items": {
+        "type": "object",
+        "required": ["productId", "quantity", "price"],
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "Product identifier"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Name of the product"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Quantity ordered"
+          },
+          "price": {
+            "type": "number",
+            "description": "Price per unit"
+          },
+          "discount": {
+            "type": "object",
+            "description": "Applied discount details",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Discount code"
+              },
+              "percentage": {
+                "type": "number",
+                "description": "Discount percentage"
+              }
+            }
+          }
+        }
+      }
+    },
+    "payment": {
+      "type": "object",
+      "description": "Payment information",
+      "required": ["method", "transactionId"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["credit_card", "debit_card", "paypal", "bank_transfer"],
+          "description": "Payment method used"
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Payment transaction identifier"
+        },
+        "cardDetails": {
+          "type": "object",
+          "description": "Credit/debit card details",
+          "properties": {
+            "lastFourDigits": {
+              "type": "string",
+              "description": "Last 4 digits of the card"
+            },
+            "cardType": {
+              "type": "string",
+              "description": "Type of card (Visa, Mastercard, etc.)"
+            },
+            "expiryDate": {
+              "type": "string",
+              "description": "Card expiry date"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Address": {
+      "type": "object",
+      "description": "A postal address",
+      "required": ["street", "city", "country"],
+      "properties": {
+        "street": {
+          "type": "string",
+          "description": "Street address"
+        },
+        "city": {
+          "type": "string",
+          "description": "City name"
+        },
+        "state": {
+          "type": "string",
+          "description": "State or province"
+        },
+        "zipCode": {
+          "type": "string",
+          "description": "ZIP or postal code"
+        },
+        "country": {
+          "type": "string",
+          "description": "Country name"
+        }
+      }
+    }
+  }
+}

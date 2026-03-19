@@ -1,0 +1,7 @@
+com\schema2excel\ExcelGenerator.class
+com\schema2excel\ExcelToSchemaGenerator$FieldInfo.class
+com\schema2excel\ExcelToSchemaGenerator.class
+com\schema2excel\ExcelToSchemaGenerator$ComplexObject.class
+com\schema2excel\JsonSchemaParser.class
+com\schema2excel\SchemaNode.class
+com\schema2excel\App.class
