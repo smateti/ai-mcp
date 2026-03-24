@@ -69,6 +69,9 @@ public class ReportGenerator {
                     if (sa.getProcessorInsight() != null && sa.getProcessorInsight().getSummary() != null) {
                         System.out.println("      -> " + sa.getProcessorInsight().getSummary());
                     }
+                    if (sa.getProcessorInsight() != null && sa.getProcessorInsight().getConditionalLogic() != null) {
+                        System.out.println("      Conditional: " + sa.getProcessorInsight().getConditionalLogic());
+                    }
                 }
 
                 if (!sa.getProcessorFunctionCalls().isEmpty()) {
@@ -103,12 +106,21 @@ public class ReportGenerator {
         Files.createDirectories(outputDir);
 
         String projectName = Path.of(report.getProjectPath()).getFileName().toString();
-        Path outputFile = outputDir.resolve(projectName + "-analysis.md");
+        Path outputFile = outputDir.resolve(projectName + "-report.md");
 
         StringBuilder md = new StringBuilder();
         md.append("# Nimba Batch Analysis Report\n\n");
         md.append("**Project**: ").append(report.getProjectPath()).append("  \n");
         md.append("**Analyzed**: ").append(report.getAnalyzedAt()).append("\n\n");
+
+        // Project Summary (merged from SummaryDocumentGenerator)
+        if (report.getProjectSummary() != null && !report.getProjectSummary().isBlank()) {
+            md.append("---\n\n");
+            md.append(report.getProjectSummary());
+            md.append("\n\n---\n\n");
+        }
+
+        md.append("# Detailed Step Analysis\n\n");
 
         // WAS Dependencies
         if (!report.getWasDependencies().isEmpty()) {
@@ -137,6 +149,13 @@ public class ReportGenerator {
             }
             md.append("\n");
 
+            // Job Listener insight
+            if (job.getJobListenerInsight() != null) {
+                md.append("### Job Listener: ").append(job.getJobListenerClassName()).append("\n\n");
+                appendLlmInsight(md, job.getJobListenerInsight());
+                md.append("\n");
+            }
+
             int stepNum = 1;
             for (StepAnalysis sa : job.getStepAnalyses()) {
                 StepDefinition step = sa.getStepDefinition();
@@ -161,6 +180,13 @@ public class ReportGenerator {
                         md.append("- **File Format**: ").append(sa.getFileFormat()).append("\n");
                     }
                     md.append("\n");
+
+                    // Custom reader LLM insight
+                    if (sa.getReaderInsight() != null) {
+                        md.append("#### Custom Reader Analysis\n\n");
+                        appendLlmInsight(md, sa.getReaderInsight());
+                        md.append("\n");
+                    }
                 } else {
                     md.append("#### Reader\n\nNo reader - **Custom Step** (single-threaded)\n\n");
                 }
@@ -184,7 +210,7 @@ public class ReportGenerator {
                     md.append("#### Processor: ").append(sa.getProcessorClassName()).append("\n\n");
                     appendLlmInsight(md, sa.getProcessorInsight());
                     if (sa.isProcessorMakesFunctionCalls()) {
-                        md.append("**Function Calls**:\n");
+                        md.append("**Static Analysis - Function Calls**:\n");
                         for (FunctionCallInfo fc : sa.getProcessorFunctionCalls()) {
                             md.append("- ").append(fc.getClientClassName()).append(".")
                                     .append(fc.getMethodCalled()).append("() (line ")
@@ -220,17 +246,31 @@ public class ReportGenerator {
 
     private void appendLlmInsight(StringBuilder md, LlmInsight insight) {
         if (insight == null) return;
-        if (insight.getSummary() != null)
-            md.append("> **Summary**: ").append(insight.getSummary()).append("\n\n");
-        if (insight.getBusinessLogic() != null)
-            md.append("> **Business Logic**: ").append(insight.getBusinessLogic()).append("\n\n");
-        if (insight.getParsingLogic() != null)
-            md.append("> **Parsing Logic**: ").append(insight.getParsingLogic()).append("\n\n");
-        if (insight.getErrorHandling() != null)
-            md.append("> **Error Handling**: ").append(insight.getErrorHandling()).append("\n\n");
-        if (insight.getPatterns() != null)
-            md.append("> **Patterns**: ").append(insight.getPatterns()).append("\n\n");
-        if (insight.getIssues() != null)
-            md.append("> **Issues**: ").append(insight.getIssues()).append("\n\n");
+        appendField(md, "Summary", insight.getSummary());
+        appendField(md, "Business Logic", insight.getBusinessLogic());
+        appendField(md, "Conditional Logic", insight.getConditionalLogic());
+        appendField(md, "Parsing Logic", insight.getParsingLogic());
+        appendField(md, "Field Mapping", insight.getFieldMapping());
+        appendField(md, "Record Structure", insight.getRecordStructure());
+        appendField(md, "Validation", insight.getValidationRules());
+        appendField(md, "Data Transformations", insight.getDataTransformations());
+        appendField(md, "Database Operations", insight.getDbOperations());
+        appendField(md, "Output", insight.getOutputDescription());
+        appendField(md, "Data Source", insight.getDataSource());
+        appendField(md, "Query Pattern", insight.getQueryPattern());
+        appendField(md, "Connection Details", insight.getConnectionDetails());
+        appendField(md, "On Job Start", insight.getOnJobStart());
+        appendField(md, "On Job Finish", insight.getOnJobFinish());
+        appendField(md, "Resource Management", insight.getResourceManagement());
+        appendField(md, "Function Calls", insight.getFunctionCalls());
+        appendField(md, "Error Handling", insight.getErrorHandling());
+        appendField(md, "Patterns", insight.getPatterns());
+        appendField(md, "Issues", insight.getIssues());
+    }
+
+    private void appendField(StringBuilder md, String label, String value) {
+        if (value != null && !value.isBlank()) {
+            md.append("> **").append(label).append("**: ").append(value).append("\n\n");
+        }
     }
 }

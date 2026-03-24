@@ -3,7 +3,6 @@ package com.nystax.nimba.analyzer.controller;
 import com.nystax.nimba.analyzer.model.ProjectAnalysisReport;
 import com.nystax.nimba.analyzer.service.BatchAnalysisOrchestrator;
 import com.nystax.nimba.analyzer.service.ReportGenerator;
-import com.nystax.nimba.analyzer.service.SummaryDocumentGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -19,14 +18,11 @@ public class AnalyzerController {
 
     private final BatchAnalysisOrchestrator orchestrator;
     private final ReportGenerator reportGenerator;
-    private final SummaryDocumentGenerator summaryGenerator;
 
     public AnalyzerController(BatchAnalysisOrchestrator orchestrator,
-                              ReportGenerator reportGenerator,
-                              SummaryDocumentGenerator summaryGenerator) {
+                              ReportGenerator reportGenerator) {
         this.orchestrator = orchestrator;
         this.reportGenerator = reportGenerator;
-        this.summaryGenerator = summaryGenerator;
     }
 
     @PostMapping("/analyze")
@@ -37,13 +33,11 @@ public class AnalyzerController {
         try {
             ProjectAnalysisReport report = orchestrator.analyze(request.getProjectPath());
 
-            Path analysisPath = reportGenerator.writeMarkdownReport(report);
-            Path summaryPath = summaryGenerator.writeSummaryDocument(report);
+            Path reportPath = reportGenerator.writeMarkdownReport(report);
 
             response.setSuccess(true);
             response.setReport(report);
-            response.setAnalysisReportPath(analysisPath.toAbsolutePath().toString());
-            response.setSummaryDocumentPath(summaryPath.toAbsolutePath().toString());
+            response.setReportPath(reportPath.toAbsolutePath().toString());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Analysis failed: {}", e.getMessage(), e);

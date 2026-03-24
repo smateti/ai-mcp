@@ -3,7 +3,6 @@ package com.nystax.nimba.analyzer.cli;
 import com.nystax.nimba.analyzer.model.ProjectAnalysisReport;
 import com.nystax.nimba.analyzer.service.BatchAnalysisOrchestrator;
 import com.nystax.nimba.analyzer.service.ReportGenerator;
-import com.nystax.nimba.analyzer.service.SummaryDocumentGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -18,14 +17,11 @@ public class CliRunner implements CommandLineRunner {
 
     private final BatchAnalysisOrchestrator orchestrator;
     private final ReportGenerator reportGenerator;
-    private final SummaryDocumentGenerator summaryGenerator;
 
     public CliRunner(BatchAnalysisOrchestrator orchestrator,
-                     ReportGenerator reportGenerator,
-                     SummaryDocumentGenerator summaryGenerator) {
+                     ReportGenerator reportGenerator) {
         this.orchestrator = orchestrator;
         this.reportGenerator = reportGenerator;
-        this.summaryGenerator = summaryGenerator;
     }
 
     @Override
@@ -50,13 +46,9 @@ public class CliRunner implements CommandLineRunner {
             // Print to console
             reportGenerator.printConsole(report);
 
-            // Write detailed analysis report
-            Path analysisPath = reportGenerator.writeMarkdownReport(report);
-            System.out.println("Analysis report saved to: " + analysisPath.toAbsolutePath());
-
-            // Write summary document
-            Path summaryPath = summaryGenerator.writeSummaryDocument(report);
-            System.out.println("Summary document saved to: " + summaryPath.toAbsolutePath());
+            // Write combined report (summary + detailed analysis)
+            Path reportPath = reportGenerator.writeMarkdownReport(report);
+            System.out.println("Report saved to: " + reportPath.toAbsolutePath());
 
         } catch (Exception e) {
             System.err.println("Analysis failed: " + e.getMessage());

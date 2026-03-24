@@ -40,8 +40,12 @@ public class LlmResponseParser {
         insight.setClassName(className);
         insight.setSummary(parsed.getOrDefault("SUMMARY", response));
         insight.setBusinessLogic(parsed.get("BUSINESS_LOGIC"));
+        insight.setConditionalLogic(parsed.get("CONDITIONAL_LOGIC"));
+        insight.setDataTransformations(parsed.get("DATA_TRANSFORMATIONS"));
+        insight.setDbOperations(parsed.get("DB_OPERATIONS"));
         insight.setFunctionCalls(parsed.get("FUNCTION_CALLS"));
         insight.setErrorHandling(parsed.get("ERROR_HANDLING"));
+        insight.setOutputDescription(parsed.get("OUTPUT"));
         insight.setPatterns(parsed.get("PATTERNS"));
         insight.setIssues(parsed.get("ISSUES"));
         return insight;
@@ -53,6 +57,9 @@ public class LlmResponseParser {
         insight.setClassName(className);
         insight.setSummary(parsed.getOrDefault("SUMMARY", response));
         insight.setParsingLogic(parsed.get("PARSING_LOGIC"));
+        insight.setFieldMapping(parsed.get("FIELD_MAPPING"));
+        insight.setRecordStructure(parsed.get("RECORD_STRUCTURE"));
+        insight.setValidationRules(parsed.get("VALIDATION"));
         insight.setFunctionCalls(parsed.get("FUNCTION_CALLS"));
         return insight;
     }
@@ -62,8 +69,10 @@ public class LlmResponseParser {
         LlmInsight insight = new LlmInsight();
         insight.setClassName(className);
         insight.setSummary(parsed.getOrDefault("SUMMARY", response));
-        insight.setBusinessLogic(parsed.get("DATA_SOURCE"));
+        insight.setDataSource(parsed.get("DATA_SOURCE"));
         insight.setParsingLogic(parsed.get("FILE_FORMAT"));
+        insight.setQueryPattern(parsed.get("QUERY_PATTERN"));
+        insight.setConnectionDetails(parsed.get("CONNECTION_DETAILS"));
         insight.setFunctionCalls(parsed.get("FUNCTION_CALLS"));
         return insight;
     }
@@ -73,8 +82,9 @@ public class LlmResponseParser {
         LlmInsight insight = new LlmInsight();
         insight.setClassName(className);
         insight.setSummary(parsed.getOrDefault("SUMMARY", response));
-        insight.setBusinessLogic(parsed.get("ON_JOB_START"));
-        insight.setErrorHandling(parsed.get("ON_JOB_FINISH"));
+        insight.setOnJobStart(parsed.get("ON_JOB_START"));
+        insight.setOnJobFinish(parsed.get("ON_JOB_FINISH"));
+        insight.setResourceManagement(parsed.get("RESOURCE_MANAGEMENT"));
         insight.setFunctionCalls(parsed.get("FUNCTION_CALLS"));
         return insight;
     }

@@ -5,12 +5,7 @@ import com.nystax.nimba.analyzer.llm.LlmPromptBuilder;
 import com.nystax.nimba.analyzer.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
 @Component
 public class SummaryDocumentGenerator {
@@ -19,9 +14,6 @@ public class SummaryDocumentGenerator {
 
     private final LlamaClient llamaClient;
     private final LlmPromptBuilder promptBuilder;
-
-    @Value("${nimba.analyzer.report-output-dir:./reports}")
-    private String reportOutputDir;
 
     public SummaryDocumentGenerator(LlamaClient llamaClient, LlmPromptBuilder promptBuilder) {
         this.llamaClient = llamaClient;
@@ -37,23 +29,6 @@ public class SummaryDocumentGenerator {
                 promptBuilder.buildProjectSummaryPrompt(analysisData));
 
         return summary;
-    }
-
-    public Path writeSummaryDocument(ProjectAnalysisReport report) throws IOException {
-        Path outputDir = Path.of(reportOutputDir);
-        Files.createDirectories(outputDir);
-
-        String projectName = Path.of(report.getProjectPath()).getFileName().toString();
-        Path outputFile = outputDir.resolve(projectName + "-summary.md");
-
-        String content = report.getProjectSummary();
-        if (content == null || content.isBlank()) {
-            content = "# Project Summary\n\nSummary generation was not available.\n";
-        }
-
-        Files.writeString(outputFile, content);
-        log.info("Summary document written to: {}", outputFile);
-        return outputFile;
     }
 
     private String buildAnalysisDataText(ProjectAnalysisReport report) {
@@ -80,7 +55,9 @@ public class SummaryDocumentGenerator {
             if (job.getJobListenerClassName() != null) {
                 sb.append("  Job Listener: ").append(job.getJobListenerClassName()).append("\n");
                 if (job.getJobListenerInsight() != null) {
-                    sb.append("    Summary: ").append(job.getJobListenerInsight().getSummary()).append("\n");
+                    appendInsightField(sb, "Summary", job.getJobListenerInsight().getSummary());
+                    appendInsightField(sb, "On Job Start", job.getJobListenerInsight().getOnJobStart());
+                    appendInsightField(sb, "On Job Finish", job.getJobListenerInsight().getOnJobFinish());
                 }
             }
 
@@ -100,6 +77,13 @@ public class SummaryDocumentGenerator {
                     }
                     step.getReader().getParameters().forEach((k, v) ->
                             sb.append("    Param ").append(k).append(": ").append(v).append("\n"));
+
+                    // Custom reader insight
+                    if (sa.getReaderInsight() != null) {
+                        appendInsightField(sb, "Reader Summary", sa.getReaderInsight().getSummary());
+                        appendInsightField(sb, "Data Source", sa.getReaderInsight().getDataSource());
+                        appendInsightField(sb, "Query Pattern", sa.getReaderInsight().getQueryPattern());
+                    }
                 } else {
                     sb.append("    Reader: None (Custom step, single-threaded)\n");
                 }
@@ -107,10 +91,10 @@ public class SummaryDocumentGenerator {
                 if (sa.isHasDeserializer() && sa.getDeserializerClassName() != null) {
                     sb.append("    Deserializer: ").append(sa.getDeserializerClassName()).append("\n");
                     if (sa.getDeserializerInsight() != null) {
-                        sb.append("      Summary: ").append(sa.getDeserializerInsight().getSummary()).append("\n");
-                        if (sa.getDeserializerInsight().getParsingLogic() != null) {
-                            sb.append("      Parsing: ").append(sa.getDeserializerInsight().getParsingLogic()).append("\n");
-                        }
+                        appendInsightField(sb, "Summary", sa.getDeserializerInsight().getSummary());
+                        appendInsightField(sb, "Parsing", sa.getDeserializerInsight().getParsingLogic());
+                        appendInsightField(sb, "Field Mapping", sa.getDeserializerInsight().getFieldMapping());
+                        appendInsightField(sb, "Record Structure", sa.getDeserializerInsight().getRecordStructure());
                     }
                     if (sa.isDeserializerMakesFunctionCalls()) {
                         sb.append("      Function Calls: ");
@@ -123,10 +107,12 @@ public class SummaryDocumentGenerator {
                 if (sa.getProcessorClassName() != null) {
                     sb.append("    Processor: ").append(sa.getProcessorClassName()).append("\n");
                     if (sa.getProcessorInsight() != null) {
-                        sb.append("      Summary: ").append(sa.getProcessorInsight().getSummary()).append("\n");
-                        if (sa.getProcessorInsight().getBusinessLogic() != null) {
-                            sb.append("      Logic: ").append(sa.getProcessorInsight().getBusinessLogic()).append("\n");
-                        }
+                        appendInsightField(sb, "Summary", sa.getProcessorInsight().getSummary());
+                        appendInsightField(sb, "Logic", sa.getProcessorInsight().getBusinessLogic());
+                        appendInsightField(sb, "Conditional Logic", sa.getProcessorInsight().getConditionalLogic());
+                        appendInsightField(sb, "Data Transformations", sa.getProcessorInsight().getDataTransformations());
+                        appendInsightField(sb, "DB Operations", sa.getProcessorInsight().getDbOperations());
+                        appendInsightField(sb, "Output", sa.getProcessorInsight().getOutputDescription());
                     }
                     if (sa.isProcessorMakesFunctionCalls()) {
                         sb.append("      Function Calls: ");
@@ -154,5 +140,11 @@ public class SummaryDocumentGenerator {
         }
 
         return sb.toString();
+    }
+
+    private void appendInsightField(StringBuilder sb, String label, String value) {
+        if (value != null && !value.isBlank()) {
+            sb.append("      ").append(label).append(": ").append(value).append("\n");
+        }
     }
 }

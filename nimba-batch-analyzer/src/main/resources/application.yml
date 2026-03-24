@@ -5,12 +5,12 @@ llama:
   enabled: true
   base-url: http://localhost:8000
   model: llama3.1-8b-instruct
-  max-tokens: 2048
+  max-tokens: 4096
   temperature: 0.1
   timeout-seconds: 120
 
 nimba:
   analyzer:
     report-output-dir: ./reports
-    max-source-size: 8000
+    max-source-size: 12000
     framework-reader-prefix: fw
