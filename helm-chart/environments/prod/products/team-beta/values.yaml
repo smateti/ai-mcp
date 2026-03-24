@@ -1,3 +1,0 @@
-# Environment: prod | Namespace: team-beta
-configMapRefs:
-  team-beta-config: {}

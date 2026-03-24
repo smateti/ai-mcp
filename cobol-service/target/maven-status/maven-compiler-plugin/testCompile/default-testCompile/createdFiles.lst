@@ -1,5 +1,0 @@
-com\enterprise\cobol\controller\SearchControllerTest.class
-com\enterprise\cobol\controller\JobControllerTest.class
-com\enterprise\cobol\repository\JpaRepositoryTest.class
-com\enterprise\cobol\controller\ProjectControllerTest.class
-com\enterprise\cobol\controller\RagControllerTest.class

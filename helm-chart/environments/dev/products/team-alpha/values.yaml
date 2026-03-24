@@ -1,3 +1,0 @@
-# Environment: dev | Namespace: team-alpha
-configMapRefs:
-  team-alpha-config: {}
