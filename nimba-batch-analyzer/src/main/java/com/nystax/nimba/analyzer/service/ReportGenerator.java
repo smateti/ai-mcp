@@ -66,6 +66,10 @@ public class ReportGenerator {
 
                 if (sa.getProcessorClassName() != null) {
                     System.out.println("    Processor: " + sa.getProcessorClassName());
+                    if (step.getProcessor() != null && step.getProcessor().getSource() != null) {
+                        String src = step.getProcessor().getSource();
+                        System.out.println("      Source: " + src + " (reads from " + describeSource(src) + ")");
+                    }
                     if (sa.getProcessorInsight() != null && sa.getProcessorInsight().getSummary() != null) {
                         System.out.println("      -> " + sa.getProcessorInsight().getSummary());
                     }
@@ -85,6 +89,10 @@ public class ReportGenerator {
 
                 if (sa.getProcessErrorThreshold() != null) {
                     System.out.println("    Error Threshold: " + sa.getProcessErrorThreshold());
+                }
+
+                if (!sa.getDatasourceNames().isEmpty()) {
+                    System.out.println("    Datasource(s): " + String.join(", ", sa.getDatasourceNames()));
                 }
             }
 
@@ -208,6 +216,11 @@ public class ReportGenerator {
                 // Processor
                 if (sa.getProcessorClassName() != null) {
                     md.append("#### Processor: ").append(sa.getProcessorClassName()).append("\n\n");
+                    if (step.getProcessor() != null && step.getProcessor().getSource() != null) {
+                        String src = step.getProcessor().getSource();
+                        md.append("- **Data Source**: `").append(src).append("` — reads from ")
+                                .append(describeSource(src)).append("\n\n");
+                    }
                     appendLlmInsight(md, sa.getProcessorInsight());
                     if (sa.isProcessorMakesFunctionCalls()) {
                         md.append("**Static Analysis - Function Calls**:\n");
@@ -219,6 +232,9 @@ public class ReportGenerator {
                     }
                     if (sa.getProcessErrorThreshold() != null) {
                         md.append("\n**Error Threshold**: ").append(sa.getProcessErrorThreshold()).append("\n");
+                    }
+                    if (!sa.getDatasourceNames().isEmpty()) {
+                        md.append("\n**Datasource(s)**: ").append(String.join(", ", sa.getDatasourceNames())).append("\n");
                     }
                     md.append("\n");
                 }
@@ -272,5 +288,25 @@ public class ReportGenerator {
         if (value != null && !value.isBlank()) {
             md.append("> **").append(label).append("**: ").append(value).append("\n\n");
         }
+    }
+
+    /**
+     * Describes a processor source attribute like "step.managedStep.out" in human-readable form.
+     * Format: step.{stepId}.out = output of step, step.{stepId}.in = input of step.
+     */
+    private String describeSource(String source) {
+        if (source == null) return "unknown";
+        // Expected format: step.{stepId}.out or step.{stepId}.in
+        String[] parts = source.split("\\.");
+        if (parts.length == 3 && "step".equals(parts[0])) {
+            String stepId = parts[1];
+            String direction = parts[2];
+            if ("out".equals(direction)) {
+                return "the **output** of step `" + stepId + "`";
+            } else if ("in".equals(direction)) {
+                return "the **input** of step `" + stepId + "`";
+            }
+        }
+        return "`" + source + "`";
     }
 }

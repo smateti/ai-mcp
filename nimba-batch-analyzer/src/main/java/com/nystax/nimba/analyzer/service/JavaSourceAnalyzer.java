@@ -28,6 +28,10 @@ public class JavaSourceAnalyzer {
             "(\\w+Client)\\s*\\.\\s*(\\w+)\\s*\\(");
     private static final Pattern WAS_IMPORT = Pattern.compile(
             "import\\s+gov\\.nystax\\.was\\.functions\\.");
+    private static final Pattern DB_HELPER_CONSTRUCTOR = Pattern.compile(
+            "new\\s+NimbusDatabaseHelperImpl\\s*\\(\\s*(\\w+|\"[^\"]+\")\\s*\\)");
+    private static final Pattern VARIABLE_ASSIGN = Pattern.compile(
+            "(\\w+)\\s*=\\s*\"([^\"]+)\"");
 
     public List<BatchExitUsage> findBatchExitUsages(List<Path> javaFiles) {
         List<BatchExitUsage> usages = new ArrayList<>();
@@ -88,6 +92,48 @@ public class JavaSourceAnalyzer {
             log.warn("Failed to read file: {}", javaFile);
         }
         return calls;
+    }
+
+    /**
+     * Finds datasource names used in NimbusDatabaseHelperImpl constructors.
+     * Handles both direct string literals and variable references.
+     */
+    public List<String> findDatasourceNames(Path javaFile) {
+        List<String> dsNames = new ArrayList<>();
+        try {
+            String content = Files.readString(javaFile);
+            if (!content.contains("NimbusDatabaseHelperImpl")) {
+                return dsNames;
+            }
+
+            // Collect all variable assignments to string literals
+            java.util.Map<String, String> varValues = new java.util.HashMap<>();
+            Matcher varMatcher = VARIABLE_ASSIGN.matcher(content);
+            while (varMatcher.find()) {
+                varValues.put(varMatcher.group(1), varMatcher.group(2));
+            }
+
+            // Find NimbusDatabaseHelperImpl constructor calls
+            Matcher dbMatcher = DB_HELPER_CONSTRUCTOR.matcher(content);
+            while (dbMatcher.find()) {
+                String arg = dbMatcher.group(1).trim();
+                if (arg.startsWith("\"") && arg.endsWith("\"")) {
+                    // Direct string literal
+                    dsNames.add(arg.substring(1, arg.length() - 1));
+                } else {
+                    // Variable reference — resolve from assignments
+                    String resolved = varValues.get(arg);
+                    if (resolved != null) {
+                        dsNames.add(resolved);
+                    } else {
+                        dsNames.add(arg + " (variable)");
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read file for datasource analysis: {}", javaFile);
+        }
+        return dsNames;
     }
 
     private BatchExitUsage parseBatchExitArgs(String className, int lineNumber, String args) {

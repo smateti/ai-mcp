@@ -18,6 +18,7 @@ public class StepAnalysis {
     private List<FunctionCallInfo> processorFunctionCalls = new ArrayList<>();
     private String processErrorThreshold;
     private LlmInsight readerInsight;
+    private List<String> datasourceNames = new ArrayList<>();
 
     public StepDefinition getStepDefinition() { return stepDefinition; }
     public void setStepDefinition(StepDefinition stepDefinition) { this.stepDefinition = stepDefinition; }
@@ -45,4 +46,6 @@ public class StepAnalysis {
     public void setProcessErrorThreshold(String processErrorThreshold) { this.processErrorThreshold = processErrorThreshold; }
     public LlmInsight getReaderInsight() { return readerInsight; }
     public void setReaderInsight(LlmInsight readerInsight) { this.readerInsight = readerInsight; }
+    public List<String> getDatasourceNames() { return datasourceNames; }
+    public void setDatasourceNames(List<String> datasourceNames) { this.datasourceNames = datasourceNames; }
 }

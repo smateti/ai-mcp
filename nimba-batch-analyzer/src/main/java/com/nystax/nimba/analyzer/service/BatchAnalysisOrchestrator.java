@@ -191,6 +191,12 @@ public class BatchAnalysisOrchestrator {
                     if (src != null) {
                         sa.setReaderInsight(analyzeLlm(src, readerClass, "reader"));
                         sa.setDeserializerFunctionCalls(javaSourceAnalyzer.findAllFunctionCalls(src));
+
+                        // Static analysis: datasource names in custom reader
+                        List<String> dsNames = javaSourceAnalyzer.findDatasourceNames(src);
+                        if (!dsNames.isEmpty()) {
+                            sa.getDatasourceNames().addAll(dsNames);
+                        }
                     }
                 }
             }
@@ -209,6 +215,12 @@ public class BatchAnalysisOrchestrator {
                     List<FunctionCallInfo> calls = javaSourceAnalyzer.findAllFunctionCalls(procSource);
                     sa.setProcessorFunctionCalls(calls);
                     sa.setProcessorMakesFunctionCalls(!calls.isEmpty());
+
+                    // Static analysis: datasource names
+                    List<String> dsNames = javaSourceAnalyzer.findDatasourceNames(procSource);
+                    if (!dsNames.isEmpty()) {
+                        sa.getDatasourceNames().addAll(dsNames);
+                    }
 
                     // LLM analysis
                     sa.setProcessorInsight(analyzeLlm(procSource, procClass, "processor"));

@@ -101,6 +101,10 @@ public class JobXmlParser {
         Element procEl = (Element) processors.item(0);
         ProcessorDefinition proc = new ProcessorDefinition();
         proc.setProcessorId(procEl.getAttribute("id"));
+        String source = procEl.getAttribute("source");
+        if (!source.isEmpty()) {
+            proc.setSource(source);
+        }
         proc.setParameters(extractParameters(procEl));
         return proc;
     }

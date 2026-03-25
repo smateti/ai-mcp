@@ -106,6 +106,17 @@ public class SummaryDocumentGenerator {
 
                 if (sa.getProcessorClassName() != null) {
                     sb.append("    Processor: ").append(sa.getProcessorClassName()).append("\n");
+                    if (step.getProcessor() != null && step.getProcessor().getSource() != null) {
+                        String src = step.getProcessor().getSource();
+                        String[] parts = src.split("\\.");
+                        if (parts.length == 3 && "step".equals(parts[0])) {
+                            String dir = "out".equals(parts[2]) ? "output" : "input";
+                            sb.append("      Data Source: reads from ").append(dir)
+                                    .append(" of step ").append(parts[1]).append("\n");
+                        } else {
+                            sb.append("      Data Source: ").append(src).append("\n");
+                        }
+                    }
                     if (sa.getProcessorInsight() != null) {
                         appendInsightField(sb, "Summary", sa.getProcessorInsight().getSummary());
                         appendInsightField(sb, "Logic", sa.getProcessorInsight().getBusinessLogic());
@@ -124,6 +135,9 @@ public class SummaryDocumentGenerator {
 
                 if (sa.getProcessErrorThreshold() != null) {
                     sb.append("    Error Threshold: ").append(sa.getProcessErrorThreshold()).append("\n");
+                }
+                if (!sa.getDatasourceNames().isEmpty()) {
+                    sb.append("    Datasource(s): ").append(String.join(", ", sa.getDatasourceNames())).append("\n");
                 }
             }
 
