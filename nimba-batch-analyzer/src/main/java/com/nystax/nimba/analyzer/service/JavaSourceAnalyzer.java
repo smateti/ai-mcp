@@ -9,8 +9,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -215,6 +214,48 @@ public class JavaSourceAnalyzer {
         return queries;
     }
 
+    /**
+     * Scans all Java files and builds an index of className -> Nimbus functions called.
+     * Only includes classes that actually call at least one Nimbus function.
+     */
+    public Map<String, List<String>> buildNimbusFunctionIndex(List<Path> javaFiles) {
+        Map<String, List<String>> index = new HashMap<>();
+        for (Path javaFile : javaFiles) {
+            List<String> funcs = findNimbusFunctionCalls(javaFile);
+            if (!funcs.isEmpty()) {
+                String className = extractSimpleClassName(javaFile);
+                index.put(className, funcs);
+            }
+        }
+        log.info("Nimbus function index: {} classes with function calls", index.size());
+        index.forEach((cls, funcs) -> log.info("  {} -> {}", cls, funcs));
+        return index;
+    }
+
+    /**
+     * Finds simple class names imported or referenced by the given Java source file.
+     * Returns only classes present in the candidateClasses set (to limit to classes with Nimbus functions).
+     */
+    public Set<String> findReferencedClassNames(Path javaFile, Set<String> candidateClasses) {
+        Set<String> referenced = new HashSet<>();
+        try {
+            String content = Files.readString(javaFile);
+            for (String candidate : candidateClasses) {
+                // Check if the class name appears anywhere in the source (import, field type, method call, etc.)
+                if (content.contains(candidate)) {
+                    // Don't match the file's own class name
+                    String ownClass = extractSimpleClassName(javaFile);
+                    if (!candidate.equals(ownClass)) {
+                        referenced.add(candidate);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read file for reference analysis: {}", javaFile);
+        }
+        return referenced;
+    }
+
     private BatchExitUsage parseBatchExitArgs(String className, int lineNumber, String args) {
         String status = "UNKNOWN";
         String message = "";
@@ -243,7 +284,7 @@ public class JavaSourceAnalyzer {
         return new BatchExitUsage(className, lineNumber, status, message);
     }
 
-    private String extractSimpleClassName(Path javaFile) {
+    public String extractSimpleClassName(Path javaFile) {
         String fileName = javaFile.getFileName().toString();
         return fileName.endsWith(".java") ? fileName.substring(0, fileName.length() - 5) : fileName;
     }

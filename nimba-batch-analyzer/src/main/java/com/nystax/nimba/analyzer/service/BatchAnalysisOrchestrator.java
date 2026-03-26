@@ -17,9 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class BatchAnalysisOrchestrator {
@@ -66,11 +64,14 @@ public class BatchAnalysisOrchestrator {
         // Phase 3: Resolve @Nimba annotations
         Map<String, String> nimbaIdMap = annotationResolver.resolveAll(files.getJavaSourceFiles());
 
+        // Phase 3.5: Build Nimbus function index across ALL Java files
+        Map<String, List<String>> nimbusFuncIndex = javaSourceAnalyzer.buildNimbusFunctionIndex(files.getJavaSourceFiles());
+
         // Phase 4: Analyze each job XML + generate per-job summary
         List<AnalysisResult> jobResults = new ArrayList<>();
         for (Path jobXml : files.getJobXmlFiles()) {
             try {
-                AnalysisResult result = analyzeJob(jobXml, files.getJavaSourceFiles(), nimbaIdMap);
+                AnalysisResult result = analyzeJob(jobXml, files.getJavaSourceFiles(), nimbaIdMap, nimbusFuncIndex);
 
                 // Generate job-level summary via LLM
                 String jobSummary = summaryGenerator.generateJobSummary(result);
@@ -93,7 +94,8 @@ public class BatchAnalysisOrchestrator {
         return report;
     }
 
-    private AnalysisResult analyzeJob(Path jobXml, List<Path> javaFiles, Map<String, String> nimbaIdMap) {
+    private AnalysisResult analyzeJob(Path jobXml, List<Path> javaFiles, Map<String, String> nimbaIdMap,
+                                      Map<String, List<String>> nimbusFuncIndex) {
         JobDefinition jobDef = jobXmlParser.parse(jobXml);
         log.info("Analyzing job: {} ({} steps)", jobDef.getJobId(), jobDef.getSteps().size());
 
@@ -119,7 +121,7 @@ public class BatchAnalysisOrchestrator {
         // Analyze each step
         List<StepAnalysis> stepAnalyses = new ArrayList<>();
         for (StepDefinition step : jobDef.getSteps()) {
-            StepAnalysis sa = analyzeStep(step, javaFiles, nimbaIdMap);
+            StepAnalysis sa = analyzeStep(step, javaFiles, nimbaIdMap, nimbusFuncIndex);
             stepAnalyses.add(sa);
             collectStepSourceFiles(step, sa, javaFiles, nimbaIdMap, jobSourceFiles);
         }
@@ -159,7 +161,8 @@ public class BatchAnalysisOrchestrator {
         }
     }
 
-    private StepAnalysis analyzeStep(StepDefinition step, List<Path> javaFiles, Map<String, String> nimbaIdMap) {
+    private StepAnalysis analyzeStep(StepDefinition step, List<Path> javaFiles, Map<String, String> nimbaIdMap,
+                                     Map<String, List<String>> nimbusFuncIndex) {
         log.info("  Analyzing step: {} ({})", step.getStepId(), step.getStepType());
 
         StepAnalysis sa = new StepAnalysis();
@@ -253,7 +256,59 @@ public class BatchAnalysisOrchestrator {
             }
         }
 
+        // Resolve Nimbus functions from helper classes referenced by this step's source files
+        if (!nimbusFuncIndex.isEmpty()) {
+            resolveHelperClassNimbusFunctions(step, sa, javaFiles, nimbaIdMap, nimbusFuncIndex);
+        }
+
         return sa;
+    }
+
+    /**
+     * For each step source file (processor, reader, deserializer), find references to classes
+     * that call Nimbus functions (helper classes). Add those Nimbus functions to the step.
+     */
+    private void resolveHelperClassNimbusFunctions(StepDefinition step, StepAnalysis sa,
+                                                    List<Path> javaFiles, Map<String, String> nimbaIdMap,
+                                                    Map<String, List<String>> nimbusFuncIndex) {
+        Set<String> candidateClasses = nimbusFuncIndex.keySet();
+        List<Path> stepSourceFiles = new ArrayList<>();
+
+        // Collect all source files for this step
+        if (step.getProcessor() != null) {
+            Path src = annotationResolver.findSourceFile(step.getProcessor().getProcessorId(), javaFiles, nimbaIdMap);
+            if (src != null) stepSourceFiles.add(src);
+        }
+        if (step.getReader() != null && step.getReader().getReaderType() == ReaderType.CUSTOM) {
+            Path src = annotationResolver.findSourceFile(step.getReader().getReaderId(), javaFiles, nimbaIdMap);
+            if (src != null) stepSourceFiles.add(src);
+        }
+        if (sa.getDeserializerClassName() != null) {
+            Path src = annotationResolver.findSourceFileByClassName(sa.getDeserializerClassName(), javaFiles);
+            if (src != null) stepSourceFiles.add(src);
+        }
+
+        // For each source file, find referenced helper classes with Nimbus functions
+        Set<String> alreadyScanned = new HashSet<>();
+        for (Path srcFile : stepSourceFiles) {
+            alreadyScanned.add(javaSourceAnalyzer.extractSimpleClassName(srcFile));
+        }
+
+        for (Path srcFile : stepSourceFiles) {
+            Set<String> refs = javaSourceAnalyzer.findReferencedClassNames(srcFile, candidateClasses);
+            for (String refClass : refs) {
+                if (!alreadyScanned.contains(refClass)) {
+                    alreadyScanned.add(refClass);
+                    List<String> helperFuncs = nimbusFuncIndex.get(refClass);
+                    for (String func : helperFuncs) {
+                        if (!sa.getNimbusFunctions().contains(func)) {
+                            sa.getNimbusFunctions().add(func);
+                            log.info("    Found Nimbus function '{}' via helper class '{}'", func, refClass);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void analyzeDeserializer(String deserializerId, StepAnalysis sa,
