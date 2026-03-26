@@ -66,11 +66,16 @@ public class BatchAnalysisOrchestrator {
         // Phase 3: Resolve @Nimba annotations
         Map<String, String> nimbaIdMap = annotationResolver.resolveAll(files.getJavaSourceFiles());
 
-        // Phase 4: Analyze each job XML
+        // Phase 4: Analyze each job XML + generate per-job summary
         List<AnalysisResult> jobResults = new ArrayList<>();
         for (Path jobXml : files.getJobXmlFiles()) {
             try {
                 AnalysisResult result = analyzeJob(jobXml, files.getJavaSourceFiles(), nimbaIdMap);
+
+                // Generate job-level summary via LLM
+                String jobSummary = summaryGenerator.generateJobSummary(result);
+                result.setJobSummary(jobSummary);
+
                 jobResults.add(result);
             } catch (Exception e) {
                 log.error("Failed to analyze job XML {}: {}", jobXml, e.getMessage());
@@ -83,10 +88,6 @@ public class BatchAnalysisOrchestrator {
         report.setAnalyzedAt(LocalDateTime.now());
         report.setWasDependencies(wasDeps);
         report.setJobAnalyses(jobResults);
-
-        // Phase 6: Generate project summary using LLM
-        String summary = summaryGenerator.generateSummary(report);
-        report.setProjectSummary(summary);
 
         log.info("Analysis complete: {} jobs analyzed", jobResults.size());
         return report;
@@ -197,6 +198,18 @@ public class BatchAnalysisOrchestrator {
                         if (!dsNames.isEmpty()) {
                             sa.getDatasourceNames().addAll(dsNames);
                         }
+
+                        // Static analysis: Nimbus function calls in custom reader
+                        List<String> readerFuncs = javaSourceAnalyzer.findNimbusFunctionCalls(src);
+                        if (!readerFuncs.isEmpty()) {
+                            sa.getNimbusFunctions().addAll(readerFuncs);
+                        }
+
+                        // Static analysis: SQL queries in custom reader
+                        List<String> readerSql = javaSourceAnalyzer.findSqlQueries(src);
+                        if (!readerSql.isEmpty()) {
+                            sa.getSqlQueries().addAll(readerSql);
+                        }
                     }
                 }
             }
@@ -220,6 +233,18 @@ public class BatchAnalysisOrchestrator {
                     List<String> dsNames = javaSourceAnalyzer.findDatasourceNames(procSource);
                     if (!dsNames.isEmpty()) {
                         sa.getDatasourceNames().addAll(dsNames);
+                    }
+
+                    // Static analysis: Nimbus function calls in processor
+                    List<String> procFuncs = javaSourceAnalyzer.findNimbusFunctionCalls(procSource);
+                    if (!procFuncs.isEmpty()) {
+                        sa.getNimbusFunctions().addAll(procFuncs);
+                    }
+
+                    // Static analysis: SQL queries in processor
+                    List<String> procSql = javaSourceAnalyzer.findSqlQueries(procSource);
+                    if (!procSql.isEmpty()) {
+                        sa.getSqlQueries().addAll(procSql);
                     }
 
                     // LLM analysis
@@ -254,6 +279,18 @@ public class BatchAnalysisOrchestrator {
             sa.setDeserializerFunctionCalls(calls);
             sa.setDeserializerMakesFunctionCalls(!calls.isEmpty());
             sa.setDeserializerInsight(analyzeLlm(source, className, "deserializer"));
+
+            // Static analysis: Nimbus function calls in deserializer
+            List<String> desFuncs = javaSourceAnalyzer.findNimbusFunctionCalls(source);
+            if (!desFuncs.isEmpty()) {
+                sa.getNimbusFunctions().addAll(desFuncs);
+            }
+
+            // Static analysis: SQL queries in deserializer
+            List<String> desSql = javaSourceAnalyzer.findSqlQueries(source);
+            if (!desSql.isEmpty()) {
+                sa.getSqlQueries().addAll(desSql);
+            }
         }
     }
 

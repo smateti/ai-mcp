@@ -32,6 +32,12 @@ public class JavaSourceAnalyzer {
             "new\\s+NimbusDatabaseHelperImpl\\s*\\(\\s*(\\w+|\"[^\"]+\")\\s*\\)");
     private static final Pattern VARIABLE_ASSIGN = Pattern.compile(
             "(\\w+)\\s*=\\s*\"([^\"]+)\"");
+    private static final Pattern NIMBUS_FUNCTION_IMPORT = Pattern.compile(
+            "import\\s+gov\\.nystax\\.nimbus\\.function\\.client\\.(\\w+Function)");
+    private static final Pattern NIMBUS_FUNCTION_CALL = Pattern.compile(
+            "(\\w+Function)\\.execute\\s*\\(");
+    private static final Pattern SQL_QUERY_PATTERN = Pattern.compile(
+            "(?:executeQuery|executeUpdate|prepareStatement|prepareCall)\\s*\\(\\s*\"([^\"]+)\"");
 
     public List<BatchExitUsage> findBatchExitUsages(List<Path> javaFiles) {
         List<BatchExitUsage> usages = new ArrayList<>();
@@ -134,6 +140,79 @@ public class JavaSourceAnalyzer {
             log.warn("Failed to read file for datasource analysis: {}", javaFile);
         }
         return dsNames;
+    }
+
+    /**
+     * Finds Nimbus function calls (e.g., SendEmailFunction.execute(...)) in a Java source file.
+     * Only considers functions imported from gov.nystax.nimbus.function.client.
+     * Skips commented-out lines. Returns function names without the "Function" suffix.
+     */
+    public List<String> findNimbusFunctionCalls(Path javaFile) {
+        List<String> functions = new ArrayList<>();
+        try {
+            String content = Files.readString(javaFile);
+
+            // Collect imported Nimbus function classes
+            java.util.Set<String> importedFunctions = new java.util.HashSet<>();
+            Matcher importMatcher = NIMBUS_FUNCTION_IMPORT.matcher(content);
+            while (importMatcher.find()) {
+                importedFunctions.add(importMatcher.group(1));
+            }
+            if (importedFunctions.isEmpty()) {
+                return functions;
+            }
+
+            // Find active (non-commented) function calls
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+
+                Matcher callMatcher = NIMBUS_FUNCTION_CALL.matcher(line);
+                while (callMatcher.find()) {
+                    String funcClass = callMatcher.group(1);
+                    if (importedFunctions.contains(funcClass)) {
+                        // Strip "Function" suffix to get Nimbus function name
+                        String funcName = funcClass.endsWith("Function")
+                                ? funcClass.substring(0, funcClass.length() - 8)
+                                : funcClass;
+                        if (!functions.contains(funcName)) {
+                            functions.add(funcName);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read file for Nimbus function analysis: {}", javaFile);
+        }
+        return functions;
+    }
+
+    /**
+     * Finds SQL queries in Java source from executeQuery(), executeUpdate(),
+     * prepareStatement(), and prepareCall() calls with inline string literals.
+     */
+    public List<String> findSqlQueries(Path javaFile) {
+        List<String> queries = new ArrayList<>();
+        try {
+            String content = Files.readString(javaFile);
+            String[] lines = content.split("\n");
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
+
+                Matcher m = SQL_QUERY_PATTERN.matcher(line);
+                while (m.find()) {
+                    String sql = m.group(1).trim();
+                    if (!queries.contains(sql)) {
+                        queries.add(sql);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read file for SQL query analysis: {}", javaFile);
+        }
+        return queries;
     }
 
     private BatchExitUsage parseBatchExitArgs(String className, int lineNumber, String args) {

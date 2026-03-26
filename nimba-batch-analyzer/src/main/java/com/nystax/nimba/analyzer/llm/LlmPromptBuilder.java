@@ -64,9 +64,11 @@ public class LlmPromptBuilder {
                    - What conditions or branches affect the logic?
                    - What is the final result or side effect?
                 3. CONDITIONAL_LOGIC: Does this processor handle different record types or conditions \
-                differently? For each condition or record type, describe what happens and which \
-                function calls are made. Use this format for each:
-                   IF <condition/record type> THEN <action and function calls made>
+                differently? Pay special attention to Nimbus function calls (classes ending in \
+                "Function" with .execute() calls from gov.nystax.nimbus.function.client). \
+                For each condition or record type, describe what happens and which \
+                Nimbus function calls or other service calls are made. Use this format for each:
+                   IF <condition/record type> THEN <action and Nimbus function/service calls made>
                    If there is no conditional processing, say "None - processes all records uniformly".
                 4. DATA_TRANSFORMATIONS: What data transformations occur?
                    - Object-to-object mappings
@@ -187,56 +189,52 @@ public class LlmPromptBuilder {
                 """, className, truncateSource(sourceCode));
     }
 
-    public String buildProjectSummaryPrompt(String analysisData) {
+    public String buildJobSummaryPrompt(String jobAnalysisData) {
         return String.format("""
-                Based on the following analysis data from a Nimba batch project, write a comprehensive \
-                project documentation in Markdown format.
+                Based on the following analysis data for a single Nimba batch job, write a concise \
+                job-level summary in Markdown format. Do NOT include top-level headings (no # or ##).
 
-                The document MUST include these sections with detailed content:
+                The summary MUST cover:
 
-                1. **Project Overview** - What this batch application does, its purpose, and the \
-                business domain it serves. Summarize the overall architecture (number of jobs, \
-                types of processing).
+                1. **Purpose** - What this job does in 2-3 sentences. Describe the business function.
 
-                2. **Job Flow Summary** - For EACH job, provide a plain-English narrative of the \
-                complete step-by-step flow. Describe what happens when the job starts, what each \
-                step does, how data flows between steps, and how the job completes. Include what \
-                conditions trigger different function calls. Group related jobs if they share patterns.
+                2. **Nimbus Function Calls** (HIGH PRIORITY) - This is the most important section. \
+                Nimbus functions contain the core business logic of the application. For EACH Nimbus \
+                function call found (marked as "NIMBUS FUNCTIONS CALLED" in the data):
+                   - Which step calls the function and what class makes the call
+                   - What conditions or record types trigger the function call
+                   - What data/parameters are passed to the function
+                   - What the function does (e.g., sends email, posts payment, queries profile)
+                   - If a step has conditional logic, describe EXACTLY which conditions lead to \
+                     which Nimbus function calls (e.g., "IF record type is X, THEN call FunctionA; \
+                     IF record type is Y, THEN call FunctionB")
+                If no Nimbus functions are called, write "None".
 
-                3. **Data Flow** - Describe the complete data pipeline:
-                   - Input sources (files, databases, APIs)
-                   - Data formats and record structures
-                   - Transformation chain through each step
-                   - Output destinations and formats
+                3. **Step-by-Step Flow** - A plain-English narrative of the complete flow. \
+                Describe what happens when the job starts, what each step does in sequence, \
+                how data flows between steps (especially when a processor reads from another step's \
+                output or input via the source attribute), and how the job completes. \
+                Emphasize which steps invoke Nimbus functions and under what conditions.
 
-                4. **External Integrations** - For each WAS function dependency:
-                   - What service it connects to
-                   - Which jobs/steps use it
-                   - What data is sent and received
-                   - Purpose of the integration
+                4. **Data Flow** - Input sources (files, databases, APIs), data formats, \
+                transformations through each step, datasource names used, and output destinations.
 
-                5. **Error Handling Strategy** - Comprehensive error handling documentation:
-                   - Error thresholds per step and their implications
-                   - BatchExitException usage with status codes and meanings
-                   - failOnError settings and their impact
-                   - Recovery and resume capabilities
+                5. **External Integrations** - Other WAS function/service calls beyond Nimbus functions. \
+                Write "None" if no additional external calls.
 
-                6. **Operational Details** - Runtime and deployment information:
-                   - File archival configuration
-                   - Parallelism settings and thread usage
-                   - Resume capability and checkpoint behavior
-                   - Configuration parameters and their purposes
+                6. **Error Handling** - Error thresholds, BatchExitException usages with status codes, \
+                failOnError settings, and resume/recovery behavior.
 
-                7. **Technical Notes** - Any notable patterns, potential issues, or recommendations \
-                observed across the codebase.
+                7. **Operational Details** - Parallelism settings, resume capability, file archival, \
+                and notable configuration parameters.
 
-                Write it as a readable technical document for someone unfamiliar with the project. \
-                Use clear headings, bullet points, and tables where appropriate. \
-                Be specific -- reference actual class names, job IDs, and step IDs.
+                Write it as a readable narrative for someone unfamiliar with the job. \
+                Use bullet points where appropriate. Be specific -- reference actual class names and step IDs. \
+                Give the highest importance and detail to Nimbus function calls and the conditions that trigger them.
 
-                Analysis data:
+                Job analysis data:
                 %s
-                """, truncateSource(analysisData));
+                """, truncateSource(jobAnalysisData));
     }
 
     private String truncateSource(String source) {

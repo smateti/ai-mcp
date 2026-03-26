@@ -19,6 +19,8 @@ public class StepAnalysis {
     private String processErrorThreshold;
     private LlmInsight readerInsight;
     private List<String> datasourceNames = new ArrayList<>();
+    private List<String> nimbusFunctions = new ArrayList<>();
+    private List<String> sqlQueries = new ArrayList<>();
 
     public StepDefinition getStepDefinition() { return stepDefinition; }
     public void setStepDefinition(StepDefinition stepDefinition) { this.stepDefinition = stepDefinition; }
@@ -48,4 +50,8 @@ public class StepAnalysis {
     public void setReaderInsight(LlmInsight readerInsight) { this.readerInsight = readerInsight; }
     public List<String> getDatasourceNames() { return datasourceNames; }
     public void setDatasourceNames(List<String> datasourceNames) { this.datasourceNames = datasourceNames; }
+    public List<String> getNimbusFunctions() { return nimbusFunctions; }
+    public void setNimbusFunctions(List<String> nimbusFunctions) { this.nimbusFunctions = nimbusFunctions; }
+    public List<String> getSqlQueries() { return sqlQueries; }
+    public void setSqlQueries(List<String> sqlQueries) { this.sqlQueries = sqlQueries; }
 }

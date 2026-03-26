@@ -10,6 +10,7 @@ public class AnalysisResult {
     private List<BatchExitUsage> batchExitUsages = new ArrayList<>();
     private String jobListenerClassName;
     private LlmInsight jobListenerInsight;
+    private String jobSummary;
 
     public JobDefinition getJobDefinition() { return jobDefinition; }
     public void setJobDefinition(JobDefinition jobDefinition) { this.jobDefinition = jobDefinition; }
@@ -21,4 +22,6 @@ public class AnalysisResult {
     public void setJobListenerClassName(String jobListenerClassName) { this.jobListenerClassName = jobListenerClassName; }
     public LlmInsight getJobListenerInsight() { return jobListenerInsight; }
     public void setJobListenerInsight(LlmInsight jobListenerInsight) { this.jobListenerInsight = jobListenerInsight; }
+    public String getJobSummary() { return jobSummary; }
+    public void setJobSummary(String jobSummary) { this.jobSummary = jobSummary; }
 }

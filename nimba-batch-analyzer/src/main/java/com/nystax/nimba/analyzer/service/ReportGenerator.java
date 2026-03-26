@@ -4,12 +4,17 @@ import com.nystax.nimba.analyzer.model.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 @Component
 public class ReportGenerator {
+
+    private static final Logger log = LoggerFactory.getLogger(ReportGenerator.class);
 
     @Value("${nimba.analyzer.report-output-dir:./reports}")
     private String reportOutputDir;
@@ -45,6 +50,10 @@ public class ReportGenerator {
                 System.out.printf("  Step %d: %s [%s] parallelism=%s failOnError=%s%n",
                         stepNum++, step.getStepId(), step.getStepType(),
                         step.getParallelism(), step.isFailOnError());
+
+                if (!sa.getNimbusFunctions().isEmpty()) {
+                    System.out.println("    Nimbus Functions: " + String.join(", ", sa.getNimbusFunctions()));
+                }
 
                 if (step.getReader() != null) {
                     ReaderDefinition r = step.getReader();
@@ -94,6 +103,13 @@ public class ReportGenerator {
                 if (!sa.getDatasourceNames().isEmpty()) {
                     System.out.println("    Datasource(s): " + String.join(", ", sa.getDatasourceNames()));
                 }
+
+                if (!sa.getSqlQueries().isEmpty()) {
+                    System.out.println("    SQL Queries:");
+                    for (String sql : sa.getSqlQueries()) {
+                        System.out.println("      - " + sql);
+                    }
+                }
             }
 
             if (!job.getBatchExitUsages().isEmpty()) {
@@ -116,19 +132,13 @@ public class ReportGenerator {
         String projectName = Path.of(report.getProjectPath()).getFileName().toString();
         Path outputFile = outputDir.resolve(projectName + "-report.md");
 
+        // Write individual {jobId}.md files
+        writeJobFiles(report, outputDir);
+
         StringBuilder md = new StringBuilder();
         md.append("# Nimba Batch Analysis Report\n\n");
         md.append("**Project**: ").append(report.getProjectPath()).append("  \n");
         md.append("**Analyzed**: ").append(report.getAnalyzedAt()).append("\n\n");
-
-        // Project Summary (merged from SummaryDocumentGenerator)
-        if (report.getProjectSummary() != null && !report.getProjectSummary().isBlank()) {
-            md.append("---\n\n");
-            md.append(report.getProjectSummary());
-            md.append("\n\n---\n\n");
-        }
-
-        md.append("# Detailed Step Analysis\n\n");
 
         // WAS Dependencies
         if (!report.getWasDependencies().isEmpty()) {
@@ -157,6 +167,13 @@ public class ReportGenerator {
             }
             md.append("\n");
 
+            // Job-level LLM summary
+            if (job.getJobSummary() != null && !job.getJobSummary().isBlank()) {
+                md.append("### Summary\n\n");
+                md.append(job.getJobSummary());
+                md.append("\n\n");
+            }
+
             // Job Listener insight
             if (job.getJobListenerInsight() != null) {
                 md.append("### Job Listener: ").append(job.getJobListenerClassName()).append("\n\n");
@@ -170,7 +187,20 @@ public class ReportGenerator {
                 md.append("### Step ").append(stepNum++).append(": ").append(step.getStepId()).append("\n\n");
                 md.append("- **Type**: ").append(step.getStepType()).append("\n");
                 md.append("- **Parallelism**: ").append(step.getParallelism()).append("\n");
-                md.append("- **Fail On Error**: ").append(step.isFailOnError()).append("\n\n");
+                md.append("- **Fail On Error**: ").append(step.isFailOnError()).append("\n");
+                if (!sa.getNimbusFunctions().isEmpty()) {
+                    md.append("- **Nimbus Functions**: ").append(String.join(", ", sa.getNimbusFunctions())).append("\n");
+                }
+                if (!sa.getDatasourceNames().isEmpty()) {
+                    md.append("- **Data Sources**: ").append(String.join(", ", sa.getDatasourceNames())).append("\n");
+                }
+                if (!sa.getSqlQueries().isEmpty()) {
+                    md.append("- **SQL Queries**:\n");
+                    for (String sql : sa.getSqlQueries()) {
+                        md.append("  - `").append(sql).append("`\n");
+                    }
+                }
+                md.append("\n");
 
                 // Reader
                 if (step.getReader() != null) {
@@ -233,9 +263,6 @@ public class ReportGenerator {
                     if (sa.getProcessErrorThreshold() != null) {
                         md.append("\n**Error Threshold**: ").append(sa.getProcessErrorThreshold()).append("\n");
                     }
-                    if (!sa.getDatasourceNames().isEmpty()) {
-                        md.append("\n**Datasource(s)**: ").append(String.join(", ", sa.getDatasourceNames())).append("\n");
-                    }
                     md.append("\n");
                 }
             }
@@ -258,6 +285,146 @@ public class ReportGenerator {
 
         Files.writeString(outputFile, md.toString());
         return outputFile;
+    }
+
+    private void writeJobFiles(ProjectAnalysisReport report, Path outputDir) throws IOException {
+        for (AnalysisResult job : report.getJobAnalyses()) {
+            String jobId = job.getJobDefinition().getJobId();
+            Path jobFile = outputDir.resolve(jobId + ".md");
+
+            StringBuilder jmd = new StringBuilder();
+            jmd.append("# Job: ").append(jobId).append("\n\n");
+            jmd.append("**Project**: ").append(report.getProjectPath()).append("  \n");
+            jmd.append("**Analyzed**: ").append(report.getAnalyzedAt()).append("\n\n");
+
+            JobDefinition jd = job.getJobDefinition();
+            jmd.append("- **Resumable**: ").append(jd.isResumable()).append("\n");
+            jmd.append("- **Archive Files**: ").append(jd.isArchiveFiles()).append("\n");
+            jmd.append("- **Steps**: ").append(jd.getSteps().size()).append("\n");
+            if (job.getJobListenerClassName() != null) {
+                jmd.append("- **Job Listener**: ").append(jd.getJobListenerId())
+                        .append(" (").append(job.getJobListenerClassName()).append(")\n");
+            }
+            jmd.append("\n");
+
+            // Job summary
+            if (job.getJobSummary() != null && !job.getJobSummary().isBlank()) {
+                jmd.append("## Summary\n\n");
+                jmd.append(job.getJobSummary());
+                jmd.append("\n\n");
+            }
+
+            jmd.append("## Detailed Step Analysis\n\n");
+
+            // Job Listener insight
+            if (job.getJobListenerInsight() != null) {
+                jmd.append("### Job Listener: ").append(job.getJobListenerClassName()).append("\n\n");
+                appendLlmInsight(jmd, job.getJobListenerInsight());
+                jmd.append("\n");
+            }
+
+            int stepNum = 1;
+            for (StepAnalysis sa : job.getStepAnalyses()) {
+                StepDefinition step = sa.getStepDefinition();
+                jmd.append("### Step ").append(stepNum++).append(": ").append(step.getStepId()).append("\n\n");
+                jmd.append("- **Type**: ").append(step.getStepType()).append("\n");
+                jmd.append("- **Parallelism**: ").append(step.getParallelism()).append("\n");
+                jmd.append("- **Fail On Error**: ").append(step.isFailOnError()).append("\n");
+                if (!sa.getNimbusFunctions().isEmpty()) {
+                    jmd.append("- **Nimbus Functions**: ").append(String.join(", ", sa.getNimbusFunctions())).append("\n");
+                }
+                if (!sa.getDatasourceNames().isEmpty()) {
+                    jmd.append("- **Data Sources**: ").append(String.join(", ", sa.getDatasourceNames())).append("\n");
+                }
+                if (!sa.getSqlQueries().isEmpty()) {
+                    jmd.append("- **SQL Queries**:\n");
+                    for (String sql : sa.getSqlQueries()) {
+                        jmd.append("  - `").append(sql).append("`\n");
+                    }
+                }
+                jmd.append("\n");
+
+                // Reader
+                if (step.getReader() != null) {
+                    ReaderDefinition r = step.getReader();
+                    jmd.append("#### Reader\n\n");
+                    jmd.append("- **ID**: ").append(r.getReaderId()).append("\n");
+                    jmd.append("- **Type**: ").append(r.getReaderType()).append("\n");
+                    if (!r.getParameters().isEmpty()) {
+                        jmd.append("- **Parameters**: ");
+                        r.getParameters().forEach((k, v) -> jmd.append(k).append("=").append(v).append(", "));
+                        jmd.setLength(jmd.length() - 2);
+                        jmd.append("\n");
+                    }
+                    if (sa.getFileFormat() != null) {
+                        jmd.append("- **File Format**: ").append(sa.getFileFormat()).append("\n");
+                    }
+                    jmd.append("\n");
+                    if (sa.getReaderInsight() != null) {
+                        jmd.append("#### Custom Reader Analysis\n\n");
+                        appendLlmInsight(jmd, sa.getReaderInsight());
+                        jmd.append("\n");
+                    }
+                } else {
+                    jmd.append("#### Reader\n\nNo reader - **Custom Step** (single-threaded)\n\n");
+                }
+
+                // Deserializer
+                if (sa.isHasDeserializer()) {
+                    jmd.append("#### Deserializer: ").append(sa.getDeserializerClassName()).append("\n\n");
+                    appendLlmInsight(jmd, sa.getDeserializerInsight());
+                    if (sa.isDeserializerMakesFunctionCalls()) {
+                        jmd.append("**Function Calls**:\n");
+                        for (FunctionCallInfo fc : sa.getDeserializerFunctionCalls()) {
+                            jmd.append("- ").append(fc.getClientClassName()).append(".")
+                                    .append(fc.getMethodCalled()).append("()\n");
+                        }
+                    }
+                    jmd.append("\n");
+                }
+
+                // Processor
+                if (sa.getProcessorClassName() != null) {
+                    jmd.append("#### Processor: ").append(sa.getProcessorClassName()).append("\n\n");
+                    if (step.getProcessor() != null && step.getProcessor().getSource() != null) {
+                        String src = step.getProcessor().getSource();
+                        jmd.append("- **Data Source**: `").append(src).append("` — reads from ")
+                                .append(describeSource(src)).append("\n\n");
+                    }
+                    appendLlmInsight(jmd, sa.getProcessorInsight());
+                    if (sa.isProcessorMakesFunctionCalls()) {
+                        jmd.append("**Static Analysis - Function Calls**:\n");
+                        for (FunctionCallInfo fc : sa.getProcessorFunctionCalls()) {
+                            jmd.append("- ").append(fc.getClientClassName()).append(".")
+                                    .append(fc.getMethodCalled()).append("() (line ")
+                                    .append(fc.getLineNumber()).append(")\n");
+                        }
+                    }
+                    if (sa.getProcessErrorThreshold() != null) {
+                        jmd.append("\n**Error Threshold**: ").append(sa.getProcessErrorThreshold()).append("\n");
+                    }
+                    jmd.append("\n");
+                }
+            }
+
+            // BatchExitException
+            if (!job.getBatchExitUsages().isEmpty()) {
+                jmd.append("### BatchExitException Usages\n\n");
+                jmd.append("| Class | Line | Status | Message |\n");
+                jmd.append("|-------|------|--------|--------|\n");
+                for (BatchExitUsage exit : job.getBatchExitUsages()) {
+                    jmd.append("| ").append(exit.getClassName())
+                            .append(" | ").append(exit.getLineNumber())
+                            .append(" | ").append(exit.getStatusCode())
+                            .append(" | ").append(exit.getMessage())
+                            .append(" |\n");
+                }
+                jmd.append("\n");
+            }
+
+            Files.writeString(jobFile, jmd.toString());
+            log.info("  Written job report: {}", jobFile.getFileName());
+        }
     }
 
     private void appendLlmInsight(StringBuilder md, LlmInsight insight) {
