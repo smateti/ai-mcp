@@ -1,0 +1,84 @@
+###############################################################################
+# 01-scc.yaml — SecurityContextConstraints for Conjur components
+#
+# OpenShift uses SCCs instead of PodSecurityPolicies/Standards.
+# Conjur and PostgreSQL need specific UID/filesystem permissions.
+#
+# Apply with: oc apply -f 01-scc.yaml   (requires cluster-admin)
+###############################################################################
+
+# --- SCC for PostgreSQL (needs specific UID 999 for postgres user) ---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: conjur-postgres-scc
+  annotations:
+    kubernetes.io/description: "SCC for Conjur PostgreSQL - allows UID 999"
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 999
+    max: 999
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- ALL
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMin: 999
+  uidRangeMax: 999
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+  - min: 999
+    max: 999
+volumes:
+- configMap
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret
+---
+# --- SCC for Conjur server (runs as root inside container) ---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: conjur-server-scc
+  annotations:
+    kubernetes.io/description: "SCC for Conjur OSS server - allows root UID"
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: RunAsAny
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- MKNOD
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+volumes:
+- configMap
+- emptyDir
+- persistentVolumeClaim
+- projected
+- secret

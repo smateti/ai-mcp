@@ -1,0 +1,6 @@
+com\example\propset\health\AppLivenessCheck.class
+com\example\propset\model\DatasourceConfig.class
+com\example\propset\rest\PropSetResource.class
+com\example\propset\PropSetApplication.class
+com\example\propset\service\ConfigMapPublisher.class
+com\example\propset\rest\RootResource.class

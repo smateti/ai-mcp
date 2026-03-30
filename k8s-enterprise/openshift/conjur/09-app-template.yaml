@@ -1,0 +1,197 @@
+###############################################################################
+# 09-app-template.yaml — OpenShift Template for onboarding microservices
+#
+# This template generates a Deployment + Service + Route for any
+# MicroProfile app that consumes Conjur secrets via the shared library.
+#
+# Usage:
+#   oc process -f 09-app-template.yaml \
+#     -p APP_NAME=order-service \
+#     -p NAMESPACE=apps \
+#     -p IMAGE=image-registry.openshift-image-registry.svc:5000/apps/order-service:latest \
+#     -p DATABASES=orderdb \
+#     -p EXTRA_SECRETS="smtp.password=creds/smtp-pwd" \
+#     -p NODE_PORT="" \
+#   | oc apply -f -
+#
+# Or from the OpenShift Console: Catalog → Developer Catalog → "Conjur App"
+###############################################################################
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: conjur-microprofile-app
+  namespace: apps
+  labels:
+    app.kubernetes.io/part-of: conjur
+  annotations:
+    openshift.io/display-name: "Conjur MicroProfile Application"
+    openshift.io/description: >-
+      Deploy a MicroProfile microservice integrated with CyberArk Conjur OSS
+      for automatic secret injection via the conjur-microprofile-lib shared library.
+    tags: "conjur,microprofile,liberty,java"
+    iconClass: "icon-java"
+parameters:
+- name: APP_NAME
+  displayName: Application Name
+  description: "Name of the microservice (lowercase, hyphen-separated)"
+  required: true
+- name: NAMESPACE
+  displayName: Namespace
+  description: "OpenShift namespace/project to deploy into"
+  value: "apps"
+  required: true
+- name: IMAGE
+  displayName: Container Image
+  description: "Full image path (e.g., image-registry.openshift-image-registry.svc:5000/apps/myapp:latest)"
+  required: true
+- name: REPLICAS
+  displayName: Replicas
+  description: "Number of pod replicas"
+  value: "1"
+- name: DATABASES
+  displayName: Databases
+  description: "Comma-separated database names this app uses (e.g., orderdb,cachedb)"
+  value: ""
+- name: EXTRA_SECRETS
+  displayName: Extra Secrets
+  description: "Comma-separated extra secret mappings (e.g., smtp.password=creds/smtp-pwd)"
+  value: ""
+- name: MEMORY_REQUEST
+  displayName: Memory Request
+  value: "256Mi"
+- name: MEMORY_LIMIT
+  displayName: Memory Limit
+  value: "512Mi"
+- name: CPU_REQUEST
+  displayName: CPU Request
+  value: "200m"
+- name: CPU_LIMIT
+  displayName: CPU Limit
+  value: "500m"
+- name: ROUTE_HOSTNAME
+  displayName: Route Hostname
+  description: "Custom hostname for the Route (leave empty for auto-generated)"
+  value: ""
+objects:
+# --- Deployment ---
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: "${APP_NAME}"
+    namespace: "${NAMESPACE}"
+    labels:
+      app: "${APP_NAME}"
+      app.kubernetes.io/name: "${APP_NAME}"
+      app.kubernetes.io/part-of: enterprise-apps
+      app.kubernetes.io/managed-by: conjur-template
+  spec:
+    replicas: "${{REPLICAS}}"
+    selector:
+      matchLabels:
+        app: "${APP_NAME}"
+    template:
+      metadata:
+        labels:
+          app: "${APP_NAME}"
+          app.kubernetes.io/name: "${APP_NAME}"
+      spec:
+        containers:
+        - name: "${APP_NAME}"
+          image: "${IMAGE}"
+          imagePullPolicy: Always
+          ports:
+          - name: http
+            containerPort: 9080
+            protocol: TCP
+          env:
+          # --- Conjur identity from per-app K8s Secret ---
+          - name: CONJUR_APPLIANCE_URL
+            valueFrom:
+              secretKeyRef:
+                name: "conjur-${APP_NAME}"
+                key: CONJUR_APPLIANCE_URL
+                optional: true
+          - name: CONJUR_ACCOUNT
+            valueFrom:
+              secretKeyRef:
+                name: "conjur-${APP_NAME}"
+                key: CONJUR_ACCOUNT
+                optional: true
+          - name: CONJUR_AUTHN_LOGIN
+            valueFrom:
+              secretKeyRef:
+                name: "conjur-${APP_NAME}"
+                key: CONJUR_AUTHN_LOGIN
+                optional: true
+          - name: CONJUR_AUTHN_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "conjur-${APP_NAME}"
+                key: CONJUR_AUTHN_API_KEY
+                optional: true
+          # --- Secret mapping (built by onboarding script/API) ---
+          - name: CONJUR_SECRETS
+            value: "${DATABASES},${EXTRA_SECRETS}"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9080
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: "${MEMORY_REQUEST}"
+              cpu: "${CPU_REQUEST}"
+            limits:
+              memory: "${MEMORY_LIMIT}"
+              cpu: "${CPU_LIMIT}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+# --- Service ---
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${APP_NAME}"
+    namespace: "${NAMESPACE}"
+    labels:
+      app: "${APP_NAME}"
+      app.kubernetes.io/name: "${APP_NAME}"
+  spec:
+    type: ClusterIP
+    selector:
+      app: "${APP_NAME}"
+    ports:
+    - name: http
+      port: 9080
+      targetPort: 9080
+      protocol: TCP
+# --- Route ---
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: "${APP_NAME}"
+    namespace: "${NAMESPACE}"
+    labels:
+      app: "${APP_NAME}"
+      app.kubernetes.io/name: "${APP_NAME}"
+  spec:
+    host: "${ROUTE_HOSTNAME}"
+    to:
+      kind: Service
+      name: "${APP_NAME}"
+      weight: 100
+    port:
+      targetPort: http
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+    wildcardPolicy: None

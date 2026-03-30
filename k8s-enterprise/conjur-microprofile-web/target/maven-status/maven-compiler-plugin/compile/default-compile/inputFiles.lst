@@ -1,0 +1,10 @@
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\ConjurApiClient.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\model\AppRegistration.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\model\DbCredentials.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\model\PolicyResult.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\model\SecretEntry.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\client\model\StatusInfo.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\ConjurWebApplication.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\health\AppLivenessCheck.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\rest\ApiProxyResource.java
+D:\apps\ws\ws28\k8s-enterprise\conjur-microprofile-web\src\main\java\com\example\conjur\web\rest\PageResource.java

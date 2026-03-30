@@ -1,0 +1,100 @@
+###############################################################################
+# 03-rbac.yaml — RBAC for Conjur components on OpenShift
+#
+# - SCC bindings (requires cluster-admin to apply)
+# - Role/RoleBinding for conjur-rest-sa to manage K8s Secrets in apps ns
+# - ClusterRole for cross-namespace secret management (optional, for bulk
+#   onboarding apps across multiple namespaces)
+###############################################################################
+
+# --- Bind PostgreSQL SA to its SCC ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: conjur-postgres-scc-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:conjur-postgres-scc
+subjects:
+- kind: ServiceAccount
+  name: conjur-postgres-sa
+  namespace: conjur-system
+---
+# --- Bind Conjur Server SA to its SCC ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: conjur-server-scc-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:conjur-server-scc
+subjects:
+- kind: ServiceAccount
+  name: conjur-server-sa
+  namespace: conjur-system
+---
+# --- Role: conjur-rest can manage Secrets in apps namespace ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: conjur-secret-manager
+  namespace: apps
+  labels:
+    app.kubernetes.io/part-of: conjur
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+# --- RoleBinding: conjur-rest-sa → conjur-secret-manager ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conjur-rest-secret-manager
+  namespace: apps
+  labels:
+    app.kubernetes.io/part-of: conjur
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: conjur-secret-manager
+subjects:
+- kind: ServiceAccount
+  name: conjur-rest-sa
+  namespace: apps
+---
+###############################################################################
+# OPTIONAL: Cross-namespace secret management
+#
+# If you bulk-onboard apps across multiple namespaces (e.g., apps, staging,
+# team-a, team-b), uncomment the ClusterRole + bindings below so that
+# conjur-rest-sa can create Secrets in any namespace.
+#
+# For single-namespace deployments, the Role above is sufficient.
+###############################################################################
+#
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: conjur-cross-namespace-secret-manager
+#   labels:
+#     app.kubernetes.io/part-of: conjur
+# rules:
+# - apiGroups: [""]
+#   resources: ["secrets"]
+#   verbs: ["get", "list", "create", "update", "patch"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: conjur-rest-cross-namespace
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: conjur-cross-namespace-secret-manager
+# subjects:
+# - kind: ServiceAccount
+#   name: conjur-rest-sa
+#   namespace: apps

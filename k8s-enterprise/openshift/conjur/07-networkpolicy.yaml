@@ -1,0 +1,134 @@
+###############################################################################
+# 07-networkpolicy.yaml — NetworkPolicies for Conjur on OpenShift
+#
+# Restricts network access following least-privilege:
+# - PostgreSQL: only accepts connections from Conjur server
+# - Conjur server: accepts from apps namespace + OpenShift Routes
+# - Conjur REST API: accepts from web UI + apps namespace + Routes
+# - Conjur Web UI: accepts from OpenShift Routes (ingress) only
+#
+# OpenShift's SDN/OVN-Kubernetes enforces these automatically.
+###############################################################################
+
+# --- PostgreSQL: only Conjur server can connect ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conjur-postgres-access
+  namespace: conjur-system
+  labels:
+    app.kubernetes.io/part-of: conjur
+spec:
+  podSelector:
+    matchLabels:
+      app: conjur-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: conjur-server
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# --- Conjur Server: accepts from apps namespace + admin apps ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conjur-server-access
+  namespace: conjur-system
+  labels:
+    app.kubernetes.io/part-of: conjur
+spec:
+  podSelector:
+    matchLabels:
+      app: conjur-server
+  policyTypes:
+  - Ingress
+  ingress:
+  # From apps namespace (REST API + application workloads)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          purpose: application-tier
+    ports:
+    - protocol: TCP
+      port: 80
+  # From within conjur-system (health checks, admin)
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 80
+  # From OpenShift Router (if Route is created for external access)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 80
+---
+# --- Conjur REST API: accepts from web UI + internal apps ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conjur-rest-access
+  namespace: apps
+  labels:
+    app.kubernetes.io/part-of: conjur
+spec:
+  podSelector:
+    matchLabels:
+      app: conjur-rest
+  policyTypes:
+  - Ingress
+  ingress:
+  # From conjur-web (same namespace)
+  - from:
+    - podSelector:
+        matchLabels:
+          app: conjur-web
+    ports:
+    - protocol: TCP
+      port: 9080
+  # From OpenShift Router (API access via Route)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 9080
+  # From within apps namespace (other pods calling onboard API)
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 9080
+---
+# --- Conjur Web UI: accepts from OpenShift Router only ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: conjur-web-access
+  namespace: apps
+  labels:
+    app.kubernetes.io/part-of: conjur
+spec:
+  podSelector:
+    matchLabels:
+      app: conjur-web
+  policyTypes:
+  - Ingress
+  ingress:
+  # From OpenShift Router (browser access)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: ingress
+    ports:
+    - protocol: TCP
+      port: 9080

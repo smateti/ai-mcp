@@ -1,0 +1,101 @@
+pipeline {
+    agent {
+        kubernetes {
+            label 'maven'
+            defaultContainer 'maven'
+        }
+    }
+
+    environment {
+        REGISTRY = 'localhost:30500'
+        IMAGE_NAME = 'employee-app'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('employee-app') {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+
+        stage('Integration Test') {
+            steps {
+                dir('employee-app') {
+                    sh 'mvn failsafe:integration-test failsafe:verify'
+                }
+            }
+            post {
+                always {
+                    dir('employee-app') {
+                        junit allowEmptyResults: true, testResults: '**/target/failsafe-reports/*.xml'
+                    }
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                container('docker') {
+                    dir('employee-app') {
+                        sh "docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ."
+                        sh "docker tag ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                container('docker') {
+                    sh "docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+                    sh "docker push ${REGISTRY}/${IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        stage('Deploy to K8s') {
+            steps {
+                sh """
+                    kubectl set image deployment/employee-app \
+                        employee-app=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                        -n apps
+                    kubectl rollout status deployment/employee-app -n apps --timeout=180s
+                """
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    sleep 30
+                    STATUS=$(kubectl exec deploy/employee-app -n apps -- \
+                        curl -s -o /dev/null -w "%{http_code}" http://localhost:9080/health/ready)
+                    if [ "$STATUS" = "200" ]; then
+                        echo "Smoke test PASSED"
+                    else
+                        echo "Smoke test FAILED (HTTP $STATUS)"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully. Employee App deployed to apps namespace."
+        }
+        failure {
+            echo "Pipeline failed. Check logs for details."
+        }
+    }
+}

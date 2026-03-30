@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Employee App - MicroProfile + DB2 + Conjur on Kubernetes">
+
+    <featureManager>
+        <feature>restfulWS-3.1</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>cdi-4.0</feature>
+        <feature>mpConfig-3.1</feature>
+        <feature>mpHealth-4.0</feature>
+        <feature>mpMetrics-5.1</feature>
+        <feature>mpOpenAPI-3.1</feature>
+        <feature>mpFaultTolerance-4.0</feature>
+        <feature>jdbc-4.3</feature>
+    </featureManager>
+
+    <variable name="default.http.port" defaultValue="9080"/>
+    <variable name="default.https.port" defaultValue="9443"/>
+    <variable name="app.context.root" defaultValue="/api"/>
+
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="${default.http.port}"
+                  httpsPort="${default.https.port}"
+                  host="*"/>
+
+    <webApplication location="employee-app.war" contextRoot="${app.context.root}">
+        <classloader apiTypeVisibility="+third-party"/>
+    </webApplication>
+
+    <!-- DB2 JCC JDBC library -->
+    <library id="db2Lib">
+        <fileset dir="${server.config.dir}/lib/db2" includes="*.jar"/>
+    </library>
+
+    <!-- DataSource: credentials injected at runtime from Conjur via env vars -->
+    <dataSource id="DefaultDataSource" jndiName="jdbc/appdb">
+        <jdbcDriver libraryRef="db2Lib"/>
+        <properties.db2.jcc serverName="${db.host}" portNumber="${db.port}"
+                             databaseName="${db.name}"
+                             user="${db.username}" password="${db.password}"/>
+    </dataSource>
+
+    <!-- Conjur connection (overridden by K8s Secret env vars at runtime) -->
+    <variable name="conjur.appliance.url" defaultValue="http://conjur-server.conjur-system.svc.cluster.local"/>
+    <variable name="conjur.account" defaultValue="myConjurAccount"/>
+    <variable name="conjur.authn.login" defaultValue="host/apps/liberty-app"/>
+    <variable name="conjur.authn.api.key" defaultValue="not-set"/>
+
+    <!-- DB connection defaults (overridden by ConfigMap env vars at runtime) -->
+    <variable name="db.host" defaultValue="db2.databases.svc.cluster.local"/>
+    <variable name="db.port" defaultValue="50000"/>
+    <variable name="db.name" defaultValue="empdb"/>
+    <variable name="db.username" defaultValue="db2inst1"/>
+    <variable name="db.password" defaultValue="change-me"/>
+
+</server>

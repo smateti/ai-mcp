@@ -1,0 +1,10 @@
+com\example\conjur\web\health\AppLivenessCheck.class
+com\example\conjur\web\client\ConjurApiClient.class
+com\example\conjur\web\client\model\DbCredentials.class
+com\example\conjur\web\client\model\AppRegistration.class
+com\example\conjur\web\rest\ApiProxyResource.class
+com\example\conjur\web\client\model\SecretEntry.class
+com\example\conjur\web\ConjurWebApplication.class
+com\example\conjur\web\client\model\PolicyResult.class
+com\example\conjur\web\client\model\StatusInfo.class
+com\example\conjur\web\rest\PageResource.class

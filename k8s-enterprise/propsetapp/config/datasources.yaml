@@ -1,0 +1,11 @@
+datasources:
+  - name: empdb
+    description: "Employee database on DB2"
+    configMapName: empdb-config
+    configMapNamespace: apps
+    properties:
+      db.host: "db2.databases.svc.cluster.local"
+      db.port: "50000"
+      db.name: "empdb"
+      db.conjur.uid.key: "db/empdb-uid"
+      db.conjur.pwd.key: "db/empdb-pwd"

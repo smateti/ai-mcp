@@ -1,0 +1,146 @@
+###############################################################################
+# 04-postgres.yaml — PostgreSQL for Conjur backend on OpenShift
+#
+# Uses PersistentVolumeClaim for data durability, OpenShift-compatible
+# security context, and resource limits suitable for production.
+###############################################################################
+
+# --- Secret for PostgreSQL credentials ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: conjur-postgres-secret
+  namespace: conjur-system
+  labels:
+    app: conjur-postgres
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: conjur
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "SuperSecretPg"
+  # Change this password before deploying to production!
+  # Consider using an external secret operator or vault.
+---
+# --- PersistentVolumeClaim for PostgreSQL data ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: conjur-postgres-data
+  namespace: conjur-system
+  labels:
+    app: conjur-postgres
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: conjur
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # Uncomment and set to your StorageClass if not using default:
+  # storageClassName: gp3-csi
+---
+# --- PostgreSQL Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conjur-postgres
+  namespace: conjur-system
+  labels:
+    app: conjur-postgres
+    app.kubernetes.io/name: conjur-postgres
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: conjur
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # PVC requires Recreate strategy
+  selector:
+    matchLabels:
+      app: conjur-postgres
+  template:
+    metadata:
+      labels:
+        app: conjur-postgres
+        app.kubernetes.io/name: conjur-postgres
+        app.kubernetes.io/component: postgres
+        app.kubernetes.io/part-of: conjur
+    spec:
+      serviceAccountName: conjur-postgres-sa
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+      - name: postgres
+        image: registry.redhat.io/rhel9/postgresql-15:latest
+        # Alternative: image: postgres:15
+        # If using the Red Hat image, env vars differ slightly:
+        #   POSTGRESQL_USER, POSTGRESQL_PASSWORD, POSTGRESQL_DATABASE
+        # If using upstream postgres:15, use the env vars below as-is.
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "password"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: conjur-postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "postgres"]
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: conjur-postgres-data
+---
+# --- PostgreSQL Service (ClusterIP — internal only) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: conjur-postgres
+  namespace: conjur-system
+  labels:
+    app: conjur-postgres
+    app.kubernetes.io/component: postgres
+    app.kubernetes.io/part-of: conjur
+spec:
+  type: ClusterIP
+  selector:
+    app: conjur-postgres
+  ports:
+  - name: postgresql
+    port: 5432
+    targetPort: 5432
+    protocol: TCP

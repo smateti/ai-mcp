@@ -1,0 +1,130 @@
+###############################################################################
+# 05-conjur-server.yaml — CyberArk Conjur OSS on OpenShift
+#
+# Deploys Conjur OSS server with:
+# - OpenShift-compatible security context (RunAsAny via SCC)
+# - PersistentVolumeClaim for Conjur data key backup
+# - Health/readiness probes
+# - TLS termination via OpenShift Route (see 08-routes.yaml)
+# - NetworkPolicy restricting access (see 07-networkpolicy.yaml)
+###############################################################################
+
+# --- Conjur configuration Secret ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: conjur-config
+  namespace: conjur-system
+  labels:
+    app: conjur-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: conjur
+type: Opaque
+stringData:
+  # CONJUR_DATA_KEY: 32-byte base64 key for encrypting Conjur data at rest.
+  # Generate with: openssl rand -base64 32
+  # IMPORTANT: Back this key up securely. If lost, all secrets are unrecoverable.
+  CONJUR_DATA_KEY: "6JXGcCVLYF8EjGvearzb3oabeYB2InGXIkPm5SF25ts="
+  DATABASE_URL: "postgres://postgres:SuperSecretPg@conjur-postgres.conjur-system.svc.cluster.local:5432/postgres"
+---
+# --- Conjur Server Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conjur-server
+  namespace: conjur-system
+  labels:
+    app: conjur-server
+    app.kubernetes.io/name: conjur-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: conjur
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conjur-server
+  template:
+    metadata:
+      labels:
+        app: conjur-server
+        app.kubernetes.io/name: conjur-server
+        app.kubernetes.io/component: server
+        app.kubernetes.io/part-of: conjur
+    spec:
+      serviceAccountName: conjur-server-sa
+      # Conjur's container internally runs processes as root.
+      # The conjur-server-scc grants RunAsAny for this SA.
+      containers:
+      - name: conjur
+        image: cyberark/conjur:latest
+        # Pin to a specific tag in production, e.g.:
+        # image: cyberark/conjur:1.20.1
+        command: ["conjurctl", "server"]
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: conjur-config
+              key: DATABASE_URL
+        - name: CONJUR_DATA_KEY
+          valueFrom:
+            secretKeyRef:
+              name: conjur-config
+              key: CONJUR_DATA_KEY
+        - name: CONJUR_AUTHENTICATORS
+          value: "authn"
+        - name: CONJUR_TELEMETRY_ENABLED
+          value: "false"
+        - name: RAILS_ENV
+          value: "production"
+        - name: WEB_CONCURRENCY
+          value: "2"
+        - name: CONJUR_LOG_LEVEL
+          value: "info"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 5
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+# --- Conjur Service (ClusterIP) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: conjur-server
+  namespace: conjur-system
+  labels:
+    app: conjur-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: conjur
+spec:
+  type: ClusterIP
+  selector:
+    app: conjur-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP

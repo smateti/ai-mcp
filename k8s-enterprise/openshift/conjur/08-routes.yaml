@@ -1,0 +1,89 @@
+###############################################################################
+# 08-routes.yaml — OpenShift Routes for Conjur components
+#
+# Replaces NodePort services with OpenShift Routes for external access.
+# Routes provide:
+# - TLS termination (edge by default, or passthrough/re-encrypt)
+# - DNS-based hostname routing via the OpenShift Router (HAProxy)
+# - No need for NodePort or LoadBalancer services
+#
+# Update the host values to match your cluster's wildcard domain:
+#   oc get ingresses.config/cluster -o jsonpath='{.spec.domain}'
+#   e.g., apps.ocp.example.com
+###############################################################################
+
+# --- Route: Conjur Server (admin/API access) ---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: conjur-server
+  namespace: conjur-system
+  labels:
+    app: conjur-server
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: conjur
+  annotations:
+    haproxy.router.openshift.io/timeout: 60s
+spec:
+  # host: conjur.apps.ocp.example.com
+  # Omit host to auto-generate: conjur-server-conjur-system.apps.ocp.example.com
+  to:
+    kind: Service
+    name: conjur-server
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# --- Route: Conjur REST API ---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: conjur-rest
+  namespace: apps
+  labels:
+    app: conjur-rest
+    app.kubernetes.io/component: rest-api
+    app.kubernetes.io/part-of: conjur
+  annotations:
+    haproxy.router.openshift.io/timeout: 120s
+spec:
+  # host: conjur-api.apps.ocp.example.com
+  to:
+    kind: Service
+    name: conjur-rest
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# --- Route: Conjur Web UI ---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: conjur-web
+  namespace: apps
+  labels:
+    app: conjur-web
+    app.kubernetes.io/component: web-ui
+    app.kubernetes.io/part-of: conjur
+  annotations:
+    haproxy.router.openshift.io/timeout: 60s
+spec:
+  # host: conjur-admin.apps.ocp.example.com
+  to:
+    kind: Service
+    name: conjur-web
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
