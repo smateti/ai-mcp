@@ -38,12 +38,12 @@
 
 ## SCC Strategy
 
-| Component        | Image                                    | SCC Required      | Why                                     |
-|------------------|------------------------------------------|--------------------|----------------------------------------|
-| PostgreSQL       | `registry.redhat.io/rhel9/postgresql-15` | `restricted` (default) | Red Hat image runs as arbitrary UID |
-| Conjur Server    | `cyberark/conjur`                        | `anyuid`           | Runs internal processes as root         |
-| Conjur REST API  | Open Liberty (custom)                    | `restricted` (default) | Liberty runs as UID 1001           |
-| Conjur Web UI    | Open Liberty (custom)                    | `restricted` (default) | Liberty runs as UID 1001           |
+| Component        | Image                    | SCC Required           | Why                                |
+|------------------|--------------------------|------------------------|------------------------------------|
+| PostgreSQL       | `postgres:15`            | `anyuid`               | Runs as UID 999                    |
+| Conjur Server    | `cyberark/conjur`        | `anyuid`               | Runs internal processes as root    |
+| Conjur REST API  | Open Liberty (custom)    | `restricted` (default) | Liberty runs as UID 1001           |
+| Conjur Web UI    | Open Liberty (custom)    | `restricted` (default) | Liberty runs as UID 1001           |
 
 ## Deployment Steps
 
@@ -59,13 +59,16 @@ oc apply -f 00-namespace.yaml
 oc apply -f 02-serviceaccounts.yaml
 ```
 
-### Step 3: Grant anyuid SCC to Conjur server (requires cluster-admin)
+### Step 3: Grant anyuid SCC to Conjur server + PostgreSQL (requires cluster-admin)
+
+Both `postgres:15` (UID 999) and `cyberark/conjur` (root) need the `anyuid` SCC.
 
 Choose **one** of these methods — they are equivalent:
 
 **Option A: Imperative (recommended)**
 ```bash
 oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
+oc adm policy add-scc-to-user anyuid -z conjur-postgres-sa -n conjur-system
 ```
 
 **Option B: Declarative**
@@ -73,10 +76,9 @@ oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
 oc apply -f 01-scc.yaml
 ```
 
-Verify the binding:
+Verify the bindings:
 ```bash
-oc get clusterrolebinding conjur-server-anyuid 2>/dev/null || \
-  oc adm policy who-can use scc anyuid -n conjur-system | grep conjur
+oc get clusterrolebinding conjur-server-anyuid conjur-postgres-anyuid
 ```
 
 ### Step 4: Apply RBAC (Secret management roles)
@@ -92,10 +94,9 @@ oc apply -f 04-postgres.yaml
 oc wait --for=condition=ready pod -l app=conjur-postgres -n conjur-system --timeout=120s
 ```
 
-> **Note:** PostgreSQL uses the Red Hat `postgresql-15` image which runs as the
-> arbitrary UID assigned by OpenShift. No custom SCC is needed.
-> The data mount is `/var/lib/pgsql/data` (Red Hat convention) and uses
-> `POSTGRESQL_*` env vars instead of upstream `POSTGRES_*`.
+> **Note:** PostgreSQL uses `postgres:15` with `anyuid` SCC (UID 999).
+> `PGDATA` is set to a subdirectory (`/var/lib/postgresql/data/pgdata`) to
+> avoid `chmod` errors on the PVC mount root.
 
 ### Step 6: Deploy Conjur server
 
@@ -222,9 +223,13 @@ oc get clusterrolebinding conjur-server-anyuid -o yaml
 # Check pod events
 oc describe pod -l app=conjur-postgres -n conjur-system
 
-# Verify no SCC conflict (should show "restricted" or "restricted-v2")
+# Verify anyuid SCC is bound (should show "anyuid")
 oc get pod -l app=conjur-postgres -n conjur-system \
   -o jsonpath='{.items[0].metadata.annotations.openshift\.io/scc}'
+
+# If still "restricted", re-apply the SCC binding:
+oc adm policy add-scc-to-user anyuid -z conjur-postgres-sa -n conjur-system
+oc rollout restart deployment/conjur-postgres -n conjur-system
 
 # Check PVC is bound
 oc get pvc conjur-postgres-data -n conjur-system
@@ -254,6 +259,6 @@ oc rollout restart deployment/conjur-server -n conjur-system
 | Registry            | localhost:30500              | Internal OpenShift registry             |
 | Service accounts    | Optional                    | Required (SCC bindings)                |
 | TLS                 | None                        | Edge termination on Routes             |
-| PostgreSQL image    | `postgres:15` (UID 999)     | `rhel9/postgresql-15` (arbitrary UID)  |
+| PostgreSQL image    | `postgres:15` (UID 999)     | `postgres:15` + anyuid SCC             |
 | Templates           | N/A                         | OpenShift Templates for app onboarding |
 | Pod security        | Unrestricted                | restricted-v2 SCC (default)            |

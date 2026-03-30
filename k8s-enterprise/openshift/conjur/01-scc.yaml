@@ -1,26 +1,19 @@
 ###############################################################################
 # 01-scc.yaml — SCC bindings for Conjur on OpenShift
 #
-# Only the Conjur server needs a non-default SCC (anyuid) because the
-# cyberark/conjur image runs internal processes as root.
-#
-# PostgreSQL uses the Red Hat postgresql image which runs as arbitrary UID
-# and works fine under the default restricted/restricted-v2 SCC.
+# Both Conjur server and PostgreSQL need the anyuid SCC:
+# - Conjur server: runs internal processes as root
+# - PostgreSQL (postgres:15): runs as UID 999
 #
 # IMPORTANT: Apply AFTER 00-namespace.yaml and 02-serviceaccounts.yaml
 # Requires cluster-admin privileges.
 #
-# Apply with:
-#   oc apply -f 02-serviceaccounts.yaml
+# Equivalent imperative commands:
 #   oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
-#
-# Or apply this file declaratively (both methods are equivalent):
-#   oc apply -f 01-scc.yaml
+#   oc adm policy add-scc-to-user anyuid -z conjur-postgres-sa -n conjur-system
 ###############################################################################
 
 # --- Grant anyuid SCC to Conjur Server SA ---
-# This is the declarative equivalent of:
-#   oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -34,4 +27,20 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: conjur-server-sa
+  namespace: conjur-system
+---
+# --- Grant anyuid SCC to PostgreSQL SA ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: conjur-postgres-anyuid
+  labels:
+    app.kubernetes.io/part-of: conjur
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+- kind: ServiceAccount
+  name: conjur-postgres-sa
   namespace: conjur-system

@@ -25,7 +25,7 @@ stringData:
   # Generate with: openssl rand -base64 32
   # IMPORTANT: Back this key up securely. If lost, all secrets are unrecoverable.
   CONJUR_DATA_KEY: "6JXGcCVLYF8EjGvearzb3oabeYB2InGXIkPm5SF25ts="
-  DATABASE_URL: "postgres://conjur:SuperSecretPg@conjur-postgres.conjur-system.svc.cluster.local:5432/conjur"
+  DATABASE_URL: "postgres://postgres:SuperSecretPg@conjur-postgres.conjur-system.svc.cluster.local:5432/postgres"
 ---
 # --- Conjur Server Deployment ---
 apiVersion: apps/v1

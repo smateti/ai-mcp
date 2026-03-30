@@ -1,12 +1,12 @@
 ###############################################################################
 # 04-postgres.yaml — PostgreSQL for Conjur backend on OpenShift
 #
-# Uses the Red Hat postgresql-15 image which is designed for OpenShift:
-# - Runs as arbitrary UID assigned by OpenShift (no custom SCC needed)
-# - Works with the default restricted/restricted-v2 SCC
-# - Uses POSTGRESQL_* env vars (not POSTGRES_*)
+# Uses the upstream postgres:15 image with anyuid SCC to allow UID 999.
+# PGDATA is set to a subdirectory of the PVC mount to avoid chmod errors
+# on the mount root.
 #
-# Data directory uses PVC for durability across pod restarts.
+# Prerequisite:
+#   oc adm policy add-scc-to-user anyuid -z conjur-postgres-sa -n conjur-system
 ###############################################################################
 
 # --- Secret for PostgreSQL credentials ---
@@ -21,12 +21,7 @@ metadata:
     app.kubernetes.io/part-of: conjur
 type: Opaque
 stringData:
-  POSTGRESQL_USER: "conjur"
-  POSTGRESQL_PASSWORD: "SuperSecretPg"
-  POSTGRESQL_DATABASE: "conjur"
-  POSTGRESQL_ADMIN_PASSWORD: "SuperSecretPg"
-  # The Conjur DATABASE_URL must match these credentials:
-  #   postgres://conjur:SuperSecretPg@conjur-postgres.conjur-system.svc.cluster.local:5432/conjur
+  POSTGRES_PASSWORD: "SuperSecretPg"
 ---
 # --- PersistentVolumeClaim for PostgreSQL data ---
 apiVersion: v1
@@ -74,52 +69,42 @@ spec:
         app.kubernetes.io/part-of: conjur
     spec:
       serviceAccountName: conjur-postgres-sa
-      # NO securityContext override — OpenShift assigns a UID from the
-      # namespace range (e.g., 1002450000). The Red Hat postgresql image
-      # is built to run as any arbitrary UID.
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
       containers:
       - name: postgres
-        image: registry.redhat.io/rhel9/postgresql-15:latest
+        image: postgres:15
         ports:
         - containerPort: 5432
           protocol: TCP
         env:
-        - name: POSTGRESQL_USER
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "password"
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: conjur-postgres-secret
-              key: POSTGRESQL_USER
-        - name: POSTGRESQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: conjur-postgres-secret
-              key: POSTGRESQL_PASSWORD
-        - name: POSTGRESQL_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: conjur-postgres-secret
-              key: POSTGRESQL_DATABASE
-        - name: POSTGRESQL_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: conjur-postgres-secret
-              key: POSTGRESQL_ADMIN_PASSWORD
+              key: POSTGRES_PASSWORD
+        # PGDATA must be a subdirectory — postgres tries to chmod the
+        # mount root which fails on OpenShift PVCs. A subdirectory
+        # is created by initdb and owned by UID 999 via fsGroup.
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
         - name: postgres-data
-          mountPath: /var/lib/pgsql/data
+          mountPath: /var/lib/postgresql/data
         readinessProbe:
           exec:
-            command:
-            - /usr/libexec/check-container
+            command: ["pg_isready", "-U", "postgres"]
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
         livenessProbe:
           exec:
-            command:
-            - /usr/libexec/check-container
-            - --live
+            command: ["pg_isready", "-U", "postgres"]
           initialDelaySeconds: 30
           periodSeconds: 20
           timeoutSeconds: 5
