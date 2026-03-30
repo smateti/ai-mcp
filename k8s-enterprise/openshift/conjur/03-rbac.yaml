@@ -1,40 +1,13 @@
 ###############################################################################
 # 03-rbac.yaml — RBAC for Conjur components on OpenShift
 #
-# - SCC bindings (requires cluster-admin to apply)
 # - Role/RoleBinding for conjur-rest-sa to manage K8s Secrets in apps ns
-# - ClusterRole for cross-namespace secret management (optional, for bulk
-#   onboarding apps across multiple namespaces)
+# - ClusterRole for cross-namespace secret management (optional)
+#
+# NOTE: SCC binding for Conjur server is in 01-scc.yaml
+#       PostgreSQL needs NO custom SCC (Red Hat image runs as arbitrary UID)
 ###############################################################################
 
-# --- Bind PostgreSQL SA to its SCC ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: conjur-postgres-scc-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:openshift:scc:conjur-postgres-scc
-subjects:
-- kind: ServiceAccount
-  name: conjur-postgres-sa
-  namespace: conjur-system
----
-# --- Bind Conjur Server SA to its SCC ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: conjur-server-scc-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: system:openshift:scc:conjur-server-scc
-subjects:
-- kind: ServiceAccount
-  name: conjur-server-sa
-  namespace: conjur-system
----
 # --- Role: conjur-rest can manage Secrets in apps namespace ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

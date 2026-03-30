@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - OpenShift 4.12+ cluster with `oc` CLI authenticated
-- `cluster-admin` role (for SCCs and ClusterRoleBindings)
+- `cluster-admin` role (for SCC binding in Step 3)
 - Access to push images to the OpenShift internal registry or an external registry
 
 ## Architecture
@@ -36,6 +36,15 @@
      └─────────────────────────────────────────────────────┘
 ```
 
+## SCC Strategy
+
+| Component        | Image                                    | SCC Required      | Why                                     |
+|------------------|------------------------------------------|--------------------|----------------------------------------|
+| PostgreSQL       | `registry.redhat.io/rhel9/postgresql-15` | `restricted` (default) | Red Hat image runs as arbitrary UID |
+| Conjur Server    | `cyberark/conjur`                        | `anyuid`           | Runs internal processes as root         |
+| Conjur REST API  | Open Liberty (custom)                    | `restricted` (default) | Liberty runs as UID 1001           |
+| Conjur Web UI    | Open Liberty (custom)                    | `restricted` (default) | Liberty runs as UID 1001           |
+
 ## Deployment Steps
 
 ### Step 1: Create namespaces
@@ -44,19 +53,33 @@
 oc apply -f 00-namespace.yaml
 ```
 
-### Step 2: Create SecurityContextConstraints (requires cluster-admin)
-
-```bash
-oc apply -f 01-scc.yaml
-```
-
-### Step 3: Create ServiceAccounts
+### Step 2: Create ServiceAccounts
 
 ```bash
 oc apply -f 02-serviceaccounts.yaml
 ```
 
-### Step 4: Apply RBAC (SCC bindings + Secret management roles)
+### Step 3: Grant anyuid SCC to Conjur server (requires cluster-admin)
+
+Choose **one** of these methods — they are equivalent:
+
+**Option A: Imperative (recommended)**
+```bash
+oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
+```
+
+**Option B: Declarative**
+```bash
+oc apply -f 01-scc.yaml
+```
+
+Verify the binding:
+```bash
+oc get clusterrolebinding conjur-server-anyuid 2>/dev/null || \
+  oc adm policy who-can use scc anyuid -n conjur-system | grep conjur
+```
+
+### Step 4: Apply RBAC (Secret management roles)
 
 ```bash
 oc apply -f 03-rbac.yaml
@@ -69,6 +92,11 @@ oc apply -f 04-postgres.yaml
 oc wait --for=condition=ready pod -l app=conjur-postgres -n conjur-system --timeout=120s
 ```
 
+> **Note:** PostgreSQL uses the Red Hat `postgresql-15` image which runs as the
+> arbitrary UID assigned by OpenShift. No custom SCC is needed.
+> The data mount is `/var/lib/pgsql/data` (Red Hat convention) and uses
+> `POSTGRESQL_*` env vars instead of upstream `POSTGRES_*`.
+
 ### Step 6: Deploy Conjur server
 
 ```bash
@@ -79,10 +107,9 @@ oc wait --for=condition=ready pod -l app=conjur-server -n conjur-system --timeou
 ### Step 7: Initialize Conjur account
 
 ```bash
-# Get the Conjur pod name
 CONJUR_POD=$(oc get pod -l app=conjur-server -n conjur-system -o jsonpath='{.items[0].metadata.name}')
 
-# Create the account (save the admin API key!)
+# Create the account — SAVE THE ADMIN API KEY!
 oc exec $CONJUR_POD -n conjur-system -- conjurctl account create myConjurAccount
 
 # If account already exists, retrieve the key:
@@ -92,17 +119,18 @@ oc exec $CONJUR_POD -n conjur-system -- conjurctl account create myConjurAccount
 ### Step 8: Push images to OpenShift internal registry
 
 ```bash
+# Expose the internal registry (if not already)
+oc patch configs.imageregistry.operator.openshift.io/cluster --type merge \
+  -p '{"spec":{"defaultRoute":true}}'
+
 # Login to OpenShift registry
-oc registry login
+REGISTRY=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')
+docker login $REGISTRY -u $(oc whoami) -p $(oc whoami -t)
 
 # Tag and push images
-REGISTRY=$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')
-
-# conjur-microprofile-rest
 docker tag localhost:30500/conjur-microprofile-rest:latest $REGISTRY/apps/conjur-microprofile-rest:latest
 docker push $REGISTRY/apps/conjur-microprofile-rest:latest
 
-# conjur-microprofile-web
 docker tag localhost:30500/conjur-microprofile-web:latest $REGISTRY/apps/conjur-microprofile-web:latest
 docker push $REGISTRY/apps/conjur-microprofile-web:latest
 ```
@@ -110,16 +138,15 @@ docker push $REGISTRY/apps/conjur-microprofile-web:latest
 ### Step 9: Update the conjur-app-identity Secret with real API keys
 
 ```bash
-# Update the placeholder Secret with the actual admin API key from Step 7
-oc patch secret conjur-app-identity -n apps --type merge -p '{
-  "stringData": {
-    "CONJUR_ADMIN_API_KEY": "<admin-api-key-from-step-7>",
-    "CONJUR_AUTHN_API_KEY": "<host-api-key-from-policy-load>"
+oc patch secret conjur-app-identity -n apps --type merge -p "{
+  \"stringData\": {
+    \"CONJUR_ADMIN_API_KEY\": \"<admin-api-key-from-step-7>\",
+    \"CONJUR_AUTHN_API_KEY\": \"<host-api-key-from-policy-load>\"
   }
-}'
+}"
 ```
 
-### Step 10: Deploy admin apps + apply network policies + create Routes
+### Step 10: Deploy admin apps + network policies + Routes
 
 ```bash
 oc apply -f 06-conjur-admin-apps.yaml
@@ -174,6 +201,50 @@ oc process -f 09-app-template.yaml \
 | oc apply -f -
 ```
 
+## Troubleshooting
+
+### SCC-related pod failures
+
+```bash
+# Check which SCC a running pod is using
+oc get pod <pod-name> -n <namespace> -o jsonpath='{.metadata.annotations.openshift\.io/scc}'
+
+# Check which SCCs a ServiceAccount can use
+oc adm policy who-can use scc anyuid -n conjur-system
+
+# Verify the anyuid binding exists
+oc get clusterrolebinding conjur-server-anyuid -o yaml
+```
+
+### PostgreSQL won't start
+
+```bash
+# Check pod events
+oc describe pod -l app=conjur-postgres -n conjur-system
+
+# Verify no SCC conflict (should show "restricted" or "restricted-v2")
+oc get pod -l app=conjur-postgres -n conjur-system \
+  -o jsonpath='{.items[0].metadata.annotations.openshift\.io/scc}'
+
+# Check PVC is bound
+oc get pvc conjur-postgres-data -n conjur-system
+```
+
+### Conjur server won't start
+
+```bash
+# Check pod events — look for SCC errors
+oc describe pod -l app=conjur-server -n conjur-system
+
+# Verify anyuid SCC is bound (should show "anyuid")
+oc get pod -l app=conjur-server -n conjur-system \
+  -o jsonpath='{.items[0].metadata.annotations.openshift\.io/scc}'
+
+# If still "restricted", re-apply the SCC binding:
+oc adm policy add-scc-to-user anyuid -z conjur-server-sa -n conjur-system
+oc rollout restart deployment/conjur-server -n conjur-system
+```
+
 ## Key Differences from Docker Desktop K8s
 
 | Feature             | Docker Desktop K8s          | OpenShift                              |
@@ -183,5 +254,6 @@ oc process -f 09-app-template.yaml \
 | Registry            | localhost:30500              | Internal OpenShift registry             |
 | Service accounts    | Optional                    | Required (SCC bindings)                |
 | TLS                 | None                        | Edge termination on Routes             |
+| PostgreSQL image    | `postgres:15` (UID 999)     | `rhel9/postgresql-15` (arbitrary UID)  |
 | Templates           | N/A                         | OpenShift Templates for app onboarding |
 | Pod security        | Unrestricted                | restricted-v2 SCC (default)            |
