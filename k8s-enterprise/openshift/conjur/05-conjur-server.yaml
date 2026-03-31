@@ -76,7 +76,7 @@ spec:
               name: conjur-config
               key: CONJUR_DATA_KEY
         - name: CONJUR_AUTHENTICATORS
-          value: "authn"
+          value: "authn,authn-jwt/openshift"
         - name: CONJUR_TELEMETRY_ENABLED
           value: "false"
         - name: RAILS_ENV

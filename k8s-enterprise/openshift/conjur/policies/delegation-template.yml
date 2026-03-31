@@ -1,0 +1,131 @@
+###############################################################################
+# delegation-template.yml — Grant app → resource access
+#
+# This file ties everything together:
+#   1. Grants individual app hosts to specific DB reader groups (granular)
+#   2. Adds app hosts to the product's resources-readers layer (shared infra)
+#   3. Adds OpenShift hosts to the JWT authenticator's authenticatable group
+#
+# Load into: acme/{env}/products/{product}
+#   curl -X POST .../policy/acme%2Fprod%2Fproducts%2Fpayments \
+#     -d @delegation-template.yml
+#
+# IMPORTANT: Load AFTER app-host-template.yml and db-resource-template.yml
+###############################################################################
+
+# =====================================================================
+# 1. Per-app DB access (granular)
+#    Each app host is added to the readers group of its specific DB(s).
+#    orders-api → orders-db only, settlement-api → ledger-db only.
+# =====================================================================
+
+# orders-api can read orders-db credentials
+- !grant
+  role: !group resources/dbs/orders-db/readers
+  member: !host apps/openshift/orders-api
+
+# settlement-api can read ledger-db credentials
+- !grant
+  role: !group resources/dbs/ledger-db/readers
+  member: !host apps/openshift/settlement-api
+
+# =====================================================================
+# 2. Product-wide shared resource access
+#    All app hosts that need Kafka, SMTP, LDAP, OAuth, certs, or API
+#    secrets are added to the resources-readers layer.
+# =====================================================================
+
+- !grant
+  role: !layer resources-readers
+  member: !host apps/openshift/orders-api
+
+- !grant
+  role: !layer resources-readers
+  member: !host apps/openshift/settlement-api
+
+# Batch and WebSphere apps can also be members:
+# - !grant
+#   role: !layer resources-readers
+#   member: !host apps/batch/settlement-job
+#
+# - !grant
+#   role: !layer resources-readers
+#   member: !host apps/websphere/billing-monolith
+
+# =====================================================================
+# 3. Permit resources-readers layer to read all shared infra secrets
+#    This single permit covers kafka, api, smtp, ldap, oauth, certs
+#    under the product's resources/ tree.
+# =====================================================================
+
+# Kafka — grant layer read on all kafka variables
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/bootstrap-servers
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-username
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-mechanism
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/security-protocol
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/keystore-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/truststore-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-url
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-key
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-secret
+
+# API keys — grant layer read on all api variables
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/key
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/secret
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/webhook-secret
+
+# =====================================================================
+# 4. JWT authenticator enrollment
+#    OpenShift hosts must be in the authn-jwt/openshift authenticatable
+#    group to use JWT authentication.
+#    Load SEPARATELY into root level (not product-scoped).
+# =====================================================================
+# Run this as a separate policy load against root:
+#
+#   - !grant
+#     role: !group conjur/authn-jwt/openshift/authenticatable
+#     member: !host acme/prod/products/payments/apps/openshift/orders-api
+#
+#   - !grant
+#     role: !group conjur/authn-jwt/openshift/authenticatable
+#     member: !host acme/prod/products/payments/apps/openshift/settlement-api

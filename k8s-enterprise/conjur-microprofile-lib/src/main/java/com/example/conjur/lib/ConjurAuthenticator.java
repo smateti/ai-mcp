@@ -6,34 +6,50 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Handles Conjur authentication and secret retrieval using java.net.http.HttpClient.
  * No external dependencies — uses only JDK standard library.
  *
+ * <p>Supports two authentication methods (auto-detected from env vars):
+ * <ul>
+ *   <li><b>API Key auth</b> ({@code authn}): set CONJUR_AUTHN_LOGIN + CONJUR_AUTHN_API_KEY</li>
+ *   <li><b>JWT auth</b> ({@code authn-jwt/{service-id}}): set CONJUR_AUTHN_JWT_SERVICE_ID + CONJUR_JWT_TOKEN_PATH</li>
+ * </ul>
+ *
+ * <p>If both are configured, JWT auth takes priority.
+ *
  * <p>Configuration via environment variables:
  * <ul>
  *   <li>CONJUR_APPLIANCE_URL — Conjur server URL (default: http://conjur-server.conjur-system.svc.cluster.local)</li>
  *   <li>CONJUR_ACCOUNT — Conjur account name (default: myConjurAccount)</li>
- *   <li>CONJUR_AUTHN_LOGIN — authentication identity, e.g. host/apps/myapp</li>
+ *   <li>CONJUR_AUTHN_LOGIN — authentication identity for API key auth</li>
  *   <li>CONJUR_AUTHN_API_KEY — API key for authentication</li>
+ *   <li>CONJUR_AUTHN_JWT_SERVICE_ID — JWT authenticator service ID (e.g. "openshift")</li>
+ *   <li>CONJUR_JWT_TOKEN_PATH — path to JWT token file (default: /var/run/secrets/kubernetes.io/serviceaccount/token)</li>
  *   <li>CONJUR_TOKEN_TTL — token cache TTL in seconds (default: 360)</li>
  * </ul>
  */
 public class ConjurAuthenticator {
 
     private static final Logger LOG = Logger.getLogger(ConjurAuthenticator.class.getName());
+    private static final String DEFAULT_JWT_TOKEN_PATH =
+            "/var/run/secrets/kubernetes.io/serviceaccount/token";
 
     private final String applianceUrl;
     private final String account;
     private final String authnLogin;
     private final String apiKey;
+    private final String jwtServiceId;
+    private final String jwtTokenPath;
     private final int tokenTtlSeconds;
+    private final boolean useJwt;
 
     private final HttpClient httpClient;
     private String cachedToken;
@@ -45,7 +61,16 @@ public class ConjurAuthenticator {
         this.account = env("CONJUR_ACCOUNT", "myConjurAccount");
         this.authnLogin = env("CONJUR_AUTHN_LOGIN", "");
         this.apiKey = env("CONJUR_AUTHN_API_KEY", "");
+        this.jwtServiceId = env("CONJUR_AUTHN_JWT_SERVICE_ID", "");
+        this.jwtTokenPath = env("CONJUR_JWT_TOKEN_PATH", DEFAULT_JWT_TOKEN_PATH);
         this.tokenTtlSeconds = Integer.parseInt(env("CONJUR_TOKEN_TTL", "360"));
+
+        // JWT takes priority if configured
+        this.useJwt = jwtServiceId != null && !jwtServiceId.isBlank();
+        if (this.useJwt && isApiKeyConfigured()) {
+            LOG.warning("Both JWT and API key auth configured — using JWT auth (authn-jwt/"
+                    + jwtServiceId + ")");
+        }
 
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -53,11 +78,29 @@ public class ConjurAuthenticator {
     }
 
     public boolean isEnabled() {
+        return useJwt || isApiKeyConfigured();
+    }
+
+    private boolean isApiKeyConfigured() {
         return apiKey != null && !apiKey.isBlank() && !"not-set".equals(apiKey)
                 && authnLogin != null && !authnLogin.isBlank();
     }
 
+    public String getAuthMethod() {
+        if (useJwt) return "authn-jwt/" + jwtServiceId;
+        if (isApiKeyConfigured()) return "authn";
+        return "none";
+    }
+
     public synchronized void authenticate() {
+        if (useJwt) {
+            authenticateJwt();
+        } else {
+            authenticateApiKey();
+        }
+    }
+
+    private void authenticateApiKey() {
         String url = applianceUrl + "/authn/" + account + "/"
                 + encode(authnLogin) + "/authenticate";
 
@@ -76,9 +119,9 @@ public class ConjurAuthenticator {
                 cachedToken = Base64.getEncoder().encodeToString(
                         response.body().getBytes(StandardCharsets.UTF_8));
                 tokenTimestamp = Instant.now();
-                LOG.info("Authenticated with Conjur as '" + authnLogin + "'");
+                LOG.info("Authenticated with Conjur via API key as '" + authnLogin + "'");
             } else {
-                throw new ConjurException("Conjur auth failed: HTTP " + response.statusCode()
+                throw new ConjurException("Conjur API key auth failed: HTTP " + response.statusCode()
                         + " - " + response.body());
             }
         } catch (ConjurException e) {
@@ -86,7 +129,48 @@ public class ConjurAuthenticator {
         } catch (Exception e) {
             cachedToken = null;
             tokenTimestamp = null;
-            throw new ConjurException("Conjur auth error", e);
+            throw new ConjurException("Conjur API key auth error", e);
+        }
+    }
+
+    private void authenticateJwt() {
+        String jwtToken;
+        try {
+            jwtToken = Files.readString(Path.of(jwtTokenPath)).trim();
+        } catch (Exception e) {
+            throw new ConjurException("Failed to read JWT token from " + jwtTokenPath, e);
+        }
+
+        // POST /authn-jwt/{service-id}/{account}/authenticate with jwt=<token> in body
+        String url = applianceUrl + "/authn-jwt/" + encode(jwtServiceId)
+                + "/" + account + "/authenticate";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .POST(HttpRequest.BodyPublishers.ofString("jwt=" + jwtToken))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Accept", "*/*")
+                .timeout(Duration.ofSeconds(10))
+                .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                cachedToken = Base64.getEncoder().encodeToString(
+                        response.body().getBytes(StandardCharsets.UTF_8));
+                tokenTimestamp = Instant.now();
+                LOG.info("Authenticated with Conjur via JWT (authn-jwt/" + jwtServiceId + ")");
+            } else {
+                throw new ConjurException("Conjur JWT auth failed: HTTP " + response.statusCode()
+                        + " - " + response.body());
+            }
+        } catch (ConjurException e) {
+            throw e;
+        } catch (Exception e) {
+            cachedToken = null;
+            tokenTimestamp = null;
+            throw new ConjurException("Conjur JWT auth error", e);
         }
     }
 
@@ -156,7 +240,8 @@ public class ConjurAuthenticator {
 
     private void ensureAuthenticated() {
         if (!isEnabled()) {
-            throw new ConjurException("Conjur not configured: CONJUR_AUTHN_LOGIN and CONJUR_AUTHN_API_KEY required");
+            throw new ConjurException("Conjur not configured: set CONJUR_AUTHN_JWT_SERVICE_ID (JWT) "
+                    + "or CONJUR_AUTHN_LOGIN + CONJUR_AUTHN_API_KEY (API key)");
         }
         if (cachedToken == null || isTokenExpired()) {
             authenticate();

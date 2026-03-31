@@ -1,0 +1,103 @@
+###############################################################################
+# infra-resource-template.yml — Shared infra resources (SMTP, LDAP, OAuth, certs, API)
+#
+# Load into the appropriate sub-path under resources/:
+#   .../resources/api    → API keys for external services
+#   .../resources/smtp   → SMTP server credentials
+#   .../resources/ldap   → LDAP bind credentials
+#   .../resources/oauth  → OAuth client credentials
+#   .../resources/certs  → Certificate/keystore passwords
+#
+# Access model: Product-wide shared (via resources-readers layer)
+###############################################################################
+
+# ===== API Keys (load into .../resources/api) =====
+# Example: Stripe payment gateway
+#   curl -X POST .../policy/acme%2Fprod%2Fproducts%2Fpayments%2Fresources%2Fapi \
+#     -d @infra-resource-template.yml
+
+- !policy
+  id: stripe
+  body:
+    - !variable
+      id: key
+      annotations:
+        description: "Stripe API key"
+    - !variable
+      id: secret
+      annotations:
+        description: "Stripe API secret"
+    - !variable
+      id: webhook-secret
+      annotations:
+        description: "Stripe webhook signing secret"
+
+# --- To add more API services, duplicate the block above:
+# - !policy
+#   id: twilio
+#   body:
+#     - !variable key
+#     - !variable secret
+
+###############################################################################
+# SMTP (load into .../resources/smtp)
+#
+# - !policy
+#   id: relay
+#   body:
+#     - !variable
+#       id: host
+#       annotations:
+#         example: "smtp.acme.com"
+#     - !variable port
+#     - !variable username
+#     - !variable password
+#     - !variable
+#       id: from-address
+#       annotations:
+#         example: "noreply@acme.com"
+###############################################################################
+
+###############################################################################
+# LDAP (load into .../resources/ldap)
+#
+# - !policy
+#   id: corp
+#   body:
+#     - !variable
+#       id: url
+#       annotations:
+#         example: "ldaps://ldap.acme.com:636"
+#     - !variable base-dn
+#     - !variable bind-dn
+#     - !variable bind-password
+###############################################################################
+
+###############################################################################
+# OAuth (load into .../resources/oauth)
+#
+# - !policy
+#   id: azure
+#   body:
+#     - !variable tenant-id
+#     - !variable client-id
+#     - !variable client-secret
+#     - !variable
+#       id: token-endpoint
+#       annotations:
+#         example: "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+###############################################################################
+
+###############################################################################
+# Certs (load into .../resources/certs)
+#
+# - !policy
+#   id: tls
+#   body:
+#     - !variable keystore-password
+#     - !variable truststore-password
+#     - !variable
+#       id: keystore-type
+#       annotations:
+#         example: "PKCS12"
+###############################################################################

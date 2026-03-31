@@ -1,0 +1,34 @@
+###############################################################################
+# env-products-template.yml — Register products under an environment
+#
+# Load into: acme/{env}
+#   curl -X POST .../policies/myConjurAccount/policy/acme%2Fdev -d @env-products-template.yml
+#
+# Replace {product} placeholders with actual product names before loading.
+# Each product gets its own policy sub-tree for apps and resources.
+#
+# Example: To register "payments" and "customer" products in dev:
+###############################################################################
+
+- !policy
+  id: products
+  body:
+    - !policy
+      id: payments
+      annotations:
+        description: "Payments product team"
+        team: "payments-team"
+        contact: "payments-team@acme.com"
+
+    - !policy
+      id: customer
+      annotations:
+        description: "Customer product team"
+        team: "customer-team"
+        contact: "customer-team@acme.com"
+
+    # Add more products as needed:
+    # - !policy
+    #   id: inventory
+    #   annotations:
+    #     description: "Inventory product team"

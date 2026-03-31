@@ -1,0 +1,61 @@
+###############################################################################
+# app-host-template.yml — Register application hosts
+#
+# Load into: acme/{env}/products/{product}/apps/{type}
+#   OpenShift:  .../apps/openshift
+#   Batch:      .../apps/batch
+#   WebSphere:  .../apps/websphere
+#
+# Example (OpenShift microservice):
+#   curl -X POST .../policy/acme%2Fprod%2Fproducts%2Fpayments%2Fapps%2Fopenshift \
+#     -d @app-host-template.yml
+#
+# Authentication:
+#   openshift → JWT auth (annotations match SA token claims)
+#   batch     → API key auth (receives API key on host creation)
+#   websphere → API key auth (receives API key on host creation)
+###############################################################################
+
+# ===== OpenShift microservices (JWT auth) =====
+# Annotations map to JWT claims for authn-jwt/openshift validation.
+# The host ID becomes the identity that Conjur matches against the JWT 'sub' claim.
+
+- !host
+  id: orders-api
+  annotations:
+    description: "Orders API microservice"
+    authn-jwt/openshift/namespace: "apps"
+    authn-jwt/openshift/serviceaccount: "orders-api-sa"
+    product: "payments"
+    team: "payments-team"
+    type: "openshift"
+
+- !host
+  id: settlement-api
+  annotations:
+    description: "Settlement API microservice"
+    authn-jwt/openshift/namespace: "apps"
+    authn-jwt/openshift/serviceaccount: "settlement-api-sa"
+    product: "payments"
+    team: "payments-team"
+    type: "openshift"
+
+# ===== Batch jobs (API key auth) =====
+# Load into: .../apps/batch
+#
+# - !host
+#   id: settlement-job
+#   annotations:
+#     description: "Nightly settlement batch job"
+#     product: "payments"
+#     type: "batch"
+
+# ===== WebSphere apps (API key auth) =====
+# Load into: .../apps/websphere
+#
+# - !host
+#   id: billing-monolith
+#   annotations:
+#     description: "Legacy billing monolith on tWAS"
+#     product: "payments"
+#     type: "websphere"
