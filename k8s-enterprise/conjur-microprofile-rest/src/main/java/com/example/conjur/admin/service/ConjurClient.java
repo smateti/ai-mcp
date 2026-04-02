@@ -28,7 +28,7 @@ public class ConjurClient {
     private String applianceUrl;
 
     @Inject
-    @ConfigProperty(name = "conjur.account", defaultValue = "myConjurAccount")
+    @ConfigProperty(name = "conjur.account", defaultValue = "nimbusConjurAccount")
     private String account;
 
     @Inject
@@ -206,6 +206,13 @@ public class ConjurClient {
         return policyRequest("POST", branch, yamlBody);
     }
 
+    /**
+     * PATCH /policies/{account}/policy/{branch} — update policy.
+     */
+    public String patchPolicy(String branch, String yamlBody) {
+        return policyRequest("PATCH", branch, yamlBody);
+    }
+
     private String policyRequest(String method, String branch, String yamlBody) {
         ensureAuthenticated();
         String url = applianceUrl + "/policies/" + account + "/policy/" + encode(branch);
@@ -218,6 +225,8 @@ public class ConjurClient {
 
         if ("PUT".equals(method)) {
             builder.PUT(HttpRequest.BodyPublishers.ofString(yamlBody));
+        } else if ("PATCH".equals(method)) {
+            builder.method("PATCH", HttpRequest.BodyPublishers.ofString(yamlBody));
         } else {
             builder.POST(HttpRequest.BodyPublishers.ofString(yamlBody));
         }
@@ -234,6 +243,89 @@ public class ConjurClient {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error loading policy to branch: " + branch, e);
+        }
+    }
+
+    // ========== Resource Listing ==========
+
+    public String listResources(String kind, String search) {
+        ensureAuthenticated();
+        StringBuilder url = new StringBuilder(applianceUrl + "/resources/" + account);
+        List<String> params = new ArrayList<>();
+        if (kind != null && !kind.isBlank()) params.add("kind=" + encode(kind));
+        if (search != null && !search.isBlank()) params.add("search=" + encode(search));
+        if (!params.isEmpty()) url.append("?").append(String.join("&", params));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url.toString()))
+                .GET()
+                .header("Authorization", authHeader())
+                .timeout(Duration.ofSeconds(15))
+                .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return response.body();
+            } else if (response.statusCode() == 401 || response.statusCode() == 403) {
+                authenticate();
+                HttpRequest retry = HttpRequest.newBuilder()
+                        .uri(URI.create(url.toString())).GET()
+                        .header("Authorization", authHeader())
+                        .timeout(Duration.ofSeconds(15)).build();
+                HttpResponse<String> r2 = httpClient.send(retry, HttpResponse.BodyHandlers.ofString());
+                if (r2.statusCode() == 200) return r2.body();
+                throw new RuntimeException("Conjur list resources failed after retry: HTTP " + r2.statusCode());
+            } else {
+                throw new RuntimeException("Conjur list resources failed: HTTP " + response.statusCode());
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Error listing resources", e);
+        }
+    }
+
+    // ========== Role Queries ==========
+
+    public String showRole(String roleId) {
+        ensureAuthenticated();
+        // roleId format: "kind:identifier" e.g. "group:conjur/authn-jwt/kubernetes/authenticatable"
+        int colonIdx = roleId.indexOf(':');
+        String kind = colonIdx > 0 ? roleId.substring(0, colonIdx) : roleId;
+        String id = colonIdx > 0 ? roleId.substring(colonIdx + 1) : roleId;
+        String url = applianceUrl + "/roles/" + account + "/" + kind + "/" + encode(id)
+                + "?members&memberships";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .header("Authorization", authHeader())
+                .timeout(Duration.ofSeconds(15))
+                .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                return response.body();
+            } else if (response.statusCode() == 401 || response.statusCode() == 403) {
+                authenticate();
+                HttpRequest retry = HttpRequest.newBuilder()
+                        .uri(URI.create(url)).GET()
+                        .header("Authorization", authHeader())
+                        .timeout(Duration.ofSeconds(15)).build();
+                HttpResponse<String> r2 = httpClient.send(retry, HttpResponse.BodyHandlers.ofString());
+                if (r2.statusCode() == 200) return r2.body();
+                throw new RuntimeException("Conjur show role failed after retry: HTTP " + r2.statusCode());
+            } else if (response.statusCode() == 404) {
+                return null;
+            } else {
+                throw new RuntimeException("Conjur show role failed: HTTP " + response.statusCode());
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Error showing role: " + roleId, e);
         }
     }
 

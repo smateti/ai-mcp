@@ -1,0 +1,119 @@
+{
+  "description": "Example: Onboard the entire 'payments' product to Conjur (Nimbus)",
+  "instructions": "Use these as a guide for the curl commands needed to onboard a product.",
+
+  "step1_register_product": {
+    "description": "Load product-template.yml into the product path",
+    "command": "curl -s -X POST 'http://localhost:30080/policies/nimbusConjurAccount/policy/nimbus%2Fprod%2Fproducts%2Fpayments' -H 'Authorization: Token token=\"$TOKEN\"' -d @product-template.yml"
+  },
+
+  "step2_register_databases": {
+    "description": "Load DB resources for the product",
+    "databases": [
+      {
+        "name": "orders-db",
+        "policy_path": "nimbus/prod/products/payments/resources/dbs",
+        "variables": {
+          "url": "jdbc:db2://db2-server:50000/ORDERSDB",
+          "username": "orders_svc",
+          "password": "<from-vault>",
+          "port": "50000",
+          "database-name": "ORDERSDB",
+          "driver-class": "com.ibm.db2.jcc.DB2Driver"
+        }
+      },
+      {
+        "name": "ledger-db",
+        "policy_path": "nimbus/prod/products/payments/resources/dbs",
+        "variables": {
+          "url": "jdbc:db2://db2-server:50000/LEDGERDB",
+          "username": "ledger_svc",
+          "password": "<from-vault>",
+          "port": "50000",
+          "database-name": "LEDGERDB",
+          "driver-class": "com.ibm.db2.jcc.DB2Driver"
+        }
+      }
+    ]
+  },
+
+  "step3_register_kafka": {
+    "description": "Load Kafka cluster for the product",
+    "policy_path": "nimbus/prod/products/payments/resources/kafka",
+    "variables": {
+      "main/bootstrap-servers": "kafka-0.kafka.svc:9093,kafka-1.kafka.svc:9093",
+      "main/sasl-username": "payments-kafka-user",
+      "main/sasl-password": "<from-vault>",
+      "main/sasl-mechanism": "SCRAM-SHA-512",
+      "main/security-protocol": "SASL_SSL",
+      "main/keystore-password": "<from-vault>",
+      "main/truststore-password": "<from-vault>",
+      "main/schema-registry-url": "https://schema-registry.kafka.svc:8081",
+      "main/schema-registry-key": "payments-sr-key",
+      "main/schema-registry-secret": "<from-vault>"
+    }
+  },
+
+  "step4_register_api_keys": {
+    "description": "Load external API keys for the product",
+    "policy_path": "nimbus/prod/products/payments/resources/api",
+    "variables": {
+      "stripe/key": "sk_live_...",
+      "stripe/secret": "<from-vault>",
+      "stripe/webhook-secret": "whsec_..."
+    }
+  },
+
+  "step5_register_app_hosts": {
+    "description": "Register application hosts",
+    "kubernetes_apps": {
+      "policy_path": "nimbus/prod/products/payments/apps/openshift",
+      "hosts": [
+        {
+          "id": "orders-api",
+          "namespace": "apps",
+          "serviceaccount": "orders-api-sa",
+          "auth_method": "jwt (authn-jwt/kubernetes)"
+        },
+        {
+          "id": "settlement-api",
+          "namespace": "apps",
+          "serviceaccount": "settlement-api-sa",
+          "auth_method": "jwt (authn-jwt/kubernetes)"
+        }
+      ]
+    },
+    "batch_apps": {
+      "policy_path": "nimbus/prod/products/payments/apps/batch",
+      "hosts": [
+        {
+          "id": "settlement-job",
+          "auth_method": "api-key (authn)"
+        }
+      ]
+    }
+  },
+
+  "step6_grant_access": {
+    "description": "Load delegation-template.yml to grant app → resource access",
+    "command": "curl -s -X POST 'http://localhost:30080/policies/nimbusConjurAccount/policy/nimbus%2Fprod%2Fproducts%2Fpayments' -H 'Authorization: Token token=\"$TOKEN\"' -d @delegation-template.yml"
+  },
+
+  "step7_jwt_enrollment": {
+    "description": "Enroll K8s hosts in JWT authenticator (load at root)",
+    "command": "curl -s -X POST 'http://localhost:30080/policies/nimbusConjurAccount/policy/root' -H 'Authorization: Token token=\"$TOKEN\"' -d @jwt-enrollment-template.yml"
+  },
+
+  "step8_set_secrets": {
+    "description": "Set actual secret values for all variables",
+    "example_commands": [
+      "curl -s -X POST 'http://localhost:30080/secrets/nimbusConjurAccount/variable/nimbus%2Fprod%2Fproducts%2Fpayments%2Fresources%2Fdbs%2Forders-db%2Fusername' -H 'Authorization: Token token=\"$TOKEN\"' -d 'orders_svc'",
+      "curl -s -X POST 'http://localhost:30080/secrets/nimbusConjurAccount/variable/nimbus%2Fprod%2Fproducts%2Fpayments%2Fresources%2Fdbs%2Forders-db%2Fpassword' -H 'Authorization: Token token=\"$TOKEN\"' -d 'S3cur3P@ssw0rd'"
+    ]
+  },
+
+  "verification": {
+    "check_resources": "curl -s 'http://localhost:30080/resources/nimbusConjurAccount?search=payments' -H 'Authorization: Token token=\"$TOKEN\"'",
+    "check_permissions": "curl -s 'http://localhost:30080/resources/nimbusConjurAccount?acting_as=host:nimbus/prod/products/payments/apps/openshift/orders-api&kind=variable' -H 'Authorization: Token token=\"$TOKEN\"'"
+  }
+}

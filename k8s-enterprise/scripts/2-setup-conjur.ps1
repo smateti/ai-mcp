@@ -29,9 +29,9 @@ kubectl wait --for=condition=ready pod -l app=conjur-server -n conjur-system --t
 Write-Host "       Conjur is ready" -ForegroundColor Green
 
 # --- Step 3: Create Conjur account ---
-Write-Host "[3/7] Creating Conjur account 'myConjurAccount'..." -ForegroundColor Yellow
+Write-Host "[3/7] Creating Conjur account 'nimbusConjurAccount'..." -ForegroundColor Yellow
 $conjurPod = kubectl get pod -l app=conjur-server -n conjur-system -o jsonpath="{.items[0].metadata.name}"
-$accountOutput = kubectl exec $conjurPod -n conjur-system -- conjurctl account create myConjurAccount 2>&1
+$accountOutput = kubectl exec $conjurPod -n conjur-system -- conjurctl account create nimbusConjurAccount 2>&1
 Write-Host "       $accountOutput" -ForegroundColor Gray
 
 # Extract admin API key from output
@@ -39,7 +39,7 @@ $adminApiKey = ($accountOutput | Select-String "API key for admin: (.+)" | ForEa
 if (-not $adminApiKey) {
     # Account may already exist — try to get the key from the role
     Write-Host "       Account may already exist. Attempting to use existing key..." -ForegroundColor DarkYellow
-    $adminApiKey = kubectl exec $conjurPod -n conjur-system -- conjurctl role retrieve-key myConjurAccount:user:admin 2>&1
+    $adminApiKey = kubectl exec $conjurPod -n conjur-system -- conjurctl role retrieve-key nimbusConjurAccount:user:admin 2>&1
     $adminApiKey = $adminApiKey.Trim()
 }
 Write-Host "       Admin API key obtained" -ForegroundColor Green
@@ -57,26 +57,26 @@ try {
     Write-Host "[5/7] Loading Conjur policies..." -ForegroundColor Yellow
 
     # Authenticate as admin
-    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/myConjurAccount/admin/authenticate" `
+    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/nimbusConjurAccount/admin/authenticate" `
         -Method Post -Body $adminApiKey -ContentType "text/plain"
     $token = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($tokenBytes))
     $authHeader = @{ Authorization = "Token token=`"$token`"" }
 
     # Load root policy
     $rootPolicy = Get-Content (Join-Path $PolicyDir "root.yml") -Raw
-    Invoke-RestMethod -Uri "$conjurUrl/policies/myConjurAccount/policy/root" `
+    Invoke-RestMethod -Uri "$conjurUrl/policies/nimbusConjurAccount/policy/root" `
         -Method Put -Headers $authHeader -Body $rootPolicy -ContentType "application/x-yaml"
     Write-Host "       Loaded root.yml" -ForegroundColor Gray
 
     # Re-authenticate (token may expire)
-    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/myConjurAccount/admin/authenticate" `
+    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/nimbusConjurAccount/admin/authenticate" `
         -Method Post -Body $adminApiKey -ContentType "text/plain"
     $token = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($tokenBytes))
     $authHeader = @{ Authorization = "Token token=`"$token`"" }
 
     # Load apps policy (capture host API key)
     $appsPolicy = Get-Content (Join-Path $PolicyDir "apps.yml") -Raw
-    $appsResult = Invoke-RestMethod -Uri "$conjurUrl/policies/myConjurAccount/policy/apps" `
+    $appsResult = Invoke-RestMethod -Uri "$conjurUrl/policies/nimbusConjurAccount/policy/apps" `
         -Method Post -Headers $authHeader -Body $appsPolicy -ContentType "application/x-yaml"
     Write-Host "       Loaded apps.yml" -ForegroundColor Gray
 
@@ -94,14 +94,14 @@ try {
     }
 
     # Re-authenticate
-    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/myConjurAccount/admin/authenticate" `
+    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/nimbusConjurAccount/admin/authenticate" `
         -Method Post -Body $adminApiKey -ContentType "text/plain"
     $token = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($tokenBytes))
     $authHeader = @{ Authorization = "Token token=`"$token`"" }
 
     # Load db-secrets policy
     $dbPolicy = Get-Content (Join-Path $PolicyDir "db-secrets.yml") -Raw
-    Invoke-RestMethod -Uri "$conjurUrl/policies/myConjurAccount/policy/db" `
+    Invoke-RestMethod -Uri "$conjurUrl/policies/nimbusConjurAccount/policy/db" `
         -Method Post -Headers $authHeader -Body $dbPolicy -ContentType "application/x-yaml"
     Write-Host "       Loaded db-secrets.yml" -ForegroundColor Gray
 
@@ -109,18 +109,18 @@ try {
     Write-Host "[6/7] Setting secrets in Conjur vault..." -ForegroundColor Yellow
 
     # Re-authenticate
-    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/myConjurAccount/admin/authenticate" `
+    $tokenBytes = Invoke-RestMethod -Uri "$conjurUrl/authn/nimbusConjurAccount/admin/authenticate" `
         -Method Post -Body $adminApiKey -ContentType "text/plain"
     $token = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($tokenBytes))
     $authHeader = @{ Authorization = "Token token=`"$token`"" }
 
     # Set empdb-uid
-    Invoke-RestMethod -Uri "$conjurUrl/secrets/myConjurAccount/variable/db%2Fempdb-uid" `
+    Invoke-RestMethod -Uri "$conjurUrl/secrets/nimbusConjurAccount/variable/db%2Fempdb-uid" `
         -Method Post -Headers $authHeader -Body "db2inst1" -ContentType "text/plain"
     Write-Host "       Set db/empdb-uid = db2inst1" -ForegroundColor Gray
 
     # Set empdb-pwd
-    Invoke-RestMethod -Uri "$conjurUrl/secrets/myConjurAccount/variable/db%2Fempdb-pwd" `
+    Invoke-RestMethod -Uri "$conjurUrl/secrets/nimbusConjurAccount/variable/db%2Fempdb-pwd" `
         -Method Post -Headers $authHeader -Body "appSecretPass123" -ContentType "text/plain"
     Write-Host "       Set db/empdb-pwd = ********" -ForegroundColor Gray
 
@@ -132,7 +132,7 @@ try {
 
     kubectl create secret generic conjur-app-identity -n apps `
         --from-literal=CONJUR_APPLIANCE_URL=http://conjur-server.conjur-system.svc.cluster.local `
-        --from-literal=CONJUR_ACCOUNT=myConjurAccount `
+        --from-literal=CONJUR_ACCOUNT=nimbusConjurAccount `
         --from-literal=CONJUR_AUTHN_LOGIN=host/apps/liberty-app `
         --from-literal=CONJUR_AUTHN_API_KEY=$hostApiKey `
         --from-literal=CONJUR_ADMIN_API_KEY=$adminApiKey `
@@ -156,7 +156,7 @@ Write-Host "============================================" -ForegroundColor Green
 Write-Host "  PostgreSQL:  conjur-postgres (conjur-system)"
 Write-Host "  Conjur:      conjur-server  (conjur-system)"
 Write-Host "  NodePort:    http://localhost:30080"
-Write-Host "  Account:     myConjurAccount"
+Write-Host "  Account:     nimbusConjurAccount"
 Write-Host "  Secrets:     db/empdb-uid, db/empdb-pwd"
 Write-Host "  App Secret:  conjur-app-identity (apps namespace)"
 Write-Host ""

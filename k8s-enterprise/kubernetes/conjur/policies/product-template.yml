@@ -1,0 +1,88 @@
+###############################################################################
+# product-template.yml — Product structure: apps + resources + access layer
+#
+# Load into: nimbus/{env}/products/{product}
+#   curl -X POST .../policies/nimbusConjurAccount/policy/nimbus%2Fprod%2Fproducts%2Fpayments \
+#     -d @product-template.yml
+#
+# This creates:
+#   apps/
+#     openshift/    — OpenShift microservices (OpenLiberty)
+#     batch/        — Batch jobs (CronJobs, etc.)
+#     websphere/    — Traditional WebSphere apps
+#   resources/
+#     dbs/          — Database credentials
+#     kafka/        — Kafka cluster credentials
+#     api/          — External API keys
+#     smtp/         — SMTP credentials
+#     ldap/         — LDAP bind credentials
+#     oauth/        — OAuth client credentials
+#     certs/        — Certificate/keystore passwords
+#   resources-readers — Layer granting shared resource access to all product apps
+###############################################################################
+
+# --- App type containers ---
+- !policy
+  id: apps
+  body:
+    - !policy
+      id: openshift
+      annotations:
+        description: "OpenShift microservices (OpenLiberty, JWT auth)"
+
+    - !policy
+      id: batch
+      annotations:
+        description: "Batch jobs and CronJobs (API key auth)"
+
+    - !policy
+      id: websphere
+      annotations:
+        description: "Traditional WebSphere applications (API key auth)"
+
+# --- Resource type containers ---
+- !policy
+  id: resources
+  body:
+    - !policy
+      id: dbs
+      annotations:
+        description: "Database credentials (per-app granular access)"
+
+    - !policy
+      id: kafka
+      annotations:
+        description: "Kafka cluster credentials (product-wide shared)"
+
+    - !policy
+      id: api
+      annotations:
+        description: "External API keys (product-wide shared)"
+
+    - !policy
+      id: smtp
+      annotations:
+        description: "SMTP server credentials (product-wide shared)"
+
+    - !policy
+      id: ldap
+      annotations:
+        description: "LDAP bind credentials (product-wide shared)"
+
+    - !policy
+      id: oauth
+      annotations:
+        description: "OAuth client credentials (product-wide shared)"
+
+    - !policy
+      id: certs
+      annotations:
+        description: "Certificate/keystore passwords (product-wide shared)"
+
+# --- Shared resource access layer ---
+# All apps in this product that need shared infra access (Kafka, SMTP, etc.)
+# are added to this layer. Individual DB access is granted separately.
+- !layer
+  id: resources-readers
+  annotations:
+    description: "Layer granting all product apps read access to shared resources (Kafka, SMTP, LDAP, etc.)"

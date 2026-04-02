@@ -162,6 +162,43 @@ public class PolicyResource {
         }
     }
 
+    @POST
+    @Path("/load")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Load generic policy YAML",
+               description = "Loads arbitrary policy YAML to a branch using PUT (replace), POST (append), or PATCH (update)")
+    public Response loadPolicy(Map<String, String> body) {
+        String branch = body.get("branch");
+        String yaml = body.get("yaml");
+        String method = body.get("method");
+
+        if (branch == null || yaml == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "branch and yaml are required")).build();
+        }
+        if (method == null) method = "POST";
+
+        try {
+            String response = switch (method.toUpperCase()) {
+                case "PUT" -> conjurClient.loadPolicy(branch, yaml);
+                case "POST" -> conjurClient.appendPolicy(branch, yaml);
+                case "PATCH" -> conjurClient.patchPolicy(branch, yaml);
+                default -> throw new IllegalArgumentException("method must be PUT, POST, or PATCH");
+            };
+
+            PolicyResult result = new PolicyResult();
+            result.setMessage("Policy loaded (" + method.toUpperCase() + ") at " + branch);
+            result.setBranch(branch);
+            result.setRawResponse(response);
+            return Response.ok(result).build();
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Failed to load policy at " + branch, e);
+            PolicyResult result = new PolicyResult();
+            result.setError("Failed to load policy: " + e.getMessage());
+            return Response.serverError().entity(result).build();
+        }
+    }
+
     private String extractHostApiKey(String jsonResponse, String appName) {
         try (JsonReader reader = Json.createReader(new StringReader(jsonResponse))) {
             JsonObject root = reader.readObject();

@@ -1,8 +1,0 @@
-com\example\conjur\health\AppLivenessCheck.class
-com\example\conjur\repository\EmployeeRepository.class
-com\example\conjur\rest\EmployeeResource.class
-com\example\conjur\health\DatabaseHealthCheck.class
-com\example\conjur\model\Employee.class
-com\example\conjur\health\ConjurHealthCheck.class
-com\example\conjur\rest\ConjurApplication.class
-com\example\conjur\rest\SecretResource.class

@@ -28,7 +28,7 @@ import java.util.logging.Logger;
  * <p>Configuration via environment variables:
  * <ul>
  *   <li>CONJUR_APPLIANCE_URL — Conjur server URL (default: http://conjur-server.conjur-system.svc.cluster.local)</li>
- *   <li>CONJUR_ACCOUNT — Conjur account name (default: myConjurAccount)</li>
+ *   <li>CONJUR_ACCOUNT — Conjur account name (default: nimbusConjurAccount)</li>
  *   <li>CONJUR_AUTHN_LOGIN — authentication identity for API key auth</li>
  *   <li>CONJUR_AUTHN_API_KEY — API key for authentication</li>
  *   <li>CONJUR_AUTHN_JWT_SERVICE_ID — JWT authenticator service ID (e.g. "openshift")</li>
@@ -58,7 +58,7 @@ public class ConjurAuthenticator {
     public ConjurAuthenticator() {
         this.applianceUrl = env("CONJUR_APPLIANCE_URL",
                 "http://conjur-server.conjur-system.svc.cluster.local");
-        this.account = env("CONJUR_ACCOUNT", "myConjurAccount");
+        this.account = env("CONJUR_ACCOUNT", "nimbusConjurAccount");
         this.authnLogin = env("CONJUR_AUTHN_LOGIN", "");
         this.apiKey = env("CONJUR_AUTHN_API_KEY", "");
         this.jwtServiceId = env("CONJUR_AUTHN_JWT_SERVICE_ID", "");

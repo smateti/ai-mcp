@@ -1,0 +1,26 @@
+###############################################################################
+# nimbus.yml — Environment branches under nimbus/
+#
+# Load into: nimbus
+#   curl -X POST .../policies/nimbusConjurAccount/policy/nimbus -d @nimbus.yml
+#
+# Creates the three environment branches:
+#   nimbus/dev/   — development
+#   nimbus/qa/    — quality assurance / staging
+#   nimbus/prod/  — production
+###############################################################################
+
+- !policy
+  id: dev
+  annotations:
+    description: "Development environment"
+
+- !policy
+  id: qa
+  annotations:
+    description: "QA / staging environment"
+
+- !policy
+  id: prod
+  annotations:
+    description: "Production environment"

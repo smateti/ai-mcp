@@ -42,7 +42,7 @@
 
     <!-- Conjur connection (overridden by K8s Secret env vars at runtime) -->
     <variable name="conjur.appliance.url" defaultValue="http://conjur-server.conjur-system.svc.cluster.local"/>
-    <variable name="conjur.account" defaultValue="myConjurAccount"/>
+    <variable name="conjur.account" defaultValue="nimbusConjurAccount"/>
     <variable name="conjur.authn.login" defaultValue="host/apps/liberty-app"/>
     <variable name="conjur.authn.api.key" defaultValue="not-set"/>
 

@@ -1,0 +1,102 @@
+###############################################################################
+# delegation-template.yml — Grant app → resource access
+#
+# Load into: nimbus/{env}/products/{product}
+#   curl -X POST .../policy/nimbus%2Fprod%2Fproducts%2Fpayments \
+#     -d @delegation-template.yml
+#
+# IMPORTANT: Load AFTER app-host-template.yml and db-resource-template.yml
+###############################################################################
+
+# =====================================================================
+# 1. Per-app DB access (granular)
+# =====================================================================
+
+- !grant
+  role: !group resources/dbs/orders-db/readers
+  member: !host apps/openshift/orders-api
+
+- !grant
+  role: !group resources/dbs/ledger-db/readers
+  member: !host apps/openshift/settlement-api
+
+# =====================================================================
+# 2. Product-wide shared resource access
+# =====================================================================
+
+- !grant
+  role: !layer resources-readers
+  member: !host apps/openshift/orders-api
+
+- !grant
+  role: !layer resources-readers
+  member: !host apps/openshift/settlement-api
+
+# =====================================================================
+# 3. Permit resources-readers layer to read all shared infra secrets
+# =====================================================================
+
+# Kafka
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/bootstrap-servers
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-username
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/sasl-mechanism
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/security-protocol
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/keystore-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/truststore-password
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-url
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-key
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/kafka/main/schema-registry-secret
+
+# API keys
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/key
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/secret
+- !permit
+  role: !layer resources-readers
+  privilege: [ read, execute ]
+  resource: !variable resources/api/stripe/webhook-secret
+
+# =====================================================================
+# 4. JWT authenticator enrollment
+#    Load SEPARATELY into root level:
+#
+#   - !grant
+#     role: !group conjur/authn-jwt/kubernetes/authenticatable
+#     member: !host nimbus/prod/products/payments/apps/openshift/orders-api
+# =====================================================================

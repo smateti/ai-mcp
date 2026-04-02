@@ -7,7 +7,7 @@ COPY --chown=1001:0 target/dependency/db2jcc.jar /config/lib/db2/db2jcc.jar
 COPY --chown=1001:0 target/employee-app.war /config/apps/
 
 ENV CONJUR_APPLIANCE_URL=http://conjur-server.conjur-system.svc.cluster.local
-ENV CONJUR_ACCOUNT=myConjurAccount
+ENV CONJUR_ACCOUNT=nimbusConjurAccount
 ENV CONJUR_AUTHN_LOGIN=host/apps/liberty-app
 ENV CONJUR_AUTHN_API_KEY=not-set
 ENV DB_HOST=db2.databases.svc.cluster.local

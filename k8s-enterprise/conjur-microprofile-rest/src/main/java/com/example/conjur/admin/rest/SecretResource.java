@@ -1,5 +1,6 @@
 package com.example.conjur.admin.rest;
 
+import com.example.conjur.admin.model.BulkSecretRequest;
 import com.example.conjur.admin.model.DbCredentials;
 import com.example.conjur.admin.model.SecretEntry;
 import com.example.conjur.admin.service.ConjurClient;
@@ -13,15 +14,17 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Path("/secrets")
 @RequestScoped
 @Tag(name = "Secrets", description = "Manage Conjur vault secrets and database credentials")
 @Produces(MediaType.APPLICATION_JSON)
 public class SecretResource {
+
+    private static final Logger LOG = Logger.getLogger(SecretResource.class.getName());
 
     @Inject
     private ConjurClient conjurClient;
@@ -148,5 +151,37 @@ public class SecretResource {
         } catch (Exception e) {
             return Response.serverError().entity(Map.of("error", e.getMessage())).build();
         }
+    }
+
+    @POST
+    @Path("/bulk")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Set multiple secrets",
+               description = "Sets multiple secret values in a single request")
+    public Response bulkSetSecrets(BulkSecretRequest request) {
+        if (request.getSecrets() == null || request.getSecrets().isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "secrets list is required")).build();
+        }
+
+        List<String> success = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        for (BulkSecretRequest.SecretValue sv : request.getSecrets()) {
+            try {
+                conjurClient.setSecret(sv.getVariableId(), sv.getValue());
+                success.add(sv.getVariableId());
+            } catch (Exception e) {
+                errors.add(sv.getVariableId() + ": " + e.getMessage());
+            }
+        }
+
+        LOG.info("Bulk set secrets: " + success.size() + " ok, " + errors.size() + " failed");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", success.size() + " secrets set successfully");
+        result.put("set", success);
+        result.put("errors", errors);
+        return Response.ok(result).build();
     }
 }

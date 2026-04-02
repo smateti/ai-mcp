@@ -1,0 +1,71 @@
+###############################################################################
+# conjur-authn-jwt-kubernetes.yml — JWT Authenticator for Kubernetes
+#
+# Load into: conjur/authn-jwt
+#   curl -X POST .../policies/nimbusConjurAccount/policy/conjur%2Fauthn-jwt -d @conjur-authn-jwt-kubernetes.yml
+#
+# After loading, set the variable values:
+#   conjur/authn-jwt/kubernetes/jwks-uri         → K8s OIDC JWKS endpoint
+#   conjur/authn-jwt/kubernetes/token-app-property → "sub" (maps SA to host)
+#   conjur/authn-jwt/kubernetes/identity-path     → base path for host lookup
+#   conjur/authn-jwt/kubernetes/issuer            → K8s token issuer URL
+#
+# Then enable the authenticator on Conjur server:
+#   CONJUR_AUTHENTICATORS=authn,authn-jwt/kubernetes
+#
+# To find your K8s OIDC endpoint:
+#   kubectl get --raw /.well-known/openid-configuration | jq .jwks_uri
+#   kubectl get --raw /.well-known/openid-configuration | jq .issuer
+###############################################################################
+
+- !policy
+  id: kubernetes
+  body:
+    # --- Authenticator configuration variables ---
+    - !variable
+      id: jwks-uri
+      annotations:
+        description: "Kubernetes OIDC JWKS endpoint for token validation"
+        example: "https://kubernetes.default.svc/openid/v1/jwks"
+
+    - !variable
+      id: token-app-property
+      annotations:
+        description: "JWT claim used to identify the application (usually 'sub')"
+        example: "sub"
+
+    - !variable
+      id: identity-path
+      annotations:
+        description: "Base Conjur policy path prepended to the token-app-property value"
+        example: "nimbus/prod/products"
+
+    - !variable
+      id: issuer
+      annotations:
+        description: "Expected 'iss' claim in the JWT (K8s API server URL)"
+        example: "https://kubernetes.default.svc"
+
+    - !variable
+      id: audience
+      annotations:
+        description: "Expected 'aud' claim (optional, defaults to conjur account)"
+
+    - !variable
+      id: claim-mapping
+      annotations:
+        description: "Comma-separated list of JWT claims to map: namespace,serviceaccount"
+
+    # --- Web service representing this authenticator ---
+    - !webservice
+
+    # --- Group of hosts allowed to authenticate via this JWT authenticator ---
+    - !group
+      id: authenticatable
+      annotations:
+        description: "Hosts permitted to use authn-jwt/kubernetes"
+
+    - !permit
+      role: !group authenticatable
+      privilege: [ read, authenticate ]
+      resource: !webservice
