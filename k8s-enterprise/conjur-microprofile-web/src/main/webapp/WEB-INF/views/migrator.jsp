@@ -70,7 +70,7 @@
     <!-- Tab 3: Grant Access -->
     <div class="tab-panel" id="panel-grants">
         <h3>Grant Access</h3>
-        <p>Select a product to discover its hosts and resources, then grant per-resource access.</p>
+        <p>Select a product, choose hosts and resources, then grant access.</p>
         <div class="form-row">
             <div class="form-group"><label>Organization</label>
                 <select id="grant-org"><option value="">-- Select --</option></select></div>
@@ -80,7 +80,34 @@
                 <select id="grant-product"><option value="">-- Select --</option></select></div>
         </div>
         <div id="grant-loading" style="display:none;"><p>Loading resources and hosts...</p></div>
-        <div id="grant-sections"></div>
+
+        <!-- Hosts Section -->
+        <div id="grant-hosts-section" style="display:none;">
+            <div class="grant-type-section">
+                <h4>Select Hosts (Apps)</h4>
+                <p style="color:#666;font-size:0.9em;">Choose which hosts should receive access.</p>
+                <div class="form-row" style="align-items:end;">
+                    <div class="form-group"><label>Filter by App Type</label>
+                        <select id="grant-apptype-filter" onchange="filterGrantHosts()">
+                            <option value="">All App Types</option>
+                        </select></div>
+                    <button type="button" onclick="toggleAllHosts(true)" style="margin-bottom:4px;">Select All</button>
+                    <button type="button" onclick="toggleAllHosts(false)" style="margin-bottom:4px;">Clear All</button>
+                </div>
+                <div id="grant-host-list" class="grant-host-grid"></div>
+            </div>
+        </div>
+
+        <!-- Resources Section -->
+        <div id="grant-resources-section" style="display:none;">
+            <div class="grant-type-section">
+                <h4>Select Resources</h4>
+                <p style="color:#666;font-size:0.9em;">Choose which resources the selected hosts should access.</p>
+                <div id="grant-resource-list"></div>
+            </div>
+        </div>
+
+        <!-- JWT Authenticator Section -->
         <div id="grant-jwt-section" style="display:none;">
             <div class="grant-type-section">
                 <h4>JWT Authenticator</h4>
@@ -90,9 +117,9 @@
                             <option value="">-- Loading --</option>
                         </select></div>
                 </div>
-                <div id="grant-jwt-hosts" class="grant-host-grid"></div>
             </div>
         </div>
+
         <div style="margin: 16px 0;">
             <button onclick="submitGrants()">Submit All Grants</button>
         </div>

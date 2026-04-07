@@ -232,66 +232,106 @@ function loadGrantContext() {
 }
 
 function renderGrantSections() {
-    var html = '';
+    var hostsSection = document.getElementById('grant-hosts-section');
+    var resourcesSection = document.getElementById('grant-resources-section');
+    var jwtSection = document.getElementById('grant-jwt-section');
 
+    // Render Hosts section
     if (grantHosts.length === 0) {
-        html = '<p class="grant-empty">No hosts found. Register hosts first in the "Create App" tab.</p>';
-        document.getElementById('grant-sections').innerHTML = html;
-        document.getElementById('grant-jwt-section').style.display = 'none';
+        hostsSection.style.display = 'block';
+        document.getElementById('grant-host-list').innerHTML =
+            '<p class="grant-empty">No hosts found. Register hosts first in the "Create App" tab.</p>';
+        document.getElementById('grant-apptype-filter').innerHTML =
+            '<option value="">All App Types</option>';
+        resourcesSection.style.display = 'none';
+        jwtSection.style.display = 'none';
         return;
     }
 
+    hostsSection.style.display = 'block';
+
+    // Populate app type filter
+    var appTypes = {};
+    grantHosts.forEach(function(h) { appTypes[h.appType] = true; });
+    var filterEl = document.getElementById('grant-apptype-filter');
+    filterEl.innerHTML = '<option value="">All App Types</option>';
+    Object.keys(appTypes).sort().forEach(function(t) {
+        filterEl.innerHTML += '<option value="' + esc(t) + '">' + esc(t) + '</option>';
+    });
+
+    // Render host checkboxes
+    var hostHtml = '';
+    grantHosts.forEach(function(h) {
+        hostHtml += '<label><input type="checkbox" class="grant-host-cb"'
+            + ' data-apptype="' + esc(h.appType) + '" data-hostid="' + esc(h.hostId) + '"> '
+            + esc(h.appType) + '/' + esc(h.hostId) + '</label>';
+    });
+    document.getElementById('grant-host-list').innerHTML = hostHtml;
+
+    // Render Resources section
     var hasResources = false;
     var allTypes = resTypeOrder.slice();
     Object.keys(grantResources).forEach(function(t) {
         if (allTypes.indexOf(t) === -1) allTypes.push(t);
     });
 
+    var resHtml = '';
     allTypes.forEach(function(type) {
         var resources = grantResources[type];
         if (!resources || resources.length === 0) return;
         hasResources = true;
         var label = resTypeLabels[type] || type;
 
-        html += '<div class="grant-type-section"><h4>' + esc(label) + '</h4>';
+        resHtml += '<div class="grant-resource-card"><h5>' + esc(label) + '</h5>'
+            + '<div class="grant-host-grid">';
         resources.forEach(function(resName) {
-            html += '<div class="grant-resource-card"><h5>' + esc(resName) + '</h5>'
-                + '<div class="grant-host-grid">';
-            grantHosts.forEach(function(h) {
-                html += '<label><input type="checkbox" class="grant-cb"'
-                    + ' data-type="' + esc(type) + '" data-resource="' + esc(resName) + '"'
-                    + ' data-apptype="' + esc(h.appType) + '" data-hostid="' + esc(h.hostId) + '"> '
-                    + esc(h.appType) + '/' + esc(h.hostId) + '</label>';
-            });
-            html += '</div></div>';
+            resHtml += '<label><input type="checkbox" class="grant-res-cb"'
+                + ' data-type="' + esc(type) + '" data-resource="' + esc(resName) + '"> '
+                + esc(resName) + '</label>';
         });
-        html += '</div>';
+        resHtml += '</div></div>';
     });
 
     if (!hasResources) {
-        html += '<p class="grant-empty">No resources found. Create resources first.</p>';
+        resHtml = '<p class="grant-empty">No resources found. Create resources first.</p>';
     }
 
-    document.getElementById('grant-sections').innerHTML = html;
+    document.getElementById('grant-resource-list').innerHTML = resHtml;
+    resourcesSection.style.display = 'block';
 
-    // JWT section: populate authenticator dropdown and host checkboxes
+    // JWT section
     if (grantAuthenticators.length > 0) {
-        document.getElementById('grant-jwt-section').style.display = 'block';
+        jwtSection.style.display = 'block';
         var sel = document.getElementById('grant-jwt-svc');
         sel.innerHTML = '';
         grantAuthenticators.forEach(function(svc) {
             sel.innerHTML += '<option value="' + esc(svc) + '">authn-jwt/' + esc(svc) + '</option>';
         });
-        var jwtHtml = '';
-        grantHosts.forEach(function(h) {
-            jwtHtml += '<label><input type="checkbox" class="grant-jwt-cb"'
-                + ' data-apptype="' + esc(h.appType) + '" data-hostid="' + esc(h.hostId) + '"> '
-                + esc(h.appType) + '/' + esc(h.hostId) + '</label>';
-        });
-        document.getElementById('grant-jwt-hosts').innerHTML = jwtHtml;
     } else {
-        document.getElementById('grant-jwt-section').style.display = 'none';
+        jwtSection.style.display = 'none';
     }
+}
+
+function filterGrantHosts() {
+    var filter = document.getElementById('grant-apptype-filter').value;
+    document.querySelectorAll('.grant-host-cb').forEach(function(cb) {
+        var label = cb.parentElement;
+        if (!filter || cb.getAttribute('data-apptype') === filter) {
+            label.style.display = '';
+        } else {
+            label.style.display = 'none';
+            cb.checked = false;
+        }
+    });
+}
+
+function toggleAllHosts(checked) {
+    var filter = document.getElementById('grant-apptype-filter').value;
+    document.querySelectorAll('.grant-host-cb').forEach(function(cb) {
+        if (!filter || cb.getAttribute('data-apptype') === filter) {
+            cb.checked = checked;
+        }
+    });
 }
 
 function submitGrants() {
@@ -300,33 +340,44 @@ function submitGrants() {
     var prod = document.getElementById('grant-product').value;
     if (!org || !env || !prod) { alert('Org, Environment, and Product are required'); return; }
 
-    var promises = [];
-
-    // Resource grants from checkboxes
-    document.querySelectorAll('.grant-cb:checked').forEach(function(cb) {
-        promises.push(apiCall('POST', '/api/access/grant', {
-            orgName: org, environment: env, product: prod,
-            appType: cb.getAttribute('data-apptype'),
-            hostId: cb.getAttribute('data-hostid'),
-            targetType: cb.getAttribute('data-type'),
-            targetResource: cb.getAttribute('data-resource')
-        }));
+    // Collect selected hosts
+    var selectedHosts = [];
+    document.querySelectorAll('.grant-host-cb:checked').forEach(function(cb) {
+        selectedHosts.push({ appType: cb.getAttribute('data-apptype'), hostId: cb.getAttribute('data-hostid') });
     });
 
-    // JWT grants
-    var jwtSvc = document.getElementById('grant-jwt-svc').value.trim();
-    if (jwtSvc) {
-        document.querySelectorAll('.grant-jwt-cb:checked').forEach(function(cb) {
+    // Collect selected resources
+    var selectedResources = [];
+    document.querySelectorAll('.grant-res-cb:checked').forEach(function(cb) {
+        selectedResources.push({ type: cb.getAttribute('data-type'), resource: cb.getAttribute('data-resource') });
+    });
+
+    var promises = [];
+
+    // Resource grants: each selected host × each selected resource
+    selectedHosts.forEach(function(h) {
+        selectedResources.forEach(function(r) {
             promises.push(apiCall('POST', '/api/access/grant', {
                 orgName: org, environment: env, product: prod,
-                appType: cb.getAttribute('data-apptype'),
-                hostId: cb.getAttribute('data-hostid'),
+                appType: h.appType, hostId: h.hostId,
+                targetType: r.type, targetResource: r.resource
+            }));
+        });
+    });
+
+    // JWT grants: each selected host × selected authenticator
+    var jwtSvc = document.getElementById('grant-jwt-svc').value;
+    if (jwtSvc && selectedHosts.length > 0) {
+        selectedHosts.forEach(function(h) {
+            promises.push(apiCall('POST', '/api/access/grant', {
+                orgName: org, environment: env, product: prod,
+                appType: h.appType, hostId: h.hostId,
                 targetType: 'jwt', targetResource: jwtSvc
             }));
         });
     }
 
-    if (promises.length === 0) { alert('Select at least one grant checkbox'); return; }
+    if (promises.length === 0) { alert('Select at least one host and one resource (or JWT authenticator)'); return; }
     showResult('grant-result', 'Submitting ' + promises.length + ' grant(s)...', false);
     Promise.all(promises)
         .then(function(results) {
