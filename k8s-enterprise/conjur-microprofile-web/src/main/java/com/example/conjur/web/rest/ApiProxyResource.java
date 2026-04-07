@@ -19,7 +19,7 @@ import java.util.Map;
  * Proxies /api/* calls from the browser to the conjur-microprofile-rest service.
  * This allows the web UI JavaScript to use relative paths without CORS issues.
  */
-@Path("/api")
+@Path("/")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -54,13 +54,13 @@ public class ApiProxyResource {
     }
 
     @GET
-    @Path("/secrets/db/{dbname}")
+    @Path("/secrets/dbs/{dbname}")
     public DbCredentials getDbCredentials(@PathParam("dbname") String dbname) {
         return api.getDbCredentials(dbname);
     }
 
     @PUT
-    @Path("/secrets/db/{dbname}")
+    @Path("/secrets/dbs/{dbname}")
     public Map<String, String> putDbCredentials(@PathParam("dbname") String dbname, Map<String, String> body) {
         return api.putDbCredentials(dbname, body);
     }

@@ -8,6 +8,7 @@ public class HostSetup {
     private String hostId;
     private String namespace;
     private String serviceAccount;
+    private String authMethod; // "authn", "kubernetes", or "openshift"
 
     public String getOrgName() { return orgName; }
     public void setOrgName(String orgName) { this.orgName = orgName; }
@@ -23,4 +24,6 @@ public class HostSetup {
     public void setNamespace(String namespace) { this.namespace = namespace; }
     public String getServiceAccount() { return serviceAccount; }
     public void setServiceAccount(String serviceAccount) { this.serviceAccount = serviceAccount; }
+    public String getAuthMethod() { return authMethod; }
+    public void setAuthMethod(String authMethod) { this.authMethod = authMethod; }
 }

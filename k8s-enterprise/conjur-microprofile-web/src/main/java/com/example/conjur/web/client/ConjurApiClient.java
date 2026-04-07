@@ -3,12 +3,14 @@ package com.example.conjur.web.client;
 import com.example.conjur.web.client.model.*;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.rest.client.annotation.RegisterProvider;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 import java.util.List;
 import java.util.Map;
 
 @RegisterRestClient(configKey = "conjur-api")
+@RegisterProvider(BackendResponseExceptionMapper.class)
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -31,11 +33,11 @@ public interface ConjurApiClient {
     Map<String, String> putSecret(@PathParam("variableId") String variableId, Map<String, String> body);
 
     @GET
-    @Path("/secrets/db/{dbname}")
+    @Path("/secrets/dbs/{dbname}")
     DbCredentials getDbCredentials(@PathParam("dbname") String dbname);
 
     @PUT
-    @Path("/secrets/db/{dbname}")
+    @Path("/secrets/dbs/{dbname}")
     Map<String, String> putDbCredentials(@PathParam("dbname") String dbname, Map<String, String> body);
 
     @GET

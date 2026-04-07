@@ -74,9 +74,13 @@ public class SetupResource {
         }
 
         try {
+            // Ensure environments branch exists under org
+            String envsBranchYaml = policyGenerator.generateEnvironmentsBranch();
+            conjurClient.appendPolicy(setup.getOrgName(), envsBranchYaml);
+
             String yaml = policyGenerator.generateEnvironments(setup.getEnvironments());
-            String response = conjurClient.appendPolicy(setup.getOrgName(), yaml);
-            LOG.info("Created environments " + setup.getEnvironments() + " under " + setup.getOrgName());
+            String response = conjurClient.appendPolicy(setup.getOrgName() + "/environments", yaml);
+            LOG.info("Created environments " + setup.getEnvironments() + " under " + setup.getOrgName() + "/environments");
 
             PolicyResult result = new PolicyResult();
             result.setMessage("Environments created: " + setup.getEnvironments());
@@ -106,7 +110,7 @@ public class SetupResource {
         List<String> resourceTypes = setup.getResourceTypes() != null ? setup.getResourceTypes()
                 : List.of("dbs", "kafka", "api", "smtp", "ldap", "oauth", "certs");
 
-        String envBranch = setup.getOrgName() + "/" + setup.getEnvironment();
+        String envBranch = setup.getOrgName() + "/environments/" + setup.getEnvironment();
         String productsBranch = envBranch + "/products";
 
         try {
@@ -146,7 +150,7 @@ public class SetupResource {
                     .entity(Map.of("error", "orgName, environment, product, and appType are required")).build();
         }
 
-        String appsBranch = setup.getOrgName() + "/" + setup.getEnvironment()
+        String appsBranch = setup.getOrgName() + "/environments/" + setup.getEnvironment()
                 + "/products/" + setup.getProduct() + "/apps";
 
         try {

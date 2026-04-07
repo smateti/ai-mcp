@@ -218,7 +218,7 @@ public class ResourceManagementResource {
             targetBranch = branch;
         } else if (orgName != null && environment != null && product != null) {
             String resourceType = (String) body.getOrDefault("resourceType", "");
-            targetBranch = orgName + "/" + environment + "/products/" + product;
+            targetBranch = orgName + "/environments/" + environment + "/products/" + product;
             if (!resourceType.isBlank()) {
                 targetBranch += "/resources/" + resourceType;
             }
@@ -250,7 +250,7 @@ public class ResourceManagementResource {
                 || setup.getProduct() == null || setup.getResourceName() == null) {
             return null;
         }
-        return setup.getOrgName() + "/" + setup.getEnvironment()
+        return setup.getOrgName() + "/environments/" + setup.getEnvironment()
                 + "/products/" + setup.getProduct()
                 + "/resources/" + resourceType;
     }

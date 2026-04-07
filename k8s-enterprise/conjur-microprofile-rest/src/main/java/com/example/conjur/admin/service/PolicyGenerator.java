@@ -76,6 +76,13 @@ public class PolicyGenerator {
 
     // ========== Environments ==========
 
+    public String generateEnvironmentsBranch() {
+        return """
+                - !policy
+                  id: environments
+                """;
+    }
+
     public String generateEnvironments(List<String> environments) {
         StringBuilder yaml = new StringBuilder();
         for (String env : environments) {
@@ -189,73 +196,55 @@ public class PolicyGenerator {
                     - !variable schema-registry-url
                     - !variable schema-registry-key
                     - !variable schema-registry-secret
+
+                    - !group readers
+
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable bootstrap-servers
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable sasl-username
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable sasl-password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable sasl-mechanism
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable security-protocol
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable keystore-password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable truststore-password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable schema-registry-url
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable schema-registry-key
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable schema-registry-secret
                 """.formatted(clusterName);
     }
 
     // ========== Infrastructure Resources ==========
 
     public String generateApiResource(String name) {
-        return """
-                - !policy
-                  id: %s
-                  body:
-                    - !variable key
-                    - !variable secret
-                    - !variable webhook-secret
-                """.formatted(name);
-    }
-
-    public String generateSmtpResource(String name) {
-        return """
-                - !policy
-                  id: %s
-                  body:
-                    - !variable host
-                    - !variable port
-                    - !variable username
-                    - !variable password
-                    - !variable from-address
-                """.formatted(name);
-    }
-
-    public String generateLdapResource(String name) {
-        return """
-                - !policy
-                  id: %s
-                  body:
-                    - !variable url
-                    - !variable base-dn
-                    - !variable bind-dn
-                    - !variable bind-password
-                """.formatted(name);
-    }
-
-    public String generateOauthResource(String name) {
-        return """
-                - !policy
-                  id: %s
-                  body:
-                    - !variable tenant-id
-                    - !variable client-id
-                    - !variable client-secret
-                    - !variable token-endpoint
-                """.formatted(name);
-    }
-
-    public String generateCertsResource(String name) {
-        return """
-                - !policy
-                  id: %s
-                  body:
-                    - !variable keystore-password
-                    - !variable truststore-password
-                    - !variable keystore-type
-                """.formatted(name);
-    }
-
-    // ========== API Resource with Readers ==========
-
-    public String generateApiResourceWithReaders(String name) {
         return """
                 - !policy
                   id: %s
@@ -278,6 +267,130 @@ public class PolicyGenerator {
                       role: !group readers
                       privilege: [ read, execute ]
                       resource: !variable webhook-secret
+                """.formatted(name);
+    }
+
+    public String generateSmtpResource(String name) {
+        return """
+                - !policy
+                  id: %s
+                  body:
+                    - !variable host
+                    - !variable port
+                    - !variable username
+                    - !variable password
+                    - !variable from-address
+
+                    - !group readers
+
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable host
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable port
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable username
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable from-address
+                """.formatted(name);
+    }
+
+    public String generateLdapResource(String name) {
+        return """
+                - !policy
+                  id: %s
+                  body:
+                    - !variable url
+                    - !variable base-dn
+                    - !variable bind-dn
+                    - !variable bind-password
+
+                    - !group readers
+
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable url
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable base-dn
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable bind-dn
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable bind-password
+                """.formatted(name);
+    }
+
+    public String generateOauthResource(String name) {
+        return """
+                - !policy
+                  id: %s
+                  body:
+                    - !variable tenant-id
+                    - !variable client-id
+                    - !variable client-secret
+                    - !variable token-endpoint
+
+                    - !group readers
+
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable tenant-id
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable client-id
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable client-secret
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable token-endpoint
+                """.formatted(name);
+    }
+
+    public String generateCertsResource(String name) {
+        return """
+                - !policy
+                  id: %s
+                  body:
+                    - !variable keystore-password
+                    - !variable truststore-password
+                    - !variable keystore-type
+
+                    - !group readers
+
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable keystore-password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable truststore-password
+                    - !permit
+                      role: !group readers
+                      privilege: [ read, execute ]
+                      resource: !variable keystore-type
                 """.formatted(name);
     }
 
@@ -325,11 +438,16 @@ public class PolicyGenerator {
     // ========== Delegation / Access Grants ==========
 
     public String generateDbAccessGrant(String dbName, String appType, String appHost) {
+        return generateResourceAccessGrant("dbs", dbName, appType, appHost);
+    }
+
+    public String generateResourceAccessGrant(String resourceType, String resourceName,
+                                               String appType, String appHost) {
         return """
                 - !grant
-                  role: !group resources/dbs/%s/readers
+                  role: !group resources/%s/%s/readers
                   member: !host apps/%s/%s
-                """.formatted(dbName, appType, appHost);
+                """.formatted(resourceType, resourceName, appType, appHost);
     }
 
     public String generateSharedResourceGrant(String appType, String appHost) {

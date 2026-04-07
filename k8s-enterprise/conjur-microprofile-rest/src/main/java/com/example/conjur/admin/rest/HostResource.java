@@ -46,17 +46,23 @@ public class HostResource {
                     .entity(Map.of("error", "orgName, environment, product, appType, and hostId are required")).build();
         }
 
-        String branch = setup.getOrgName() + "/" + setup.getEnvironment()
+        String branch = setup.getOrgName() + "/environments/" + setup.getEnvironment()
                 + "/products/" + setup.getProduct()
                 + "/apps/" + setup.getAppType();
 
         try {
+            // authMethod determines annotation style: "kubernetes"/"openshift" get JWT annotations,
+            // "authn" or null gets a plain host with description annotation
+            String authMethod = setup.getAuthMethod();
+            String hostAppType = (authMethod != null && !authMethod.isBlank()) ? authMethod : setup.getAppType();
+            String jwtServiceId = ("kubernetes".equals(authMethod) || "openshift".equals(authMethod)) ? authMethod : null;
+
             String yaml = policyGenerator.generateAppHost(
                     setup.getHostId(),
-                    setup.getAppType(),
+                    hostAppType,
                     setup.getNamespace() != null ? setup.getNamespace() : "apps",
                     setup.getServiceAccount() != null ? setup.getServiceAccount() : setup.getHostId() + "-sa",
-                    null
+                    jwtServiceId
             );
 
             String response = conjurClient.appendPolicy(branch, yaml);

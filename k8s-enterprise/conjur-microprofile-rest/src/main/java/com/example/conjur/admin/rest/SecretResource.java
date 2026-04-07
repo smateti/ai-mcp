@@ -101,9 +101,9 @@ public class SecretResource {
     }
 
     @GET
-    @Path("/db/{dbname}")
+    @Path("/dbs/{dbname}")
     @Operation(summary = "Read DB credentials",
-               description = "Reads the username/password pair for a database (convention: db/{name}-uid and db/{name}-pwd)")
+               description = "Reads the username/password pair for a database (convention: dbs/{name}-uid and dbs/{name}-pwd)")
     @APIResponse(responseCode = "200", description = "Credentials returned")
     public Response getDbCredentials(
             @Parameter(description = "Database name, e.g., empdb")
@@ -111,8 +111,8 @@ public class SecretResource {
 
         DbCredentials creds = new DbCredentials(dbname);
         try {
-            creds.setUsername(conjurClient.getSecret("db/" + dbname + "-uid"));
-            creds.setPassword(conjurClient.getSecret("db/" + dbname + "-pwd"));
+            creds.setUsername(conjurClient.getSecret("dbs/" + dbname + "-uid"));
+            creds.setPassword(conjurClient.getSecret("dbs/" + dbname + "-pwd"));
             creds.setFound(creds.getUsername() != null || creds.getPassword() != null);
         } catch (Exception e) {
             creds.setFound(false);
@@ -122,7 +122,7 @@ public class SecretResource {
     }
 
     @PUT
-    @Path("/db/{dbname}")
+    @Path("/dbs/{dbname}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Write DB credentials",
                description = "Writes or updates the username/password pair for a database")
@@ -140,13 +140,13 @@ public class SecretResource {
                     .entity(Map.of("error", "Body must contain 'username' and 'password' fields")).build();
         }
         try {
-            conjurClient.setSecret("db/" + dbname + "-uid", username);
-            conjurClient.setSecret("db/" + dbname + "-pwd", password);
+            conjurClient.setSecret("dbs/" + dbname + "-uid", username);
+            conjurClient.setSecret("dbs/" + dbname + "-pwd", password);
             return Response.ok(Map.of(
                     "message", "DB credentials written",
                     "database", dbname,
-                    "uidVariable", "db/" + dbname + "-uid",
-                    "pwdVariable", "db/" + dbname + "-pwd"
+                    "uidVariable", "dbs/" + dbname + "-uid",
+                    "pwdVariable", "dbs/" + dbname + "-pwd"
             )).build();
         } catch (Exception e) {
             return Response.serverError().entity(Map.of("error", e.getMessage())).build();

@@ -1,0 +1,162 @@
+/* === Base styles (from PageTemplates.CSS) === */
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       max-width: 960px; margin: 0 auto; padding: 20px;
+       background: #f5f5f5; color: #333; }
+h1 { color: #1a1a2e; border-bottom: 2px solid #16213e; padding-bottom: 10px; }
+h2 { color: #16213e; margin-top: 0; }
+nav { background: #16213e; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; }
+nav a { color: #e0e0e0; text-decoration: none; margin-right: 20px; font-weight: 500; }
+nav a:hover, nav a.active { color: #fff; text-decoration: underline; }
+.card { background: #fff; border-radius: 8px; padding: 20px; margin: 16px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eee; }
+th { background: #f0f0f0; font-weight: 600; }
+.badge { display: inline-block; padding: 3px 12px; border-radius: 12px;
+         font-size: 0.85em; font-weight: 600; }
+.badge-ok  { background: #d4edda; color: #155724; }
+.badge-err { background: #f8d7da; color: #721c24; }
+.badge-warn { background: #fff3cd; color: #856404; }
+code.masked { cursor: pointer; background: #333; color: #333;
+              padding: 2px 8px; border-radius: 3px; user-select: none; }
+code.masked.revealed { background: #e9ecef; color: #333; }
+.form-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 12px 0; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-weight: 600; margin-bottom: 4px; font-size: 0.9em; }
+.form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px; }
+button { padding: 8px 20px; background: #0f3460; color: #fff; border: none;
+         border-radius: 4px; cursor: pointer; font-size: 0.95em; height: 38px; }
+button:hover { background: #16213e; }
+button.danger { background: #c0392b; }
+button.danger:hover { background: #96281b; }
+.result { margin-top: 10px; padding: 12px; background: #e9ecef; border-radius: 4px;
+          font-family: monospace; white-space: pre-wrap; display: none; font-size: 0.9em; }
+.result.error { background: #f8d7da; color: #721c24; }
+.result.success { background: #d4edda; color: #155724; }
+.alert { padding: 12px 16px; border-radius: 6px; margin: 10px 0; font-weight: 500; }
+.alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+.alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #17a2b8; }
+.summary { display: flex; gap: 20px; flex-wrap: wrap; }
+.summary .stat { text-align: center; padding: 16px 24px; background: #16213e;
+                 color: #fff; border-radius: 8px; min-width: 120px; }
+.summary .stat .num { font-size: 2em; font-weight: 700; }
+.summary .stat .label { font-size: 0.85em; opacity: 0.8; }
+
+/* === Tab styles (shared by DBA, Migrator, CI/CD) === */
+.tab-bar { display: flex; gap: 0; margin-bottom: 0; flex-wrap: wrap; }
+.tab-btn { padding: 10px 20px; background: #e0e0e0; border: none; cursor: pointer;
+           font-weight: 600; border-radius: 8px 8px 0 0; color: #555; font-size: 0.9em; }
+.tab-btn.active { background: #fff; color: #16213e; }
+.tab-panel { display: none; background: #fff; padding: 20px; border-radius: 0 8px 8px 8px;
+             box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+textarea { width: 100%; min-height: 60px; font-family: monospace; padding: 8px;
+           border: 1px solid #ccc; border-radius: 4px; }
+
+/* === Explorer tab styles === */
+.explorer-tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+.explorer-tabs .tab {
+    padding: 8px 16px; border-radius: 6px 6px 0 0; font-weight: 600;
+    background: #e0e0e0; color: #666; cursor: pointer; border: none; font-size: 0.9em;
+}
+.explorer-tabs .tab.active { background: #0f3460; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.search-bar { margin-bottom: 12px; }
+.search-bar input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; width: 300px; }
+.role-detail { margin-top: 12px; padding: 16px; background: #f8f9fa; border-radius: 4px;
+               border: 1px solid #dee2e6; display: none; }
+.role-detail ul { margin: 4px 0; padding-left: 24px; }
+.role-detail li { margin: 2px 0; }
+.cb-group { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0; }
+.cb-group label { font-weight: normal; display: flex; align-items: center; gap: 4px; }
+.ref-section { margin-bottom: 16px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6; }
+.ref-section h4 { margin: 0 0 8px 0; color: #0f3460; }
+.ref-add-row { display: flex; gap: 8px; align-items: end; margin-top: 8px; flex-wrap: wrap; }
+.ref-add-row input { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+
+/* === DBA detail panel === */
+#db-detail { display: none; margin-top: 16px; padding: 16px; background: #f8f9fa;
+             border-radius: 8px; border: 1px solid #dee2e6; }
+
+/* === Migrator styles === */
+#app-detail { display: none; margin-top: 16px; padding: 16px; background: #f8f9fa;
+              border-radius: 8px; border: 1px solid #dee2e6; }
+.grant-row { border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
+
+/* === CI/CD guide styles === */
+.guide-section { margin: 20px 0; }
+.guide-section h4 { color: #16213e; margin-bottom: 8px; }
+.guide-section p { margin: 4px 0; line-height: 1.6; }
+pre.yaml { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px;
+           overflow-x: auto; font-size: 0.85em; line-height: 1.5; white-space: pre; }
+.info-box { background: #d1ecf1; color: #0c5460; padding: 12px 16px; border-radius: 6px;
+            border: 1px solid #17a2b8; margin: 12px 0; }
+
+/* === Wizard styles === */
+.wizard-progress { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+.wizard-progress .step-dot {
+    padding: 6px 14px; border-radius: 16px; font-size: 0.82em; font-weight: 600;
+    background: #e0e0e0; color: #666; cursor: pointer; white-space: nowrap;
+    transition: all 0.2s;
+}
+.wizard-progress .step-dot.active { background: #0f3460; color: #fff; }
+.wizard-progress .step-dot.done { background: #28a745; color: #fff; }
+.wizard-progress .step-dot.error { background: #dc3545; color: #fff; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+.step-nav { display: flex; gap: 12px; margin-top: 16px; }
+.step-nav button.secondary { background: #6c757d; }
+.step-result { margin-top: 12px; padding: 12px; border-radius: 4px;
+               font-family: monospace; white-space: pre-wrap; font-size: 0.88em;
+               display: none; max-height: 300px; overflow-y: auto; }
+.step-result.ok { display: block; background: #d4edda; color: #155724; }
+.step-result.err { display: block; background: #f8d7da; color: #721c24; }
+.step-result.info { display: block; background: #d1ecf1; color: #0c5460; }
+.cb-group label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.secret-row { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.secret-row input, .secret-row select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; }
+.secret-row input.var-id { width: 320px; }
+.secret-row input.var-val { width: 240px; }
+.ctx-bar { background: #e9ecef; padding: 8px 14px; border-radius: 6px; margin-bottom: 12px;
+           font-size: 0.9em; color: #333; }
+.ctx-bar strong { color: #0f3460; }
+.exists-badge { display: inline-block; background: #d4edda; color: #155724; padding: 2px 8px;
+                border-radius: 4px; font-size: 0.75em; margin-left: 4px; font-weight: 600; }
+.existing-section { margin: 12px 0; padding: 12px; background: #f0f7ff; border: 1px solid #b8daff;
+                    border-radius: 6px; }
+.existing-section h4 { margin: 0 0 8px 0; color: #004085; font-size: 0.95em; }
+.org-pill { display: inline-block; padding: 6px 16px; margin: 4px; border-radius: 20px;
+            background: #28a745; color: #fff; font-weight: 600; cursor: pointer; font-size: 0.9em; }
+.org-pill:hover { background: #218838; }
+
+/* === Sample App styles === */
+.sa-config { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sa-full { grid-column: 1 / -1; }
+.sa-status { padding: 12px; border-radius: 6px; margin: 12px 0; font-family: monospace;
+             white-space: pre-wrap; font-size: 0.88em; max-height: 400px; overflow-y: auto; }
+.sa-status.ok { background: #d4edda; color: #155724; }
+.sa-status.err { background: #f8d7da; color: #721c24; }
+.sa-status.info { background: #d1ecf1; color: #0c5460; }
+.sa-mappings { width: 100%; min-height: 80px; font-family: monospace; font-size: 0.88em;
+               padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+.sa-actions { display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+.sa-actions button { height: 38px; }
+.sa-pod { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin: 8px 0; }
+.sa-pod h4 { margin: 0 0 8px 0; }
+
+/* === Grant Access resource-type sections === */
+.grant-type-section { background: #fff; border: 1px solid #dee2e6; border-radius: 8px;
+                      padding: 16px; margin: 16px 0; }
+.grant-type-section h4 { margin: 0 0 12px 0; color: #16213e; border-bottom: 1px solid #eee;
+                          padding-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.grant-type-icon { font-size: 1.1em; width: 24px; text-align: center; }
+.grant-resource-card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;
+                       padding: 12px 16px; margin: 8px 0; }
+.grant-resource-card h5 { margin: 0 0 8px 0; font-size: 0.95em; color: #333; }
+.grant-host-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.grant-host-grid label { display: flex; align-items: center; gap: 4px; padding: 4px 10px;
+                         background: #e9ecef; border-radius: 4px; font-size: 0.88em;
+                         cursor: pointer; transition: background 0.15s; }
+.grant-host-grid label:hover { background: #d4edda; }
+.grant-host-grid label input[type="checkbox"] { margin: 0; }
+.grant-empty { color: #999; font-style: italic; font-size: 0.9em; padding: 8px 0; }

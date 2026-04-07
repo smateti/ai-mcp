@@ -34,11 +34,11 @@ public class AccessResource {
     @POST
     @Path("/grant")
     @Operation(summary = "Grant access",
-               description = "Grants app host access to DB, shared resources, or JWT authenticator")
+               description = "Grants app host access to a resource type (dbs, kafka, api, etc.), shared resources, or JWT authenticator")
     public Response grantAccess(AccessGrant grant) {
         if (grant.getTargetType() == null || grant.getTargetType().isBlank()) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "targetType is required (db, shared, jwt)")).build();
+                    .entity(Map.of("error", "targetType is required")).build();
         }
 
         try {
@@ -46,20 +46,14 @@ public class AccessResource {
             String branch;
 
             switch (grant.getTargetType()) {
-                case "db" -> {
-                    yaml = policyGenerator.generateDbAccessGrant(
-                            grant.getTargetResource(), grant.getAppType(), grant.getHostId());
-                    branch = grant.getOrgName() + "/" + grant.getEnvironment()
-                            + "/products/" + grant.getProduct();
-                }
                 case "shared" -> {
                     yaml = policyGenerator.generateSharedResourceGrant(
                             grant.getAppType(), grant.getHostId());
-                    branch = grant.getOrgName() + "/" + grant.getEnvironment()
+                    branch = grant.getOrgName() + "/environments/" + grant.getEnvironment()
                             + "/products/" + grant.getProduct();
                 }
                 case "jwt" -> {
-                    String fullHostPath = grant.getOrgName() + "/" + grant.getEnvironment()
+                    String fullHostPath = grant.getOrgName() + "/environments/" + grant.getEnvironment()
                             + "/products/" + grant.getProduct()
                             + "/apps/" + grant.getAppType() + "/" + grant.getHostId();
                     yaml = policyGenerator.generateJwtEnrollment(
@@ -67,9 +61,13 @@ public class AccessResource {
                     branch = "root";
                 }
                 default -> {
-                    return Response.status(Response.Status.BAD_REQUEST)
-                            .entity(Map.of("error", "Unknown targetType: " + grant.getTargetType()
-                                    + ". Use 'db', 'shared', or 'jwt'")).build();
+                    // Generic per-resource grant (dbs, kafka, api, ldap, smtp, oauth, certs, etc.)
+                    String resType = "db".equals(grant.getTargetType()) ? "dbs" : grant.getTargetType();
+                    yaml = policyGenerator.generateResourceAccessGrant(
+                            resType, grant.getTargetResource(),
+                            grant.getAppType(), grant.getHostId());
+                    branch = grant.getOrgName() + "/environments/" + grant.getEnvironment()
+                            + "/products/" + grant.getProduct();
                 }
             }
 
