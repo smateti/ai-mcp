@@ -1,0 +1,19 @@
+# Database secrets policy
+- &variables
+  - !variable username
+  - !variable password
+  - !variable url
+
+# Group allowed to read db secrets
+- !group secrets-readers
+
+# Grant read + execute on secrets to the group
+- !permit
+  resource: *variables
+  privileges: [ read, execute ]
+  roles: !group secrets-readers
+
+# Allow the myapp layer to read db secrets
+- !grant
+  role: !group secrets-readers
+  member: !layer /myapp
