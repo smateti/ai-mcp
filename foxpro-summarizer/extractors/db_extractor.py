@@ -30,7 +30,7 @@ class DbExtractor(BaseExtractor):
             re.IGNORECASE | re.MULTILINE,
         ),
         "use_table": re.compile(
-            r"^\s*USE\s+(.+?)(?:\s+ALIAS\s+(\w+))?(?:\s+IN\s+\d+)?(?:\s+(?:SHARED|EXCLUSIVE|NOUPDATE))?\s*$",
+            r"^[^\S\n]*USE[^\S\n]+(.+?)(?:[^\S\n]+ALIAS[^\S\n]+(\w+))?(?:[^\S\n]+IN[^\S\n]+\d+)?(?:[^\S\n]+(?:SHARED|EXCLUSIVE|NOUPDATE))?[^\S\n]*$",
             re.IGNORECASE | re.MULTILINE,
         ),
         "create_table": re.compile(
@@ -50,7 +50,7 @@ class DbExtractor(BaseExtractor):
             re.IGNORECASE | re.MULTILINE,
         ),
         "open_database": re.compile(
-            r"^\s*OPEN\s+DATABASE\s+\(?([^\s)]+)\)?",
+            r"^\s*OPEN\s+DATABASE\s+(.+?)$",
             re.IGNORECASE | re.MULTILINE,
         ),
         "set_relation": re.compile(
@@ -157,7 +157,19 @@ class DbExtractor(BaseExtractor):
 
         # OPEN DATABASE
         for match in self.PATTERNS["open_database"].finditer(source):
+            raw_ref = match.group(0)  # full matched line
             db_ref = match.group(1).strip().strip("()'\"")
+            # Extract actual .dbc filename from path expressions like: gcAppPath + "data\inventory.dbc"
+            dbc_match = re.search(r'[\\/]?(\w+)\.dbc', raw_ref, re.IGNORECASE)
+            if dbc_match:
+                db_ref = dbc_match.group(1) + ".dbc"
+            elif db_ref.startswith("gc") or db_ref.startswith("lc"):
+                # Variable reference - try to extract from string literal in the line
+                str_match = re.search(r'"([^"]*\.dbc)"', raw_ref, re.IGNORECASE)
+                if str_match:
+                    db_ref = os.path.basename(str_match.group(1))
+                else:
+                    db_ref = f"{db_ref} (variable)"
             db_info["databases"].append({"database": db_ref, "file": filename})
 
         # REPLACE commands -> extract field names

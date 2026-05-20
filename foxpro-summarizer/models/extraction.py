@@ -91,3 +91,5 @@ class AnalysisResult:
     summary: str
     original_code_snippet: str = ""
     python_equivalent: str = ""
+    business_summary: str = ""
+    technical_summary: str = ""

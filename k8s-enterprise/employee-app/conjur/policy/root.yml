@@ -1,8 +1,0 @@
-- !policy
-  id: db
-
-- !policy
-  id: apps
-
-- !policy
-  id: creds

@@ -88,32 +88,38 @@ class OllamaClient:
         """Build a detailed prompt for FoxPro analysis."""
         sections = [
             "You are a software analyst expert in Visual FoxPro (VFP) applications.",
-            "Analyze the following FoxPro source code and provide a structured, "
-            "human-readable summary.",
+            "Analyze the following FoxPro source code and provide a structured summary.",
+            "You MUST organize your response into exactly two top-level sections:",
             "",
             f"Context: {context}",
             "",
-            "Provide the following sections:",
+            "## Business Summary",
             "",
-            "## Use Case / Purpose",
+            "Write this section for business stakeholders (non-technical readers):",
+            "",
+            "### Purpose & Use Case",
             "What business function does this code serve? Describe in plain English.",
             "",
-            "## Key Operations",
-            "List the main operations (CRUD, calculations, validations, navigation).",
-            "",
-            "## Data Tables & Fields",
-            "Which .dbf tables are opened/queried and what fields are used?",
-            "",
-            "## Business Rules & Validations",
+            "### Business Rules & Validations",
             "What rules, constraints, or validations are enforced?",
             "",
-            "## User Interface & Interactions",
-            "What inputs, outputs, messages, or forms are involved?",
+            "### User Interactions",
+            "What inputs, outputs, messages, or forms does the user see?",
             "",
-            "## Dependencies",
+            "## Technical Details",
+            "",
+            "Write this section for developers:",
+            "",
+            "### Key Operations",
+            "List the main operations (CRUD, calculations, validations, navigation).",
+            "",
+            "### Data Tables & Fields",
+            "Which .dbf tables are opened/queried and what fields are used?",
+            "",
+            "### Dependencies",
             "What other modules, procedures, forms, or class libraries does it call?",
             "",
-            "## Access Control",
+            "### Access Control",
             "Are there any access level checks or permission-based logic?",
             "",
             "---",
@@ -135,8 +141,9 @@ class OllamaClient:
 
         sections.extend([
             "",
-            "Provide a clear, well-organized summary. Use bullet points and "
-            "short paragraphs. Focus on business logic, not syntax.",
+            "IMPORTANT: You must include both '## Business Summary' and "
+            "'## Technical Details' headers in your response. Use bullet points "
+            "and short paragraphs. Focus on business logic, not syntax.",
         ])
 
         return "\n".join(sections)

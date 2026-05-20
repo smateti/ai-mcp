@@ -1,6 +1,0 @@
-# Root policy - defines top-level namespaces
-- !policy
-  id: db
-
-- !policy
-  id: myapp

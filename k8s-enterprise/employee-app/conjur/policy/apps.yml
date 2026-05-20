@@ -1,7 +1,0 @@
-- !layer
-
-- !host liberty-app
-
-- !grant
-  role: !layer
-  member: !host liberty-app
