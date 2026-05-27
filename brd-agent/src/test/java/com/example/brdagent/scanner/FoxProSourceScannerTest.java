@@ -14,16 +14,16 @@ class FoxProSourceScannerTest {
 
     /**
      * The fixtures/scanner directory contains SAMPLE.prg and README.txt.
-     * Only the .prg file should be returned.
+     * Only supported FoxPro extensions (.prg, .scx, .frx, .mnx, .vcx, .h) are returned.
      */
     @Test
-    void scanFindsOnlyPrgFiles() throws IOException {
+    void scanFindsOnlySupportedFiles() throws IOException {
         Path fixtureDir = Path.of("src/test/resources/fixtures").toAbsolutePath().normalize();
         FoxProSourceScanner scanner = new FoxProSourceScanner(fixtureDir.toString());
 
         List<SourceFile> files = scanner.scan(List.of("scanner"));
 
-        assertEquals(1, files.size(), "Should find exactly one .prg file");
+        assertEquals(1, files.size(), "Should find exactly one supported file");
     }
 
     @Test

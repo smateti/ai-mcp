@@ -60,13 +60,13 @@ public class ExtractionResource {
         }
 
         if (files.isEmpty()) {
-            LOG.warn("No .prg files found in the specified paths");
+            LOG.warn("No FoxPro source files found in the specified paths");
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity("{\"error\": \"No .prg files found in the specified paths\"}")
+                    .entity("{\"error\": \"No FoxPro source files found in the specified paths\"}")
                     .build();
         }
 
-        LOG.info("Found {} .prg files, starting extraction", files.size());
+        LOG.info("Found {} source files, starting extraction", files.size());
 
         List<ExtractionResult> results = new ArrayList<>();
         for (SourceFile file : files) {
