@@ -1,0 +1,119 @@
+{
+  "applications": {
+    "order-management": {
+      "description": "Order Management System",
+      "type": "service",
+      "services": [
+        {
+          "name": "order-api",
+          "groupId": "com.example.order",
+          "artifactId": "order-api",
+          "version": "2.1.0",
+          "gitRepo": "https://gitlab.example.com/services/order-api.git",
+          "gitRef": "main"
+        },
+        {
+          "name": "order-worker",
+          "groupId": "com.example.order",
+          "artifactId": "order-worker",
+          "version": "2.1.0",
+          "gitRepo": "https://gitlab.example.com/services/order-worker.git",
+          "gitRef": "main"
+        }
+      ],
+      "helm": {
+        "chart": "sample-service/helm",
+        "baseValues": "values.yaml",
+        "overrides": {
+          "dev": {
+            "replicaCount": 1,
+            "resources.limits.memory": "512Mi",
+            "route.host": "order-dev.apps.ocp.example.com"
+          },
+          "staging": {
+            "replicaCount": 2,
+            "resources.limits.memory": "1Gi",
+            "route.host": "order-staging.apps.ocp.example.com"
+          },
+          "prod": {
+            "replicaCount": 3,
+            "resources.limits.memory": "2Gi",
+            "route.host": "order.apps.ocp.example.com"
+          }
+        }
+      },
+      "postDeploy": {
+        "queues": ["order.created", "order.updated", "order.cancelled"],
+        "listeners": ["order-event-listener"]
+      }
+    },
+    "inventory-system": {
+      "description": "Inventory Tracking System",
+      "type": "service",
+      "services": [
+        {
+          "name": "inventory-api",
+          "groupId": "com.example.inventory",
+          "artifactId": "inventory-api",
+          "version": "1.4.0",
+          "gitRepo": "https://gitlab.example.com/services/inventory-api.git",
+          "gitRef": "main"
+        }
+      ],
+      "helm": {
+        "chart": "sample-service/helm",
+        "baseValues": "values.yaml",
+        "overrides": {
+          "dev": {
+            "replicaCount": 1,
+            "resources.limits.memory": "256Mi",
+            "route.host": "inventory-dev.apps.ocp.example.com"
+          },
+          "prod": {
+            "replicaCount": 2,
+            "resources.limits.memory": "1Gi",
+            "route.host": "inventory.apps.ocp.example.com"
+          }
+        }
+      },
+      "postDeploy": {
+        "queues": ["inventory.updated"],
+        "listeners": []
+      }
+    },
+    "sample-hello": {
+      "description": "Sample Hello World MicroProfile App (for pipeline testing)",
+      "type": "service",
+      "services": [
+        {
+          "name": "hello-service",
+          "groupId": "com.example",
+          "artifactId": "hello-service",
+          "version": "1.0.0-SNAPSHOT",
+          "gitRepo": "https://gitlab.example.com/services/sample-service.git",
+          "gitRef": "main"
+        }
+      ],
+      "helm": {
+        "chart": "sample-service/helm",
+        "baseValues": "values.yaml",
+        "overrides": {
+          "dev": {
+            "replicaCount": 1,
+            "resources.limits.memory": "256Mi",
+            "route.host": "hello-dev.apps.ocp.example.com"
+          },
+          "prod": {
+            "replicaCount": 2,
+            "resources.limits.memory": "512Mi",
+            "route.host": "hello.apps.ocp.example.com"
+          }
+        }
+      },
+      "postDeploy": {
+        "queues": [],
+        "listeners": []
+      }
+    }
+  }
+}

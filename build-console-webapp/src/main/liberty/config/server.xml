@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Build Console Web Application">
+
+    <!-- ── Features ─────────────────────────────────────────────────── -->
+    <featureManager>
+        <feature>servlet-6.0</feature>
+        <feature>pages-3.1</feature>
+        <feature>cdi-4.0</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>mpConfig-3.1</feature>
+        <feature>mpHealth-4.0</feature>
+        <feature>restfulWS-3.1</feature>
+        <feature>restfulWSClient-3.1</feature>
+    </featureManager>
+
+    <!-- ── HTTP Endpoints ───────────────────────────────────────────── -->
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="${default.http.port}"
+                  httpsPort="${default.https.port}"
+                  host="*" />
+
+    <!-- ── Web Application ──────────────────────────────────────────── -->
+    <webApplication location="build-console-webapp.war"
+                    contextRoot="/">
+        <classloader apiTypeVisibility="+third-party" />
+    </webApplication>
+
+    <!-- ── MicroProfile Config ──────────────────────────────────────── -->
+    <variable name="default.http.port"  defaultValue="9082" />
+    <variable name="default.https.port" defaultValue="9445" />
+
+    <!-- ── Logging ──────────────────────────────────────────────────── -->
+    <logging consoleLogLevel="INFO"
+            consoleFormat="simple" />
+
+</server>

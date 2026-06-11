@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="hello-service">
+
+    <!-- Enable the full MicroProfile 6.0 umbrella feature -->
+    <featureManager>
+        <feature>microProfile-6.0</feature>
+    </featureManager>
+
+    <!-- HTTP endpoint -->
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="${default.http.port}"
+                  httpsPort="${default.https.port}" />
+
+    <!-- Automatically expand the WAR and serve it -->
+    <webApplication location="hello-service.war" contextRoot="/" />
+
+</server>
