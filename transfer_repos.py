@@ -97,29 +97,64 @@ def save_state(state_file: str, state: dict) -> None:
 
 
 def build_entities(batch: list[dict]) -> list[dict]:
-    """Convert source project records into bulk-import `entities`.
+    """Convert source records into bulk-import `entities`.
 
-    Each project is recreated at the SAME full path on the destination:
+    Each entry is recreated at the SAME full path on the destination:
     destination_namespace = everything before the last '/',
     destination_slug      = the last path segment.
 
+    Records may carry an optional "entity_type" key ("project" default,
+    or "group" for subgroup paths supplied via --projects-file). A group
+    entity imports the subgroup AND everything nested inside it
+    (migrate_projects=true), so its destination_namespace only needs the
+    PARENT chain to exist on the destination. Note: an empty namespace
+    (top-level group) is only valid on self-managed/Dedicated targets.
+
     Args:
-        batch: List of project dicts from list_all_projects().
+        batch: List of dicts with at least path_with_namespace.
 
     Returns:
         List of entity dicts for the POST /bulk_imports payload.
     """
     entities = []
-    for proj in batch:
-        full = proj["path_with_namespace"]
+    for rec in batch:
+        full = rec["path_with_namespace"]
         namespace, _, slug = full.rpartition("/")
-        entities.append({
-            "source_type": "project_entity",
+        entity = {
             "source_full_path": full,
             "destination_slug": slug,
             "destination_namespace": namespace,
-        })
+        }
+        if rec.get("entity_type") == "group":
+            entity["source_type"] = "group_entity"
+            entity["migrate_projects"] = True
+        else:
+            entity["source_type"] = "project_entity"
+        entities.append(entity)
     return entities
+
+
+def classify_path(src_session, base_url: str, path: str) -> str | None:
+    """Determine whether a source path is a group or a project.
+
+    Asks the source API: a 200 on /groups/:path means group (subgroup),
+    otherwise a 200 on /projects/:path means project.
+
+    Args:
+        src_session: Source-instance session.
+        base_url: Source base URL.
+        path: Full path, e.g. 'g1/sg1/sg2/sg3' or 'g1/sg1/repo'.
+
+    Returns:
+        'group', 'project', or None if the path exists as neither.
+    """
+    if src_session.get(f"{base_url}/api/v4/groups/{encode_path(path)}",
+                       params={"with_projects": False}, timeout=60).status_code == 200:
+        return "group"
+    if src_session.get(f"{base_url}/api/v4/projects/{encode_path(path)}",
+                       timeout=60).status_code == 200:
+        return "project"
+    return None
 
 
 def submit_batch(dest_session, dest_url: str, source_url: str,
@@ -209,6 +244,14 @@ def main() -> None:
     parser.add_argument("--projects-file",
                         help="File with one source path_with_namespace per line; "
                              "overrides group enumeration.")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Before transferring, check the DESTINATION for each "
+                             "pending path and skip any project that already "
+                             "exists there (marking it finished in the state "
+                             "file). Protects against duplicate imports when the "
+                             "state file is missing/stale or projects were "
+                             "migrated outside this script. Costs one GET per "
+                             "pending project.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -221,9 +264,22 @@ def main() -> None:
     # ---- enumerate -------------------------------------------------------
     if args.projects_file:
         with open(args.projects_file, encoding="utf-8") as fh:
-            wanted = [ln.strip() for ln in fh if ln.strip()]
-        projects = [{"path_with_namespace": p} for p in wanted]
-        log.info("Loaded %d project paths from %s", len(projects), args.projects_file)
+            wanted = [ln.strip() for ln in fh if ln.strip()
+                      and not ln.strip().startswith("#")]
+        projects = []
+        for p in wanted:
+            kind = classify_path(src, cfg["source"]["url"], p)
+            if kind is None:
+                log.error("Path '%s' is neither a group nor a project on "
+                          "source - skipping (recorded as failure).", p)
+                failures.add(PHASE, p, "path not found on source as group or project")
+                continue
+            if kind == "group":
+                log.warning("Path '%s' is a SUBGROUP: it will be imported as a "
+                            "group_entity including ALL nested projects in one "
+                            "entity - batch throttling does not apply inside it.", p)
+            projects.append({"path_with_namespace": p, "entity_type": kind})
+        log.info("Loaded %d valid paths from %s", len(projects), args.projects_file)
     else:
         log.info("Enumerating projects under group '%s' on %s ...",
                  cfg.get("top_level_group"), cfg["source"]["url"])
@@ -237,6 +293,37 @@ def main() -> None:
                if state.get(p["path_with_namespace"], {}).get("status") != "finished"]
     log.info("%d already finished (state file), %d pending.",
              len(projects) - len(pending), len(pending))
+
+    # ---- destination existence check (--skip-existing) --------------------
+    # The bulk import API is NOT idempotent: re-importing an existing path
+    # creates a duplicate project. This optional pass asks the destination
+    # whether each pending PROJECT path already exists and, if so, marks it
+    # finished instead of re-submitting it. (Group entities are not skipped
+    # this way: an existing group may legitimately need its projects.)
+    if args.skip_existing and pending:
+        log.info("Checking destination for %d pending paths (--skip-existing) ...",
+                 len(pending))
+        still_pending = []
+        for n, p in enumerate(pending, 1):
+            path = p["path_with_namespace"]
+            if p.get("entity_type") == "group":
+                still_pending.append(p)
+                continue
+            resp = dst.get(
+                f"{cfg['destination']['url']}/api/v4/projects/{encode_path(path)}",
+                timeout=60)
+            if resp.status_code == 200:
+                state[path] = {"status": "finished",
+                               "note": "already existed on destination",
+                               "updated_at": utc_now()}
+                log.info("  [%d/%d] exists on destination, skipping: %s",
+                         n, len(pending), path)
+            else:
+                still_pending.append(p)
+        save_state(cfg["state_file"], state)
+        log.info("%d skipped (already on destination), %d remain to transfer.",
+                 len(pending) - len(still_pending), len(still_pending))
+        pending = still_pending
 
     batch_size = cfg["batch_size"]
     batches = [pending[i:i + batch_size] for i in range(0, len(pending), batch_size)]
