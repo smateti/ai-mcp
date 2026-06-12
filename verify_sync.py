@@ -93,6 +93,68 @@ def get_refs(session, base_url: str, project_path: str) -> dict | None:
     }
 
 
+# Metadata collections compared by --check-metadata: API subpath + params.
+METADATA_KINDS = {
+    "issues": ("issues", {"state": "all", "scope": "all"}),
+    "merge_requests": ("merge_requests", {"state": "all", "scope": "all"}),
+    "labels": ("labels", {}),
+    "milestones": ("milestones", {"state": "all"}),
+}
+
+
+def get_metadata_counts(session, base_url: str, project_path: str) -> dict:
+    """Fetch item COUNTS for issues, MRs, labels, and milestones.
+
+    Uses per_page=1 requests and reads the `X-Total` response header, so
+    each collection costs a single tiny GET regardless of its size.
+    This is a count comparison, not a content comparison: equal counts
+    do not guarantee identical items, but unequal counts reliably flag
+    partial imports or post-migration activity on the source.
+
+    Args:
+        session: API session for the instance.
+        base_url: Instance base URL.
+        project_path: Full path_with_namespace.
+
+    Returns:
+        {"issues": int|-1, "merge_requests": int|-1, ...} (-1 = the
+        instance did not return X-Total; shown as '?' in reports and
+        excluded from the comparison rather than producing false diffs).
+    """
+    pid = encode_path(project_path)
+    counts = {}
+    for kind, (subpath, params) in METADATA_KINDS.items():
+        p = dict(params)
+        p["per_page"] = 1
+        resp = session.get(f"{base_url}/api/v4/projects/{pid}/{subpath}",
+                           params=p, timeout=60)
+        resp.raise_for_status()
+        total = resp.headers.get("X-Total")
+        counts[kind] = int(total) if total is not None else -1
+    return counts
+
+
+def diff_metadata(src_counts: dict, dst_counts: dict) -> list[str]:
+    """Compare metadata counts source vs target.
+
+    Args:
+        src_counts: get_metadata_counts() for the source project.
+        dst_counts: get_metadata_counts() for the target project.
+
+    Returns:
+        Difference strings, e.g. "issues count differs (src 42 != dst 40)";
+        kinds with unknown counts (-1) on either side are skipped.
+    """
+    diffs = []
+    for kind in METADATA_KINDS:
+        s, d = src_counts.get(kind, -1), dst_counts.get(kind, -1)
+        if s == -1 or d == -1:
+            continue
+        if s != d:
+            diffs.append(f"{kind} count differs (src {s} != dst {d})")
+    return diffs
+
+
 def diff_refs(src: dict, dst: dict) -> list[str]:
     """Produce a human-readable list of ref differences source vs target.
 
@@ -126,6 +188,15 @@ def main() -> None:
     parser.add_argument("--projects-file",
                         help="Verify only these paths (one per line) instead "
                              "of enumerating the whole group.")
+    parser.add_argument("--check-metadata", action="store_true",
+                        help="Also compare COUNTS of issues, merge requests, "
+                             "labels, and milestones (git refs alone cannot "
+                             "detect metadata drift). Count-based: catches "
+                             "partial imports and post-migration activity, "
+                             "not item-level content edits. Adds 8 small API "
+                             "calls per project. NOTE: metadata diffs are NOT "
+                             "fixable by mirror re-sync - they need "
+                             "resync_repos.py --reimport.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -169,6 +240,10 @@ def main() -> None:
                                 n, len(paths), path)
                     continue
                 dst_refs = get_refs(dst, cfg["destination"]["url"], path)
+                src_meta = dst_meta = None
+                if args.check_metadata and dst_refs is not None:
+                    src_meta = get_metadata_counts(src, cfg["source"]["url"], path)
+                    dst_meta = get_metadata_counts(dst, cfg["destination"]["url"], path)
             except requests.RequestException as exc:
                 counts["error"] += 1
                 log.error("[%d/%d] %s API error: %s", n, len(paths), path, exc)
@@ -185,6 +260,8 @@ def main() -> None:
                 continue
 
             diffs = diff_refs(src_refs, dst_refs)
+            if src_meta is not None:
+                diffs.extend(diff_metadata(src_meta, dst_meta))
             if diffs:
                 counts["out_of_sync"] += 1
                 writer.writerow([path, "out_of_sync",

@@ -65,6 +65,7 @@ import time
 from gitlab_common import (FailureReport, encode_path, list_all_projects,
                            load_config, make_session, setup_logging, utc_now)
 
+VERSION = "1.2.0"  # 1.2.0 = auto-creates missing destination namespaces
 PHASE = "transfer"
 TERMINAL_IMPORT_STATES = {"finished", "failed", "timeout"}
 
@@ -321,6 +322,7 @@ def main() -> None:
 
     cfg = load_config(args.config)
     log = setup_logging(os.path.join(cfg["reports_dir"], "transfer.log"))
+    log.info("transfer_repos.py version %s starting", VERSION)
     failures = FailureReport(cfg["reports_dir"], "transfer_failures.csv")
 
     src = make_session(cfg["source"]["token"])
