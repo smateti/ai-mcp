@@ -157,6 +157,71 @@ def classify_path(src_session, base_url: str, path: str) -> str | None:
     return None
 
 
+def ensure_namespace(dst_session, dest_url: str, namespace: str,
+                     cache: dict, log) -> bool:
+    """Make sure a destination group chain exists, creating missing levels.
+
+    The bulk import API requires `destination_namespace` to be an
+    EXISTING group for project entities - it never creates it. This
+    walks the chain top-down (g1, then g1/sg1, then g1/sg1/sg2, ...);
+    each level is checked with GET /groups/:path and created with
+    POST /groups (name=path=segment, parent_id=<level above>) if absent.
+
+    Groups created here are plain private groups carrying only the path -
+    no labels/milestones/settings from the source. If you need full group
+    metadata, run a group_entity import with migrate_projects=false
+    instead; this function is the convenience fallback so project
+    transfers never fail on a missing namespace.
+
+    Args:
+        dst_session: Destination API session.
+        dest_url: Destination base URL.
+        namespace: Full group path, e.g. 'g1/sg1/sg2/sg3' ('' allowed -
+            returns True, nothing to ensure).
+        cache: Dict path->group_id shared across calls so each level is
+            checked/created at most once per run.
+        log: Logger.
+
+    Returns:
+        True if the namespace exists (or was created), False if a level
+        could not be created (recorded by the caller as a failure).
+    """
+    if not namespace:
+        return True
+    parent_id = None
+    current = ""
+    for segment in namespace.split("/"):
+        current = f"{current}/{segment}" if current else segment
+        if current in cache:
+            parent_id = cache[current]
+            continue
+        resp = dst_session.get(
+            f"{dest_url}/api/v4/groups/{encode_path(current)}",
+            params={"with_projects": False}, timeout=60)
+        if resp.status_code == 200:
+            parent_id = resp.json()["id"]
+            cache[current] = parent_id
+            continue
+        if resp.status_code != 404:
+            log.error("Namespace check failed for '%s': HTTP %s",
+                      current, resp.status_code)
+            return False
+        payload = {"name": segment, "path": segment, "visibility": "private"}
+        if parent_id is not None:
+            payload["parent_id"] = parent_id
+        create = dst_session.post(f"{dest_url}/api/v4/groups",
+                                  json=payload, timeout=60)
+        if create.status_code not in (200, 201):
+            log.error("Could not create group '%s': HTTP %s %s",
+                      current, create.status_code, create.text[:300])
+            return False
+        parent_id = create.json()["id"]
+        cache[current] = parent_id
+        log.info("  created missing destination group: %s (id=%s)",
+                 current, parent_id)
+    return True
+
+
 def submit_batch(dest_session, dest_url: str, source_url: str,
                  source_token: str, batch: list[dict], log) -> int | None:
     """Submit one batch of projects as a single bulk import.
@@ -336,9 +401,30 @@ def main() -> None:
         return
 
     # ---- transfer loop ---------------------------------------------------
+    ns_cache: dict = {}  # destination group path -> group id (shared, per run)
     for i, batch in enumerate(batches, 1):
         log.info("=== Batch %d/%d (%d projects) at %s ===",
                  i, len(batches), len(batch), utc_now())
+
+        # The bulk import API never creates destination namespaces for
+        # project entities - make sure each group chain exists first.
+        ready = []
+        for p in batch:
+            namespace = p["path_with_namespace"].rpartition("/")[0]
+            if ensure_namespace(dst, cfg["destination"]["url"], namespace,
+                                ns_cache, log):
+                ready.append(p)
+            else:
+                failures.add(PHASE, p["path_with_namespace"],
+                             f"destination namespace '{namespace}' missing and "
+                             f"could not be created (see transfer.log)")
+                state[p["path_with_namespace"]] = {"status": "failed",
+                                                   "updated_at": utc_now()}
+        if not ready:
+            save_state(cfg["state_file"], state)
+            continue
+        batch = ready
+
         bulk_id = submit_batch(dst, cfg["destination"]["url"],
                                cfg["source"]["url"], cfg["source"]["token"],
                                batch, log)
