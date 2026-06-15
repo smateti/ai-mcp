@@ -203,8 +203,9 @@ def main() -> None:
     log = setup_logging(os.path.join(cfg["reports_dir"], "verify.log"))
     failures = FailureReport(cfg["reports_dir"], "verify_failures.csv")
 
-    src = make_session(cfg["source"]["token"])
-    dst = make_session(cfg["destination"]["token"])
+    ca_bundle = cfg.get("ssl_ca_bundle")
+    src = make_session(cfg["source"]["token"], ca_bundle)
+    dst = make_session(cfg["destination"]["token"], ca_bundle)
 
     if args.projects_file:
         with open(args.projects_file, encoding="utf-8") as fh:
@@ -229,7 +230,27 @@ def main() -> None:
 
         writer = csv.writer(rep_fh)
         writer.writerow(["project_path", "status", "branches_src",
-                         "branches_dst", "tags_src", "tags_dst", "differences"])
+                         "branches_dst", "tags_src", "tags_dst",
+                         "issues_src", "issues_dst",
+                         "mrs_src", "mrs_dst",
+                         "labels_src", "labels_dst",
+                         "milestones_src", "milestones_dst",
+                         "differences"])
+
+        def meta_cells(meta: dict | None) -> list:
+            """Return the 8 metadata cells (issues/mrs/labels/milestones,
+            src+dst) for one side. '-' when --check-metadata is off,
+            '?' when the instance did not report a count (X-Total -1)."""
+            if meta is None:
+                return ["-"] * 4
+            order = ("issues", "merge_requests", "labels", "milestones")
+            return [("?" if meta.get(k, -1) == -1 else meta[k]) for k in order]
+
+        def meta_columns(src_meta: dict | None, dst_meta: dict | None) -> list:
+            """Interleave src/dst metadata cells to match the header order
+            (issues_src, issues_dst, mrs_src, mrs_dst, ...)."""
+            s, d = meta_cells(src_meta), meta_cells(dst_meta)
+            return [v for pair in zip(s, d) for v in pair]
 
         for n, path in enumerate(paths, 1):
             try:
@@ -253,8 +274,9 @@ def main() -> None:
             if dst_refs is None:
                 counts["missing"] += 1
                 writer.writerow([path, "missing", len(src_refs["branches"]),
-                                 "-", len(src_refs["tags"]), "-",
-                                 "project not found on target"])
+                                 "-", len(src_refs["tags"]), "-"]
+                                + meta_columns(None, None)
+                                + ["project not found on target"])
                 miss_fh.write(path + "\n")
                 log.warning("[%d/%d] MISSING     %s", n, len(paths), path)
                 continue
@@ -266,8 +288,9 @@ def main() -> None:
                 counts["out_of_sync"] += 1
                 writer.writerow([path, "out_of_sync",
                                  len(src_refs["branches"]), len(dst_refs["branches"]),
-                                 len(src_refs["tags"]), len(dst_refs["tags"]),
-                                 "; ".join(diffs[:10])])
+                                 len(src_refs["tags"]), len(dst_refs["tags"])]
+                                + meta_columns(src_meta, dst_meta)
+                                + ["; ".join(diffs[:10])])
                 oos_fh.write(path + "\n")
                 log.warning("[%d/%d] OUT_OF_SYNC %s (%d diffs)",
                             n, len(paths), path, len(diffs))
@@ -275,7 +298,9 @@ def main() -> None:
                 counts["in_sync"] += 1
                 writer.writerow([path, "in_sync",
                                  len(src_refs["branches"]), len(dst_refs["branches"]),
-                                 len(src_refs["tags"]), len(dst_refs["tags"]), ""])
+                                 len(src_refs["tags"]), len(dst_refs["tags"])]
+                                + meta_columns(src_meta, dst_meta)
+                                + [""])
                 if n % 100 == 0:
                     log.info("[%d/%d] progress ... last: %s in_sync",
                              n, len(paths), path)

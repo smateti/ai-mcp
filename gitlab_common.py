@@ -116,18 +116,22 @@ def load_config(path: str = "migration_config.json") -> dict:
     return cfg
 
 
-def make_session(token: str) -> requests.Session:
+def make_session(token: str, ca_bundle: str | None = None) -> requests.Session:
     """Build a requests Session with the PRIVATE-TOKEN header and a
     retry policy (5 attempts, exponential backoff) for 429 and 5xx.
 
     Args:
         token: GitLab personal/group access token.
+        ca_bundle: Path to a CA bundle PEM file for self-signed certs,
+            or None to use the default.
 
     Returns:
         Configured requests.Session.
     """
     session = requests.Session()
     session.headers.update({"PRIVATE-TOKEN": token})
+    if ca_bundle:
+        session.verify = ca_bundle
     retry = Retry(
         total=5,
         backoff_factor=2,  # 2s, 4s, 8s, 16s, 32s

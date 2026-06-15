@@ -325,8 +325,9 @@ def main() -> None:
     log.info("transfer_repos.py version %s starting", VERSION)
     failures = FailureReport(cfg["reports_dir"], "transfer_failures.csv")
 
-    src = make_session(cfg["source"]["token"])
-    dst = make_session(cfg["destination"]["token"])
+    ca_bundle = cfg.get("ssl_ca_bundle")
+    src = make_session(cfg["source"]["token"], ca_bundle)
+    dst = make_session(cfg["destination"]["token"], ca_bundle)
 
     # ---- enumerate -------------------------------------------------------
     if args.projects_file:
@@ -427,8 +428,9 @@ def main() -> None:
             continue
         batch = ready
 
+        source_import_url = cfg.get("source_url_for_import", cfg["source"]["url"])
         bulk_id = submit_batch(dst, cfg["destination"]["url"],
-                               cfg["source"]["url"], cfg["source"]["token"],
+                               source_import_url, cfg["source"]["token"],
                                batch, log)
         if bulk_id is None:
             for p in batch:
