@@ -1,0 +1,29 @@
+# Helm values for build-console-webapp
+replicaCount: 1
+
+image:
+  repository: registry.example.com/platform/build-console-webapp
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 9082
+  httpsPort: 9445
+
+route:
+  enabled: true
+  host: build-console.apps.example.com
+  tls:
+    termination: edge
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 100m
+    memory: 192Mi
+
+env:
+  BUILD_SERVICE_URL: "http://build-trigger-service:9081"

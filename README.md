@@ -1,86 +1,210 @@
-# GitLab Server-to-Server Migration Toolkit (~10k repos)
+# GitLab CI/CD Pipeline Architecture — Jenkins Migration Sample
 
-Three throttled, resumable Python scripts built around GitLab's **direct
-transfer (bulk import) API**, plus git-level re-sync for drift — because the
-bulk import API is one-shot: it has **no incremental/delta mode**, and
-re-importing an existing path creates a duplicate copy instead of updating it.
+This project demonstrates a GitLab CI/CD pipeline architecture designed for migrating ~600 applications from Jenkins. It implements the **shared pipeline pattern**: one pipeline definition per application type, parameterized by `APP_NAME` and `ENVIRONMENT`.
 
-## Workflow
+## Architecture Overview
 
 ```
-Day 0          transfer_repos.py     batches of 10, sleep between batches,
-                                     resumable via transfer_state.json
-Week 1-2       (teams verify on the new server; old server still receives pushes)
-Cutover prep   verify_sync.py        compares every repo's branch/tag SHAs
-                                     -> in_sync / out_of_sync / missing lists
-Cutover        resync_repos.py       git clone --mirror + push --mirror for
-                                     out_of_sync repos (git data only), or
-                                     --reimport for a destructive full refresh
-Confirm        verify_sync.py --projects-file reports/out_of_sync_<ts>.txt
+┌─────────────────────┐     ┌──────────────────────────┐     ┌─────────────────────┐
+│  Build Console       │     │  Build Trigger           │     │  GitLab             │
+│  Web Application     │────▶│  Service (REST API)      │────▶│  (CI/CD Engine)     │
+│  (JSP / Servlets)    │HTTP │  (MicroProfile)          │HTTPS│                     │
+│  :9082               │     │  :9081                   │     │  :9043              │
+└─────────────────────┘     └──────────┬───────────────┘     └────────┬────────────┘
+                                        │                              │
+                                        ▼                              ▼
+                               ┌────────────────┐           ┌─────────────────────┐
+                               │ Embedded Derby  │           │  GitLab Runner      │
+                               │ (Build History) │           │  (Docker executor)  │
+                               └────────────────┘           └─────────┬───────────┘
+                                                                       │
+                                                               ┌───────▼──────────┐
+                                                               │ Trigger Repos    │
+                                                               │ app-type-service/│
+                                                               │ (include: ...)   │
+                                                               └───────┬──────────┘
+                                                                       │
+                                                               ┌───────▼──────────┐
+                                                               │ Central Templates│
+                                                               │ pipeline-        │
+                                                               │   templates/     │
+                                                               │ scripts/         │
+                                                               │ registry.json    │
+                                                               └──────────────────┘
 ```
 
-Failures in **every** phase append to `reports/*_failures.csv`
-(`timestamp,phase,project_path,reason`) and the run continues.
+### Key Design Principles
 
-## Files
+1. **Trigger repos have no source code.** They exist only to provide a GitLab pipeline entry point. One trigger repo per application type (e.g., `service`, `batch`, `ai-app`).
 
-| File                | Purpose                                                        |
-|---------------------|----------------------------------------------------------------|
-| `gitlab_common.py`  | config, API session w/ retry+backoff, pagination, reports      |
-| `transfer_repos.py` | phase 1: throttled bulk import, batch+sleep, resume state      |
-| `verify_sync.py`    | phase 2: ref-level comparison, produces actionable lists       |
-| `resync_repos.py`   | phase 3: mirror-sync drifted repos (or delete+reimport)        |
-| `migration_config.json` | shared config (URLs, tokens, throttle settings)            |
+2. **Pipelines are shared.** The real pipeline logic lives in `pipeline-templates/`. Trigger repos `include:` the appropriate template. Updating the template updates all apps of that type.
 
-## Prerequisites
+3. **The pipeline is a traffic controller.** Heavy lifting happens in Python scripts and Maven. The YAML sequences stages, manages artifacts, and handles GitLab-specific concerns (caching, environments, rules).
 
-1. **Direct transfer enabled on both instances**: Admin Area → Settings →
-   General → *Import and export settings* → "Migrate groups and projects by
-   direct transfer". Both instances should be on recent, compatible versions.
-2. **Tokens**: destination token (`api` scope, rights to create projects in
-   the destination namespaces); source token (`api`, `read_repository`).
-3. **Group tree exists on destination**: projects are recreated at the *same*
-   full path. Either run one group-level direct transfer first (with
-   `"migrate_projects": false`) to copy the empty group hierarchy, or
-   pre-create the groups.
-4. `pip install requests` (only external dependency) and `git` on PATH
-   (resync only).
+4. **Application metadata is registry-driven.** `registry.json` maps `APP_NAME` to its services, Maven coordinates, Helm overrides, and post-deploy resources. The pipeline looks up the app and acts accordingly.
 
-## Quick start
+5. **Artifacts replace the Jenkins workspace.** Each stage writes JSON/YAML/properties files as GitLab artifacts. Downstream stages consume them via `dependencies:`. Artifacts are kept with `when: always` so developers can download and debug failures.
+
+## Project Structure
+
+```
+├── README.md                           ← you are here
+│
+├── build-trigger-service/              ← REST BACKEND (MicroProfile)
+│   ├── pom.xml
+│   ├── Dockerfile
+│   ├── helm/values.yaml
+│   └── src/main/java/com/example/buildtrigger/
+│       ├── model/       Application, BuildRecord, BuildRequest, BuildResponse,
+│       │                JobInfo, ErrorResponse, GitLabException
+│       ├── registry/    ApplicationRegistry (loads registry.json)
+│       ├── repository/  BuildRepository (JPA / Derby)
+│       ├── gitlab/      GitLabClient (JAX-RS Client → GitLab API)
+│       ├── rest/        BuildTriggerApplication, ApplicationResource,
+│       │                BuildResource, CorsFilter, GitLabExceptionMapper
+│       └── health/      LivenessCheck, ReadinessCheck
+│
+├── build-console-webapp/               ← WEB UI (JSP / Servlets)
+│   ├── pom.xml
+│   ├── Dockerfile
+│   ├── helm/values.yaml
+│   └── src/main/
+│       ├── java/com/example/console/
+│       │   ├── client/  BuildServiceClient
+│       │   └── servlet/ ApplicationsServlet, TriggerBuildServlet,
+│       │                HistoryServlet, JobsServlet
+│       └── webapp/
+│           ├── css/style.css
+│           └── WEB-INF/views/ header.jsp, footer.jsp, applications.jsp,
+│                              history.jsp, jobs.jsp
+│
+├── pipeline-templates/                 ← CENTRAL TEMPLATE REPO
+│   ├── templates/
+│   │   └── service-pipeline.yml        ← full reusable pipeline for "service" type
+│   ├── scripts/
+│   │   ├── lookup_registry.py          ← reads registry, writes app-metadata.json
+│   │   ├── generate_helm_values.py     ← merges base + env + registry → values-final.yaml
+│   │   └── post_deploy_resources.py    ← creates queues/listeners after deploy (mock)
+│   ├── registry.json                   ← mock application registry
+│   ├── docker/
+│   │   └── Dockerfile                  ← custom runner image (Java 21, Maven, Python, oc, helm)
+│   └── local-test/
+│       ├── docker-compose.yml          ← local testing harness
+│       ├── .env.example                ← template for local env vars
+│       ├── run-local.sh                ← simulates pipeline stages locally
+│       └── .gitignore                  ← ignores .env and .secrets/
+│
+├── app-type-service/                   ← TRIGGER REPO for "service" type
+│   ├── .gitlab-ci.yml                  ← minimal; includes template, declares variables
+│   └── README.md                       ← API trigger examples, query examples
+│
+└── sample-service/                     ← SAMPLE MICROPROFILE APP
+    ├── pom.xml                         ← Java 21, MicroProfile 6.x, Open Liberty
+    ├── Dockerfile                      ← multi-stage build → Open Liberty runtime
+    ├── src/main/java/com/example/hello/
+    │   ├── HelloApplication.java       ← JAX-RS @ApplicationPath("/api")
+    │   ├── HelloResource.java          ← GET /api/hello
+    │   ├── GreetingService.java        ← CDI bean with MicroProfile Config
+    │   ├── HealthReadyCheck.java       ← /health/ready
+    │   └── HealthLiveCheck.java        ← /health/live
+    └── helm/
+        ├── Chart.yaml
+        ├── values.yaml                 ← base values (all environments)
+        ├── values-dev.yaml             ← dev overrides
+        ├── values-prod.yaml            ← prod overrides
+        └── templates/
+            ├── deployment.yaml
+            ├── service.yaml
+            ├── route.yaml              ← OpenShift Route
+            └── configmap.yaml
+```
+
+## REST API (build-trigger-service)
+
+| Method | Path                          | Description                    |
+|--------|-------------------------------|--------------------------------|
+| GET    | `/api/applications`           | List registered applications   |
+| POST   | `/api/builds`                 | Trigger a new pipeline build   |
+| GET    | `/api/builds?appName=X`       | Get build history              |
+| GET    | `/api/builds/{id}/jobs`       | Get jobs for a pipeline        |
+| GET    | `/api/builds/{id}/refresh`    | Refresh pipeline status        |
+| GET    | `/openapi/ui`                 | Swagger UI                     |
+
+## Pipeline Stages
+
+| Stage        | What it does                                                           | Key artifacts produced         |
+|--------------|------------------------------------------------------------------------|-------------------------------|
+| `prepare`    | Looks up APP_NAME in registry.json; writes metadata + build properties | `app-metadata.json`, `build.properties` |
+| `build`      | Clones service source, runs `mvn package -DskipTests`                  | `target/*.war`                |
+| `test`       | Runs `mvn test`; publishes JUnit XML for GitLab MR widget              | `surefire-reports/`           |
+| `package`    | Builds container image with buildah; pushes to GitLab Container Registry | `image-ref.env`             |
+| `deploy`     | Generates `values-final.yaml`; runs `helm upgrade --install`           | `values-final.yaml`, `deploy-receipt.json` |
+| `post-deploy`| Creates queues/listeners (mocked)                                      | `resources-created.json`      |
+
+## Quick Start
+
+### 1. Run with mock mode (no GitLab required)
 
 ```bash
-cp migration_config.json.example migration_config.json   # edit URLs/tokens
-python transfer_repos.py --dry-run        # review the batch plan
-python transfer_repos.py                  # phase 1 (Ctrl-C safe; re-run resumes)
-# ... 1-2 weeks later ...
-python verify_sync.py                     # phase 2
-python resync_repos.py --projects-file reports/out_of_sync_<ts>.txt   # phase 3
-python transfer_repos.py --projects-file reports/missing_<ts>.txt     # stragglers
+# Terminal 1: Start the REST backend
+cd build-trigger-service
+mvn liberty:dev
+
+# Terminal 2: Start the web UI
+cd build-console-webapp
+mvn liberty:dev
 ```
 
-## Throttling knobs (protecting the source server)
+- Swagger UI: http://localhost:9081/openapi/ui
+- Web Console: http://localhost:9082
 
-* `batch_size` (default **10**) — projects per bulk-import request; the script
-  waits for the whole batch to finish before submitting the next, so at most
-  one batch is exporting on the source at any time.
-* `sleep_between_batches_seconds` (default **300**) — cool-down between batches.
-* `resync_repos.py --sleep` (default **10s**) — pause between mirror clones.
-* Server-side, you can additionally cap `bulk_import_concurrent_pipeline_batch_limit`
-  and tune Sidekiq on both instances per GitLab's import documentation.
+### 2. Connect to a real GitLab instance
 
-## Important caveats
+Edit `build-trigger-service/src/main/resources/META-INF/microprofile-config.properties`:
 
-* **Drift re-sync is git-only.** `push --mirror` makes branches/tags identical
-  but does not touch issues, MRs, wikis, or CI variables. For full metadata
-  refresh use `resync_repos.py --reimport`, which **deletes** the target
-  project first — destructive to anything created on the new server since
-  migration.
-* **Protected branches**: mirror pushes are force-pushes; the script lifts and
-  restores target-side protections by default (`--keep-protections` to opt out).
-* **Delayed deletion**: if the destination has delayed project deletion
-  enabled, `--reimport` waits for the path to free up and aborts if it doesn't.
-* **What direct transfer migrates** (issues, MRs, pipelines history, etc.)
-  varies by GitLab version — check the "migrated items" matrix in the docs for
-  your versions and spot-check a pilot group first.
-* **Pilot first**: run the whole three-phase cycle on one small subgroup
-  before pointing it at all 10k repos.
+```properties
+gitlab.url=https://localhost:9043
+gitlab.token=glpat-YOUR_TOKEN_HERE
+gitlab.mock=false
+```
+
+### 3. Test pipelines locally with docker-compose
+
+```bash
+cd pipeline-templates/local-test
+cp .env.example .env
+# Edit .env with APP_NAME, ENVIRONMENT, etc.
+docker-compose run --rm pipeline bash /workspace/pipeline-templates/local-test/run-local.sh
+```
+
+### 4. Trigger a pipeline via GitLab API
+
+```bash
+curl --request POST \
+  "${GITLAB_URL}/api/v4/projects/${PROJECT_ID}/pipeline" \
+  --header "PRIVATE-TOKEN: ${PRIVATE_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "ref": "main",
+    "variables": [
+      {"key": "APP_NAME", "value": "sample-hello"},
+      {"key": "ENVIRONMENT", "value": "dev"}
+    ]
+  }'
+```
+
+## Technology Stack
+
+| Layer            | Technology                                          |
+|------------------|-----------------------------------------------------|
+| Language         | Java 21                                             |
+| Framework        | MicroProfile 6.1, Jakarta EE 10                    |
+| Runtime          | Open Liberty                                        |
+| Build            | Maven                                               |
+| Database         | Embedded Derby (swappable to DB2)                   |
+| UI               | JSP 3.1, JSTL, clean CSS                           |
+| API Docs         | MicroProfile OpenAPI (Swagger UI)                   |
+| CI/CD            | GitLab CI/CD with shared pipeline templates         |
+| Container        | Open Liberty on UBI (multi-stage Docker builds)     |
+| Orchestration    | OpenShift / Kubernetes with Helm charts             |
+| Pipeline Scripts | Python 3 (registry lookup, Helm values, post-deploy)|

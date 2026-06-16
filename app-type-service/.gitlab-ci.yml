@@ -1,0 +1,42 @@
+# =============================================================================
+# Trigger repo for the "service" application type
+# =============================================================================
+# This repo contains NO application source code.  It exists solely to provide
+# a GitLab pipeline entry point that our custom UI calls via the GitLab API.
+#
+# The UI passes APP_NAME and ENVIRONMENT as pipeline variables.  This file
+# includes the real pipeline logic from the central pipeline-templates project.
+# =============================================================================
+
+# ── Pipeline variables ──────────────────────────────────────────────────────
+# These are overridden at runtime via the GitLab API / web UI / trigger.
+# Defaults are provided for manual/test runs from the GitLab UI.
+variables:
+  APP_NAME: "sample-hello"             # default for manual runs; overridden by API
+  ENVIRONMENT: "dev"                   # default; overridden per deployment
+
+# ── Workflow rules ──────────────────────────────────────────────────────────
+# Since this repo has no source code, we only want pipelines when explicitly
+# triggered (via API, web UI, or trigger token) — never on push or MR events.
+workflow:
+  rules:
+    # Run when triggered via the GitLab Pipelines API (what our UI calls)
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+      when: always
+    # Run when triggered via the GitLab web UI "Run pipeline" button
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+      when: always
+    # Run when triggered via a trigger token (for integrations)
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+      when: always
+    # Block all other sources (push, merge_request_event, schedule, etc.)
+    - when: never
+
+# ── Include the real pipeline from the central template repo ────────────────
+# `include: project` pulls YAML from another GitLab project by path.
+# This is the core of the "shared pipeline" pattern: hundreds of apps share
+# the same pipeline definition; only the trigger repo + variables differ.
+include:
+  - project: 'platform/pipeline-templates'   # GitLab project path of the template repo
+    ref: 'main'                               # branch/tag to use; pin to a tag for stability
+    file: '/templates/service-pipeline.yml'   # path within that project

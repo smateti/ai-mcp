@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence
+                                 https://jakarta.ee/xml/ns/persistence/persistence_3_0.xsd"
+             version="3.0">
+
+    <persistence-unit name="buildPU" transaction-type="JTA">
+        <jta-data-source>jdbc/buildDS</jta-data-source>
+
+        <class>com.example.buildtrigger.model.BuildRecord</class>
+
+        <properties>
+            <!-- Auto-create tables from JPA entities -->
+            <property name="jakarta.persistence.schema-generation.database.action"
+                      value="create" />
+
+            <!-- EclipseLink (Liberty default JPA provider) settings -->
+            <property name="eclipselink.logging.level" value="FINE" />
+            <property name="eclipselink.target-database" value="Derby" />
+        </properties>
+    </persistence-unit>
+
+</persistence>
