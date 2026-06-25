@@ -1,0 +1,17 @@
+{
+  "source": {
+    "url": "https://gitlab-old.example.com",
+    "token": "glpat-SOURCE-TOKEN"
+  },
+  "destination": {
+    "url": "https://gitlab-new.example.com",
+    "token": "glpat-DEST-TOKEN"
+  },
+  "top_level_group": "myorg",
+  "batch_size": 10,
+  "sleep_between_batches_seconds": 300,
+  "poll_interval_seconds": 30,
+  "batch_timeout_seconds": 3600,
+  "state_file": "transfer_state.json",
+  "reports_dir": "reports"
+}
