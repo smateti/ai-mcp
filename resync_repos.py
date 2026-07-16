@@ -69,39 +69,26 @@ from gitlab_common import (FailureReport, encode_path, load_config,
 PHASE = "resync"
 
 
-def run_git(args: list[str], token: str, cwd: str | None = None,
-            ssl_verify: bool = True) -> subprocess.CompletedProcess:
-    """Run a git command with token auth via URL-embedded credentials.
+def run_git(args: list[str], token: str, cwd: str | None = None) -> subprocess.CompletedProcess:
+    """Run a git command with token auth injected via a credential helper.
 
-    The token is injected into HTTPS URLs as oauth2:token@ so it works
-    cross-platform (Windows GCM can interfere with credential helpers).
+    A one-shot `credential.helper` is configured on the command line so
+    the token never appears in the remote URL or stored config.
 
     Args:
         args: git arguments, e.g. ["clone", "--mirror", url, dir].
         token: GitLab token used as the password (username 'oauth2').
         cwd: Working directory for the command.
-        ssl_verify: If False, set http.sslVerify=false for self-signed certs.
 
     Returns:
         CompletedProcess with captured stdout/stderr (check=False; the
         caller inspects returncode).
     """
-    # Inject token into any https:// URLs in the args
-    patched_args = []
-    for arg in args:
-        if arg.startswith("https://"):
-            arg = arg.replace("https://", f"https://oauth2:{token}@", 1)
-        patched_args.append(arg)
-
-    cmd = ["git"]
-    if not ssl_verify:
-        cmd += ["-c", "http.sslVerify=false"]
-    cmd += patched_args
-
-    env = dict(os.environ)
-    env["GIT_TERMINAL_PROMPT"] = "0"  # never prompt for credentials
+    helper = ("!f() { echo username=oauth2; echo password=" + token + "; }; f")
+    cmd = ["git", "-c", f"credential.helper={helper}",
+           "-c", "credential.useHttpPath=true"] + args
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                          timeout=3600, check=False, env=env)
+                          timeout=3600, check=False)
 
 
 def get_project(session, base_url: str, path: str) -> dict | None:
@@ -190,24 +177,9 @@ def mirror_sync(path: str, cfg: dict, dst_session, keep_protections: bool,
     saved_rules: list[dict] = []
     try:
         res = run_git(["clone", "--mirror", src_http, clone_dir],
-                      cfg["source"]["token"],
-                      ssl_verify=cfg.get("git_ssl_verify", True))
+                      cfg["source"]["token"])
         if res.returncode != 0:
             raise RuntimeError(f"mirror clone failed: {res.stderr.strip()[:300]}")
-
-        # Remove GitLab internal refs that can't be pushed (merge requests, etc.)
-        clean = subprocess.run(
-            ["git", "for-each-ref", "--format=%(refname)",
-             "refs/merge-requests/", "refs/pipelines/",
-             "refs/environments/", "refs/keep-around/"],
-            cwd=clone_dir, capture_output=True, text=True, check=False)
-        if clean.returncode == 0 and clean.stdout.strip():
-            for ref in clean.stdout.strip().split("\n"):
-                ref = ref.strip()
-                if ref:
-                    subprocess.run(["git", "update-ref", "-d", ref],
-                                   cwd=clone_dir, check=False)
-            log.info("    cleaned internal refs from mirror clone")
 
         if not keep_protections:
             saved_rules = lift_protections(dst_session,
@@ -217,8 +189,7 @@ def mirror_sync(path: str, cfg: dict, dst_session, keep_protections: bool,
                 log.info("    lifted %d protected-branch rule(s)", len(saved_rules))
 
         res = run_git(["push", "--mirror", dst_http],
-                      cfg["destination"]["token"], cwd=clone_dir,
-                      ssl_verify=cfg.get("git_ssl_verify", True))
+                      cfg["destination"]["token"], cwd=clone_dir)
         if res.returncode != 0:
             raise RuntimeError(f"mirror push failed: {res.stderr.strip()[:300]}")
     finally:
@@ -259,9 +230,8 @@ def reimport(path: str, cfg: dict, dst_session, log) -> None:
                                "(delayed-deletion setting?) - reimport aborted")
 
     namespace, _, slug = path.rpartition("/")
-    source_import_url = cfg.get("source_url_for_import", cfg["source"]["url"])
     payload = {
-        "configuration": {"url": source_import_url,
+        "configuration": {"url": cfg["source"]["url"],
                           "access_token": cfg["source"]["token"]},
         "entities": [{"source_type": "project_entity",
                       "source_full_path": path,
@@ -306,8 +276,7 @@ def main() -> None:
     cfg = load_config(args.config)
     log = setup_logging(os.path.join(cfg["reports_dir"], "resync.log"))
     failures = FailureReport(cfg["reports_dir"], "resync_failures.csv")
-    ca_bundle = cfg.get("ssl_ca_bundle")
-    dst = make_session(cfg["destination"]["token"], ca_bundle)
+    dst = make_session(cfg["destination"]["token"])
 
     with open(args.projects_file, encoding="utf-8") as fh:
         paths = [ln.strip() for ln in fh if ln.strip()]
