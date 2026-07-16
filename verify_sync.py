@@ -58,102 +58,43 @@ from gitlab_common import (FailureReport, api_get_paginated, encode_path,
 PHASE = "verify"
 
 
-def is_group(session, base_url: str, path: str) -> bool:
-    """Check if a path is a group/subgroup (not a project).
-    
-    Args:
-        session: API session for the instance.
-        base_url: Instance base URL.
-        path: Full path to check.
-    
-    Returns:
-        True if the path is a group, False if it's a project or doesn't exist.
-    """
-    # Try to get it as a group first
-    try:
-        resp = session.get(f"{base_url}/api/v4/groups/{encode_path(path)}", timeout=60)
-        if resp.status_code == 200:
-            return True
-    except requests.RequestException:
-        pass
-    return False
-
-
-def expand_group_paths(session, base_url: str, paths: list[str], log) -> list[str]:
-    """Expand any group paths in the list to all projects under those groups.
-    
-    Args:
-        session: API session for the instance.
-        base_url: Instance base URL.
-        paths: List of paths that may be projects or groups.
-        log: Logger instance for progress messages.
-    
-    Returns:
-        List of project paths with groups expanded to their projects.
-    """
-    expanded = []
-    
-    def get_projects_from_group(group_path: str, log) -> list[str]:
-        """Get all projects from a group, handling subgroups recursively."""
-        projects = []
-        
-        # Get projects from this group
-        group_projects = list_all_projects(session, base_url, group_path)
-        project_paths = [p["path_with_namespace"] for p in group_projects]
-        log.info("    Found %d projects in group '%s'", len(project_paths), group_path)
-        projects.extend(project_paths)
-        
-        return projects
-    
-    def process_paths_recursive(paths_to_process: list[str], log) -> list[str]:
-        """Process paths recursively, handling groups by getting their subgroups."""
-        result = []
-        
-        for path in paths_to_process:
-            if is_group(session, base_url, path):
-                # It's a group - get its projects first
-                log.info("  Processing group '%s' ...", path)
-                result.extend(get_projects_from_group(path, log))
-                
-                # Then get subgroups and process them recursively
-                subgroups = get_subgroups(session, base_url, path)
-                if subgroups:
-                    log.info("    Found %d subgroups in '%s'", len(subgroups), path)
-                    # Process subgroups recursively
-                    result.extend(process_paths_recursive(subgroups, log))
-            else:
-                # It's a project path - add directly
-                result.append(path)
-        
-        return result
-    
-    # Process the initial paths
-    expanded = process_paths_recursive(paths, log)
-    return expanded
-
 def get_subgroups(session, base_url: str, group_path: str) -> list[str]:
-    """Get all subgroups under a given group path.
-    
+    """Get all immediate subgroups under a given group path (paginated).
+
     Args:
         session: API session for the instance.
         base_url: Instance base URL.
         group_path: Path to the parent group.
-    
+
     Returns:
-        List of subgroup paths.
+        List of subgroup full_path strings.
     """
     try:
-        # Get subgroups of the given group
-        resp = session.get(
-            f"{base_url}/api/v4/groups/{encode_path(group_path)}/subgroups",
-            params={"include_parent": False, "per_page": 100},
-            timeout=60
-        )
-        resp.raise_for_status()
-        subgroups = resp.json()
-        return [sg["full_path"] for sg in subgroups]
+        raw = api_get_paginated(
+            session, base_url,
+            f"/api/v4/groups/{encode_path(group_path)}/subgroups")
+        return [sg["full_path"] for sg in raw]
     except requests.RequestException:
         return []
+
+
+def get_direct_projects(session, base_url: str, group_path: str) -> list[str]:
+    """Fetch only the direct (non-recursive) projects of a single group.
+
+    Args:
+        session: API session for the instance.
+        base_url: Instance base URL.
+        group_path: Full path of the group.
+
+    Returns:
+        List of path_with_namespace strings for projects directly in this group.
+    """
+    raw = api_get_paginated(
+        session, base_url,
+        f"/api/v4/groups/{encode_path(group_path)}/projects",
+        params={"include_subgroups": False, "archived": False,
+                "simple": True, "order_by": "path", "sort": "asc"})
+    return [p["path_with_namespace"] for p in raw]
 
 
 def get_refs(session, base_url: str, project_path: str) -> dict | None:
@@ -279,6 +220,159 @@ def diff_refs(src: dict, dst: dict) -> list[str]:
     return diffs
 
 
+def _meta_cells(meta: dict | None) -> list:
+    """Return metadata cells (issues/mrs/milestones) for one side.
+
+    '-' when --check-metadata is off, '?' when the instance did not
+    report a count (X-Total returned -1).
+    """
+    if meta is None:
+        return ["-"] * 3
+    order = ("issues", "merge_requests", "milestones")
+    return [("?" if meta.get(k, -1) == -1 else meta[k]) for k in order]
+
+
+def _meta_columns(src_meta: dict | None, dst_meta: dict | None) -> list:
+    """Interleave src/dst metadata cells to match the CSV header order
+    (issues_src, issues_dst, mrs_src, mrs_dst, milestones_src, milestones_dst).
+    """
+    s, d = _meta_cells(src_meta), _meta_cells(dst_meta)
+    return [v for pair in zip(s, d) for v in pair]
+
+
+def compare_project(path: str, src_session, dst_session,
+                    src_url: str, dst_url: str, check_metadata: bool,
+                    counter: list, writer, oos_fh, miss_fh,
+                    counts: dict, failures, log) -> None:
+    """Fetch refs (and optionally metadata) for one project on both sides,
+    classify it, write the CSV row and output-file lines.
+
+    Args:
+        path: Full path_with_namespace of the project.
+        src_session / dst_session: API sessions for source / destination.
+        src_url / dst_url: Base URLs for source / destination.
+        check_metadata: Whether to compare issue/MR/milestone counts.
+        counter: Mutable ``[int]`` — incremented here, used for log lines.
+        writer: csv.writer for the sync report.
+        oos_fh / miss_fh: File handles for out-of-sync / missing lists.
+        counts: Shared dict ``{in_sync, out_of_sync, missing, error}``.
+        failures: FailureReport instance.
+        log: Logger.
+    """
+    counter[0] += 1
+    n = counter[0]
+    try:
+        src_refs = get_refs(src_session, src_url, path)
+        if src_refs is None:
+            log.warning("[%d] %s vanished from source, skipping", n, path)
+            return
+        dst_refs = get_refs(dst_session, dst_url, path)
+        src_meta = dst_meta = None
+        if check_metadata and dst_refs is not None:
+            src_meta = get_metadata_counts(src_session, src_url, path)
+            dst_meta = get_metadata_counts(dst_session, dst_url, path)
+    except requests.RequestException as exc:
+        counts["error"] += 1
+        log.error("[%d] %s API error: %s", n, path, exc)
+        failures.add(PHASE, path, f"verification API error: {exc}")
+        return
+
+    if dst_refs is None:
+        counts["missing"] += 1
+        writer.writerow([path, "missing", len(src_refs["branches"]),
+                         "-", len(src_refs["tags"]), "-"]
+                        + _meta_columns(None, None)
+                        + ["project not found on target"])
+        miss_fh.write(path + "\n")
+        log.warning("[%d] MISSING     %s", n, path)
+        return
+
+    diffs = diff_refs(src_refs, dst_refs)
+    if src_meta is not None and dst_meta is not None:
+        diffs.extend(diff_metadata(src_meta, dst_meta))
+    if diffs:
+        counts["out_of_sync"] += 1
+        writer.writerow([path, "out_of_sync",
+                         len(src_refs["branches"]), len(dst_refs["branches"]),
+                         len(src_refs["tags"]), len(dst_refs["tags"])]
+                        + _meta_columns(src_meta, dst_meta)
+                        + ["; ".join(diffs[:10])])
+        oos_fh.write(path + "\n")
+        log.warning("[%d] OUT_OF_SYNC %s (%d diffs)", n, path, len(diffs))
+    else:
+        counts["in_sync"] += 1
+        writer.writerow([path, "in_sync",
+                         len(src_refs["branches"]), len(dst_refs["branches"]),
+                         len(src_refs["tags"]), len(dst_refs["tags"])]
+                        + _meta_columns(src_meta, dst_meta)
+                        + [""])
+        if n % 100 == 0:
+            log.info("[%d] in_sync %s", n, path)
+
+
+def walk_and_compare(src_session, dst_session, src_url: str, dst_url: str,
+                     group_path: str, check_metadata: bool,
+                     counter: list, writer, oos_fh, miss_fh,
+                     counts: dict, failures, log, depth: int = 0) -> None:
+    """Recursively walk a group tree and compare each project inline.
+
+    For every group visited:
+      1. Fetch its direct projects and compare each immediately.
+      2. Fetch its immediate subgroups and recurse into each.
+
+    This avoids collecting all 10k+ paths upfront and lets comparison
+    start as soon as the first projects are discovered.
+
+    Args:
+        src_session / dst_session: API sessions.
+        src_url / dst_url: Base URLs.
+        group_path: Full path of the group to process.
+        check_metadata: Whether to compare metadata counts.
+        counter: Mutable ``[int]`` shared across the entire walk.
+        writer / oos_fh / miss_fh: Output handles (CSV + text files).
+        counts: Shared classification counters.
+        failures: FailureReport instance.
+        log: Logger.
+        depth: Current recursion depth (for indented log output).
+    """
+    indent = "  " * depth
+    log.info("%sProcessing group: %s", indent, group_path)
+
+    # --- direct projects in this group ---
+    try:
+        projects = get_direct_projects(src_session, src_url, group_path)
+    except requests.RequestException as exc:
+        log.error("%s  Failed to list projects in '%s': %s",
+                  indent, group_path, exc)
+        failures.add(PHASE, group_path, f"list projects error: {exc}")
+        projects = []
+
+    log.info("%s  %d direct projects", indent, len(projects))
+    for path in projects:
+        compare_project(path, src_session, dst_session, src_url, dst_url,
+                        check_metadata, counter, writer, oos_fh, miss_fh,
+                        counts, failures, log)
+
+    # --- subgroups → recurse ---
+    subgroups = get_subgroups(src_session, src_url, group_path)
+    if subgroups:
+        log.info("%s  %d subgroups", indent, len(subgroups))
+    for sg in subgroups:
+        walk_and_compare(src_session, dst_session, src_url, dst_url,
+                         sg, check_metadata, counter, writer, oos_fh,
+                         miss_fh, counts, failures, log, depth + 1)
+
+
+def _is_group(session, base_url: str, path: str) -> bool:
+    """Return True if *path* resolves as a group on the instance."""
+    try:
+        resp = session.get(
+            f"{base_url}/api/v4/groups/{encode_path(path)}", timeout=60)
+        return resp.status_code == 200
+    except requests.RequestException:
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="migration_config.json")
@@ -300,22 +394,10 @@ def main() -> None:
     log = setup_logging(os.path.join(cfg["reports_dir"], "verify.log"))
     failures = FailureReport(cfg["reports_dir"], "verify_failures.csv")
 
-    src = make_session(cfg["source"]["token"])
-    dst = make_session(cfg["destination"]["token"])
-
-    if args.projects_file:
-        with open(args.projects_file, encoding="utf-8") as fh:
-            input_paths = [ln.strip() for ln in fh if ln.strip()]
-        log.info("Loaded %d paths from %s", len(input_paths), args.projects_file)
-        log.info("Expanding any group paths to projects ...")
-        paths = expand_group_paths(src, cfg["source"]["url"], input_paths, log)
-        log.info("Expanded to %d projects", len(paths))
-    else:
-        log.info("Enumerating source projects ...")
-        paths = [p["path_with_namespace"]
-                 for p in list_all_projects(src, cfg["source"]["url"],
-                                            cfg.get("top_level_group"))]
-    log.info("Verifying %d projects ...", len(paths))
+    src_session = make_session(cfg["source"]["token"])
+    dst_session = make_session(cfg["destination"]["token"])
+    src_url = cfg["source"]["url"]
+    dst_url = cfg["destination"]["url"]
 
     ts = utc_now().replace(":", "")
     report_path = os.path.join(cfg["reports_dir"], f"sync_report_{ts}.csv")
@@ -323,6 +405,7 @@ def main() -> None:
     missing_path = os.path.join(cfg["reports_dir"], f"missing_{ts}.txt")
 
     counts = {"in_sync": 0, "out_of_sync": 0, "missing": 0, "error": 0}
+    counter = [0]  # mutable int shared across recursive calls
 
     with open(report_path, "w", newline="", encoding="utf-8") as rep_fh, \
          open(oos_path, "w", encoding="utf-8") as oos_fh, \
@@ -336,76 +419,59 @@ def main() -> None:
                          "milestones_src", "milestones_dst",
                          "differences"])
 
-        def meta_cells(meta: dict | None) -> list:
-            """Return the 7 metadata cells (issues/mrs/milestones,
-            src+dst) for one side. '-' when --check-metadata is off,
-            '?' when the instance did not report a count (X-Total -1)."""
-            if meta is None:
-                return ["-"] * 4
-            order = ("issues", "merge_requests", "milestones")
-            return [("?" if meta.get(k, -1) == -1 else meta[k]) for k in order]
+        if args.projects_file:
+            # --- projects-file path: process each entry inline ---
+            with open(args.projects_file, encoding="utf-8") as fh:
+                input_paths = [ln.strip() for ln in fh if ln.strip()]
+            log.info("Loaded %d paths from %s",
+                     len(input_paths), args.projects_file)
 
-        def meta_columns(src_meta: dict | None, dst_meta: dict | None) -> list:
-            """Interleave src/dst metadata cells to match the header order
-            (issues_src, issues_dst, mrs_src, mrs_dst, ...)."""
-            s, d = meta_cells(src_meta), meta_cells(dst_meta)
-            return [v for pair in zip(s, d) for v in pair]
+            for path in input_paths:
+                # Try as a project first (common case, avoids extra API call).
+                try:
+                    src_refs = get_refs(src_session, src_url, path)
+                except requests.RequestException:
+                    src_refs = None
 
-        for n, path in enumerate(paths, 1):
-            try:
-                src_refs = get_refs(src, cfg["source"]["url"], path)
-                if src_refs is None:
-                    # Gone from source (deleted since enumeration) - skip.
-                    log.warning("[%d/%d] %s vanished from source, skipping",
-                                n, len(paths), path)
-                    continue
-                dst_refs = get_refs(dst, cfg["destination"]["url"], path)
-                src_meta = dst_meta = None
-                if args.check_metadata and dst_refs is not None:
-                    src_meta = get_metadata_counts(src, cfg["source"]["url"], path)
-                    dst_meta = get_metadata_counts(dst, cfg["destination"]["url"], path)
-            except requests.RequestException as exc:
-                counts["error"] += 1
-                log.error("[%d/%d] %s API error: %s", n, len(paths), path, exc)
-                failures.add(PHASE, path, f"verification API error: {exc}")
-                continue
-
-            if dst_refs is None:
-                counts["missing"] += 1
-                writer.writerow([path, "missing", len(src_refs["branches"]),
-                                 "-", len(src_refs["tags"]), "-"]
-                                + meta_columns(None, None)
-                                + ["project not found on target"])
-                miss_fh.write(path + "\n")
-                log.warning("[%d/%d] MISSING     %s", n, len(paths), path)
-                continue
-
-            diffs = diff_refs(src_refs, dst_refs)
-            if src_meta is not None and dst_meta is not None:
-                diffs.extend(diff_metadata(src_meta, dst_meta))
-            if diffs:
-                counts["out_of_sync"] += 1
-                writer.writerow([path, "out_of_sync",
-                                 len(src_refs["branches"]), len(dst_refs["branches"]),
-                                 len(src_refs["tags"]), len(dst_refs["tags"])]
-                                + meta_columns(src_meta, dst_meta)
-                                + ["; ".join(diffs[:10])])
-                oos_fh.write(path + "\n")
-                log.warning("[%d/%d] OUT_OF_SYNC %s (%d diffs)",
-                            n, len(paths), path, len(diffs))
+                if src_refs is not None:
+                    # It resolved as a project — compare directly.
+                    compare_project(path, src_session, dst_session,
+                                    src_url, dst_url, args.check_metadata,
+                                    counter, writer, oos_fh, miss_fh,
+                                    counts, failures, log)
+                elif _is_group(src_session, src_url, path):
+                    # It's a group — recurse into it.
+                    log.info("'%s' is a group, walking recursively ...", path)
+                    walk_and_compare(src_session, dst_session, src_url,
+                                     dst_url, path, args.check_metadata,
+                                     counter, writer, oos_fh, miss_fh,
+                                     counts, failures, log)
+                else:
+                    log.warning("'%s' is neither a project nor a group on "
+                                "source, skipping", path)
+        else:
+            # --- default path: recursive walk from top-level group ---
+            top = cfg.get("top_level_group")
+            if top:
+                log.info("Walking group tree from '%s' ...", top)
+                walk_and_compare(src_session, dst_session, src_url, dst_url,
+                                 top, args.check_metadata, counter, writer,
+                                 oos_fh, miss_fh, counts, failures, log)
             else:
-                counts["in_sync"] += 1
-                writer.writerow([path, "in_sync",
-                                 len(src_refs["branches"]), len(dst_refs["branches"]),
-                                 len(src_refs["tags"]), len(dst_refs["tags"])]
-                                + meta_columns(src_meta, dst_meta)
-                                + [""])
-                if n % 100 == 0:
-                    log.info("[%d/%d] progress ... last: %s in_sync",
-                             n, len(paths), path)
+                log.info("No top_level_group set — listing all projects ...")
+                paths = [p["path_with_namespace"]
+                         for p in list_all_projects(src_session, src_url, None)]
+                log.info("Verifying %d projects ...", len(paths))
+                for path in paths:
+                    compare_project(path, src_session, dst_session,
+                                    src_url, dst_url, args.check_metadata,
+                                    counter, writer, oos_fh, miss_fh,
+                                    counts, failures, log)
 
-    log.info("Done. in_sync=%(in_sync)d out_of_sync=%(out_of_sync)d "
-             "missing=%(missing)d errors=%(error)d", counts)
+    log.info("Done. Verified %d projects: in_sync=%d out_of_sync=%d "
+             "missing=%d errors=%d", counter[0],
+             counts["in_sync"], counts["out_of_sync"],
+             counts["missing"], counts["error"])
     log.info("Full report : %s", report_path)
     log.info("Out-of-sync list (input for resync_repos.py): %s", oos_path)
     log.info("Missing list (input for transfer_repos.py --projects-file): %s",
