@@ -1,267 +1,478 @@
+#!/usr/bin/env python3
 """
-gitlab_common.py
-================
-Shared utilities for the GitLab server-to-server migration toolkit.
+transfer_repos.py  (Phase 1 - initial migration)
+================================================
+Throttled migration of projects from an old GitLab server to a new one
+using the *direct transfer* (bulk import) API:
 
-This module is imported by:
-    1. transfer_repos.py  - throttled bulk import (direct transfer) of projects
-    2. verify_sync.py     - source vs. target repository comparison
-    3. resync_repos.py    - git-level re-sync of out-of-sync repositories
+    POST {destination}/api/v4/bulk_imports
 
-Configuration
+How it protects the source server
+---------------------------------
+Direct transfer is pull-based: the DESTINATION instance asks the SOURCE
+instance to export each entity, which costs the source CPU/Sidekiq.
+To keep that load controlled, this script:
+
+    1. Enumerates all projects under `top_level_group` on the source.
+    2. Submits them in small batches (default 10 projects per
+       bulk-import request - `batch_size` in config).
+    3. POLLS the bulk import until it reaches a terminal state
+       (finished / failed / timeout) before doing anything else, so at
+       most one batch is ever exporting on the source.
+    4. SLEEPS `sleep_between_batches_seconds` (default 300) between
+       batches to let the source breathe.
+    5. Persists progress to `state_file` after every project, so the
+       script can be stopped (Ctrl-C) and re-run; already-completed
+       projects are skipped on resume.
+
+Failures
+--------
+Any project whose bulk-import entity ends in `failed`/`timeout`, or any
+batch that cannot be submitted at all, is appended to
+    reports/transfer_failures.csv
+with a reason (including GitLab's per-entity failure details when
+available). The run continues with the next batch.
+
+Prerequisites
 -------------
-All scripts read a single JSON config file (default: ./migration_config.json).
-Example:
+* Direct transfer must be enabled on BOTH instances
+  (Admin Area > Settings > General > Import and export settings).
+* Destination token: `api` scope, permission to create projects in the
+  destination namespace. Source token: `api` + `read_repository`.
+* The destination namespace (group/subgroup tree) is derived from each
+  project's source path: by default the project is recreated under the
+  SAME full path on the destination. The group hierarchy must already
+  exist there - migrate groups first, or pre-create them. (You can also
+  run one group-level bulk import with "migrate_projects": false to
+  copy the empty group tree, then use this script for projects.)
 
-    {
-      "source": {
-        "url": "https://gitlab-old.example.com",
-        "token": "glpat-source-XXXX"
-      },
-      "destination": {
-        "url": "https://gitlab-new.example.com",
-        "token": "glpat-dest-XXXX"
-      },
-      "top_level_group": "myorg",
-      "batch_size": 10,
-      "sleep_between_batches_seconds": 300,
-      "poll_interval_seconds": 30,
-      "batch_timeout_seconds": 3600,
-      "state_file": "transfer_state.json",
-      "reports_dir": "reports"
-    }
-
-Tokens:
-    * Destination token: needs `api` scope; the user must be allowed to
-      create groups/projects under the destination namespace.
-    * Source token: needs `api` + `read_repository` scope on everything
-      being migrated. Both are sent to the *destination* instance, which
-      pulls from the source (that is how direct transfer works).
-
-Design notes
-------------
-* Synchronous `requests` only - easy to read, easy to debug, no async.
-* Every API call goes through one Session with automatic retry/backoff
-  on 429/5xx so a brief hiccup never kills a 10k-repo run.
-* Pagination uses GitLab's `X-Next-Page` header (keyset not required at
-  per_page=100 for this workload).
+Usage
+-----
+    python transfer_repos.py                       # uses migration_config.json
+    python transfer_repos.py --config other.json
+    python transfer_repos.py --dry-run             # list batches, no API writes
+    python transfer_repos.py --projects-file paths.txt
+        # paths.txt = one source path_with_namespace per line, overrides
+        # group enumeration (useful for retrying the failures report)
 """
 
-import csv
+import argparse
 import json
-import logging
 import os
 import sys
 import time
-import urllib.parse
-from datetime import datetime, timezone
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from gitlab_common import (FailureReport, encode_path, list_all_projects,
+                           load_config, make_session, setup_logging, utc_now)
 
-LOG_FORMAT = "%(asctime)s %(levelname)-7s %(message)s"
+PHASE = "transfer"
+TERMINAL_IMPORT_STATES = {"finished", "failed", "timeout"}
 
 
-def setup_logging(log_file: str) -> logging.Logger:
-    """Configure logging to both console and a file.
+def load_state(state_file: str) -> dict:
+    """Load resume state from disk.
 
-    Args:
-        log_file: Path of the log file (appended, never truncated, so a
-            resumed run keeps one continuous history).
-
-    Returns:
-        The root logger, configured.
-    """
-    logging.basicConfig(
-        level=logging.INFO,
-        format=LOG_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(log_file, encoding="utf-8"),
-        ],
-    )
-    return logging.getLogger()
-
-
-def load_config(path: str = "migration_config.json") -> dict:
-    """Load and minimally validate the shared JSON configuration file.
+    The state maps source `path_with_namespace` to a record:
+        {"status": "finished"|"failed"|"timeout"|"submitted",
+         "bulk_import_id": int, "updated_at": iso8601}
 
     Args:
-        path: Path to the JSON config file.
+        state_file: Path to the JSON state file.
 
     Returns:
-        Parsed configuration dictionary with defaults filled in.
-
-    Raises:
-        SystemExit: if the file is missing or required keys are absent.
+        State dict ({} if the file does not exist yet).
     """
-    if not os.path.exists(path):
-        sys.exit(f"Config file not found: {path} - see gitlab_common.py docstring for format.")
-    with open(path, "r", encoding="utf-8") as fh:
-        cfg = json.load(fh)
-
-    for side in ("source", "destination"):
-        if side not in cfg or "url" not in cfg[side] or "token" not in cfg[side]:
-            sys.exit(f"Config error: '{side}.url' and '{side}.token' are required.")
-        cfg[side]["url"] = cfg[side]["url"].rstrip("/")
-
-    cfg.setdefault("batch_size", 10)
-    cfg.setdefault("sleep_between_batches_seconds", 300)
-    cfg.setdefault("poll_interval_seconds", 30)
-    cfg.setdefault("batch_timeout_seconds", 3600)
-    cfg.setdefault("state_file", "transfer_state.json")
-    cfg.setdefault("reports_dir", "reports")
-    os.makedirs(cfg["reports_dir"], exist_ok=True)
-    return cfg
+    if os.path.exists(state_file):
+        with open(state_file, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    return {}
 
 
-def make_session(token: str) -> requests.Session:
-    """Build a requests Session with the PRIVATE-TOKEN header and a
-    retry policy (5 attempts, exponential backoff) for 429 and 5xx.
+def save_state(state_file: str, state: dict) -> None:
+    """Atomically persist resume state (write tmp file, then rename)."""
+    tmp = state_file + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(state, fh, indent=2)
+    os.replace(tmp, state_file)
+
+
+def build_entities(batch: list[dict]) -> list[dict]:
+    """Convert source records into bulk-import `entities`.
+
+    Each entry is recreated at the SAME full path on the destination:
+    destination_namespace = everything before the last '/',
+    destination_slug      = the last path segment.
+
+    Records may carry an optional "entity_type" key ("project" default,
+    or "group" for subgroup paths supplied via --projects-file). A group
+    entity imports the subgroup AND everything nested inside it
+    (migrate_projects=true), so its destination_namespace only needs the
+    PARENT chain to exist on the destination. Note: an empty namespace
+    (top-level group) is only valid on self-managed/Dedicated targets.
 
     Args:
-        token: GitLab personal/group access token.
+        batch: List of dicts with at least path_with_namespace.
 
     Returns:
-        Configured requests.Session.
+        List of entity dicts for the POST /bulk_imports payload.
     """
-    session = requests.Session()
-    session.headers.update({"PRIVATE-TOKEN": token})
-    
-    # Configure certificate verification using local certificate files
-    import os
-    cert_path = os.path.join(os.path.dirname(__file__), 'ca-bundle.pem')
-    if os.path.exists(cert_path):
-        session.verify = cert_path
-    else:
-        # Fallback to system certificates if our bundle doesn't exist
-        session.verify = True
-    
-    retry = Retry(
-        total=5,
-        backoff_factor=2,  # 2s, 4s, 8s, 16s, 32s
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("GET", "POST", "DELETE"),
-        respect_retry_after_header=True,
-    )
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    return session
-
-
-def api_get_paginated(session: requests.Session, base_url: str, path: str,
-                      params: dict | None = None) -> list:
-    """GET every page of a paginated GitLab API collection.
-
-    Follows the `X-Next-Page` response header until exhausted.
-
-    Args:
-        session: Session created by make_session().
-        base_url: Instance base URL, e.g. https://gitlab.example.com
-        path: API path beginning with '/', e.g. '/api/v4/projects'.
-        params: Extra query parameters (per_page/page are managed here).
-
-    Returns:
-        Concatenated list of all JSON items across pages.
-
-    Raises:
-        requests.HTTPError: on a non-2xx response after retries.
-    """
-    items, page = [], "1"
-    params = dict(params or {})
-    params["per_page"] = 5
-    while page:
-        params["page"] = page
-        resp = session.get(f"{base_url}{path}", params=params, timeout=60)
-        resp.raise_for_status()
-        items.extend(resp.json())
-        page = resp.headers.get("X-Next-Page") or None
-    return items
-
-
-def encode_path(full_path: str) -> str:
-    """URL-encode a project/group full path for use as an API id,
-    e.g. 'group/sub/repo' -> 'group%2Fsub%2Frepo'."""
-    return urllib.parse.quote(full_path, safe="")
-
-
-def list_all_projects(session: requests.Session, base_url: str,
-                      top_level_group: str | None) -> list[dict]:
-    """Enumerate every project to migrate from the source instance.
-
-    If `top_level_group` is set, lists that group's projects including all
-    subgroups (the normal case). If it is None/empty, lists every project
-    on the instance (requires an admin token).
-
-    Args:
-        session: Source-instance session.
-        base_url: Source instance base URL.
-        top_level_group: Full path of the top-level group, or None.
-
-    Returns:
-        List of dicts: {id, path_with_namespace, name, archived,
-        default_branch}.
-    """
-    if top_level_group:
-        path = f"/api/v4/groups/{encode_path(top_level_group)}/projects"
-        params = {"include_subgroups": True, "archived": False, "simple": False,
-                  "order_by": "path", "sort": "asc"}
-    else:
-        path = "/api/v4/projects"
-        params = {"archived": False, "simple": False, "order_by": "path", "sort": "asc"}
-    raw = api_get_paginated(session, base_url, path, params)
-    return [
-        {
-            "id": p["id"],
-            "path_with_namespace": p["path_with_namespace"],
-            "name": p["name"],
-            "default_branch": p.get("default_branch"),
-            "archived": p.get("archived", False),
+    entities = []
+    for rec in batch:
+        full = rec["path_with_namespace"]
+        namespace, _, slug = full.rpartition("/")
+        entity = {
+            "source_full_path": full,
+            "destination_slug": slug,
+            "destination_namespace": namespace,
         }
-        for p in raw
-    ]
+        if rec.get("entity_type") == "group":
+            entity["source_type"] = "group_entity"
+            entity["migrate_projects"] = True
+        else:
+            entity["source_type"] = "project_entity"
+        entities.append(entity)
+    return entities
 
 
-def utc_now() -> str:
-    """Current UTC timestamp in ISO-8601, used in all reports."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+def classify_path(src_session, base_url: str, path: str) -> str | None:
+    """Determine whether a source path is a group or a project.
 
+    Asks the source API: a 200 on /groups/:path means group (subgroup),
+    otherwise a 200 on /projects/:path means project.
 
-class FailureReport:
-    """Append-only CSV failure report shared by all three scripts.
+    Args:
+        src_session: Source-instance session.
+        base_url: Source base URL.
+        path: Full path, e.g. 'g1/sg1/sg2/sg3' or 'g1/sg1/repo'.
 
-    Every phase writes failures in the same shape so they can be
-    concatenated, grepped, or loaded into a spreadsheet:
-
-        timestamp, phase, project_path, reason
-
-    The file is opened in append mode and flushed per row, so even if a
-    script dies mid-run, everything reported so far is on disk.
+    Returns:
+        'group', 'project', or None if the path exists as neither.
     """
+    if src_session.get(f"{base_url}/api/v4/groups/{encode_path(path)}",
+                       params={"with_projects": False}, timeout=60).status_code == 200:
+        return "group"
+    if src_session.get(f"{base_url}/api/v4/projects/{encode_path(path)}",
+                       timeout=60).status_code == 200:
+        return "project"
+    return None
 
-    HEADER = ["timestamp", "phase", "project_path", "reason"]
 
-    def __init__(self, reports_dir: str, filename: str):
-        """Create/open the report file, writing the header if new.
+def ensure_namespace(dst_session, dest_url: str, namespace: str,
+                     cache: dict, log) -> bool:
+    """Make sure a destination group chain exists, creating missing levels.
 
-        Args:
-            reports_dir: Directory for reports (created by load_config).
-            filename: e.g. 'transfer_failures.csv'.
-        """
-        self.path = os.path.join(reports_dir, filename)
-        new_file = not os.path.exists(self.path)
-        self._fh = open(self.path, "a", newline="", encoding="utf-8")
-        self._writer = csv.writer(self._fh)
-        if new_file:
-            self._writer.writerow(self.HEADER)
-            self._fh.flush()
+    The bulk import API requires `destination_namespace` to be an
+    EXISTING group for project entities - it never creates it. This
+    walks the chain top-down (g1, then g1/sg1, then g1/sg1/sg2, ...);
+    each level is checked with GET /groups/:path and created with
+    POST /groups (name=path=segment, parent_id=<level above>) if absent.
 
-    def add(self, phase: str, project_path: str, reason: str) -> None:
-        """Record one failure row and flush immediately."""
-        self._writer.writerow([utc_now(), phase, project_path, reason])
-        self._fh.flush()
+    Groups created here are plain private groups carrying only the path -
+    no labels/milestones/settings from the source. If you need full group
+    metadata, run a group_entity import with migrate_projects=false
+    instead; this function is the convenience fallback so project
+    transfers never fail on a missing namespace.
 
-    def close(self) -> None:
-        self._fh.close()
+    Args:
+        dst_session: Destination API session.
+        dest_url: Destination base URL.
+        namespace: Full group path, e.g. 'g1/sg1/sg2/sg3' ('' allowed -
+            returns True, nothing to ensure).
+        cache: Dict path->group_id shared across calls so each level is
+            checked/created at most once per run.
+        log: Logger.
+
+    Returns:
+        True if the namespace exists (or was created), False if a level
+        could not be created (recorded by the caller as a failure).
+    """
+    if not namespace:
+        return True
+    parent_id = None
+    current = ""
+    for segment in namespace.split("/"):
+        current = f"{current}/{segment}" if current else segment
+        if current in cache:
+            parent_id = cache[current]
+            continue
+        resp = dst_session.get(
+            f"{dest_url}/api/v4/groups/{encode_path(current)}",
+            params={"with_projects": False}, timeout=60)
+        if resp.status_code == 200:
+            parent_id = resp.json()["id"]
+            cache[current] = parent_id
+            continue
+        if resp.status_code != 404:
+            log.error("Namespace check failed for '%s': HTTP %s",
+                      current, resp.status_code)
+            return False
+        payload = {"name": segment, "path": segment, "visibility": "private"}
+        if parent_id is not None:
+            payload["parent_id"] = parent_id
+        create = dst_session.post(f"{dest_url}/api/v4/groups",
+                                  json=payload, timeout=60)
+        if create.status_code not in (200, 201):
+            log.error("Could not create group '%s': HTTP %s %s",
+                      current, create.status_code, create.text[:300])
+            return False
+        parent_id = create.json()["id"]
+        cache[current] = parent_id
+        log.info("  created missing destination group: %s (id=%s)",
+                 current, parent_id)
+    return True
+
+
+def submit_batch(dest_session, dest_url: str, source_url: str,
+                 source_token: str, batch: list[dict], log) -> int | None:
+    """Submit one batch of projects as a single bulk import.
+
+    Args:
+        dest_session: Destination-instance session (auth header set).
+        dest_url: Destination base URL.
+        source_url: Source base URL (sent in the payload `configuration`).
+        source_token: Source token (sent in the payload `configuration`).
+        batch: Project records for this batch.
+        log: Logger.
+
+    Returns:
+        The created bulk import id, or None if submission failed.
+    """
+    payload = {
+        "configuration": {"url": source_url, "access_token": source_token},
+        "entities": build_entities(batch),
+    }
+    resp = dest_session.post(f"{dest_url}/api/v4/bulk_imports",
+                             json=payload, timeout=120)
+    if resp.status_code not in (200, 201):
+        log.error("Batch submission failed: HTTP %s %s",
+                  resp.status_code, resp.text[:500])
+        return None
+    bulk_id = resp.json()["id"]
+    log.info("Submitted bulk import id=%s with %d projects", bulk_id, len(batch))
+    return bulk_id
+
+
+def wait_for_batch(dest_session, dest_url: str, bulk_id: int,
+                   poll_interval: int, timeout: int, log) -> dict:
+    """Poll a bulk import until it reaches a terminal state, then fetch
+    per-entity outcomes.
+
+    Args:
+        dest_session: Destination session.
+        dest_url: Destination base URL.
+        bulk_id: Bulk import id returned by submit_batch().
+        poll_interval: Seconds between status polls.
+        timeout: Give up after this many seconds (the import keeps
+            running server-side; we just stop waiting and mark unknown
+            entities as 'timeout' so they land in the failure report
+            for manual review).
+        log: Logger.
+
+    Returns:
+        Mapping of source_full_path -> {"status": str, "failures": list}.
+    """
+    deadline = time.time() + timeout
+    status = "created"
+    while time.time() < deadline:
+        resp = dest_session.get(f"{dest_url}/api/v4/bulk_imports/{bulk_id}",
+                                timeout=60)
+        resp.raise_for_status()
+        status = resp.json()["status"]
+        if status in TERMINAL_IMPORT_STATES:
+            break
+        log.info("  bulk_import %s status=%s ... waiting %ss",
+                 bulk_id, status, poll_interval)
+        time.sleep(poll_interval)
+    else:
+        log.warning("  bulk_import %s did not finish within %ss (last=%s)",
+                    bulk_id, timeout, status)
+
+    # Per-entity results (paginated; batches are small so one page).
+    resp = dest_session.get(
+        f"{dest_url}/api/v4/bulk_imports/{bulk_id}/entities",
+        params={"per_page": 100}, timeout=60)
+    resp.raise_for_status()
+    results = {}
+    for ent in resp.json():
+        results[ent["source_full_path"]] = {
+            "status": ent["status"],
+            "failures": ent.get("failures", []),
+        }
+    return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default="migration_config.json")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Show the batch plan without calling any write API.")
+    parser.add_argument("--projects-file",
+                        help="File with one source path_with_namespace per line; "
+                             "overrides group enumeration.")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Before transferring, check the DESTINATION for each "
+                             "pending path and skip any project that already "
+                             "exists there (marking it finished in the state "
+                             "file). Protects against duplicate imports when the "
+                             "state file is missing/stale or projects were "
+                             "migrated outside this script. Costs one GET per "
+                             "pending project.")
+    args = parser.parse_args()
+
+    cfg = load_config(args.config)
+    log = setup_logging(os.path.join(cfg["reports_dir"], "transfer.log"))
+    failures = FailureReport(cfg["reports_dir"], "transfer_failures.csv")
+
+    src = make_session(cfg["source"]["token"])
+    dst = make_session(cfg["destination"]["token"])
+
+    # ---- enumerate -------------------------------------------------------
+    if args.projects_file:
+        with open(args.projects_file, encoding="utf-8") as fh:
+            wanted = [ln.strip() for ln in fh if ln.strip()
+                      and not ln.strip().startswith("#")]
+        projects = []
+        for p in wanted:
+            kind = classify_path(src, cfg["source"]["url"], p)
+            if kind is None:
+                log.error("Path '%s' is neither a group nor a project on "
+                          "source - skipping (recorded as failure).", p)
+                failures.add(PHASE, p, "path not found on source as group or project")
+                continue
+            if kind == "group":
+                log.warning("Path '%s' is a SUBGROUP: it will be imported as a "
+                            "group_entity including ALL nested projects in one "
+                            "entity - batch throttling does not apply inside it.", p)
+            projects.append({"path_with_namespace": p, "entity_type": kind})
+        log.info("Loaded %d valid paths from %s", len(projects), args.projects_file)
+    else:
+        log.info("Enumerating projects under group '%s' on %s ...",
+                 cfg.get("top_level_group"), cfg["source"]["url"])
+        projects = list_all_projects(src, cfg["source"]["url"],
+                                     cfg.get("top_level_group"))
+        log.info("Found %d projects on source.", len(projects))
+
+    # ---- resume filter ---------------------------------------------------
+    state = load_state(cfg["state_file"])
+    pending = [p for p in projects
+               if state.get(p["path_with_namespace"], {}).get("status") != "finished"]
+    log.info("%d already finished (state file), %d pending.",
+             len(projects) - len(pending), len(pending))
+
+    # ---- destination existence check (--skip-existing) --------------------
+    # The bulk import API is NOT idempotent: re-importing an existing path
+    # creates a duplicate project. This optional pass asks the destination
+    # whether each pending PROJECT path already exists and, if so, marks it
+    # finished instead of re-submitting it. (Group entities are not skipped
+    # this way: an existing group may legitimately need its projects.)
+    if args.skip_existing and pending:
+        log.info("Checking destination for %d pending paths (--skip-existing) ...",
+                 len(pending))
+        still_pending = []
+        for n, p in enumerate(pending, 1):
+            path = p["path_with_namespace"]
+            if p.get("entity_type") == "group":
+                still_pending.append(p)
+                continue
+            resp = dst.get(
+                f"{cfg['destination']['url']}/api/v4/projects/{encode_path(path)}",
+                timeout=60)
+            if resp.status_code == 200:
+                state[path] = {"status": "finished",
+                               "note": "already existed on destination",
+                               "updated_at": utc_now()}
+                log.info("  [%d/%d] exists on destination, skipping: %s",
+                         n, len(pending), path)
+            else:
+                still_pending.append(p)
+        save_state(cfg["state_file"], state)
+        log.info("%d skipped (already on destination), %d remain to transfer.",
+                 len(pending) - len(still_pending), len(still_pending))
+        pending = still_pending
+
+    batch_size = cfg["batch_size"]
+    batches = [pending[i:i + batch_size] for i in range(0, len(pending), batch_size)]
+
+    if args.dry_run:
+        for i, b in enumerate(batches, 1):
+            log.info("Batch %d/%d: %s", i, len(batches),
+                     ", ".join(p["path_with_namespace"] for p in b))
+        log.info("Dry run complete - nothing submitted.")
+        return
+
+    # ---- transfer loop ---------------------------------------------------
+    ns_cache: dict = {}  # destination group path -> group id (shared, per run)
+    for i, batch in enumerate(batches, 1):
+        log.info("=== Batch %d/%d (%d projects) at %s ===",
+                 i, len(batches), len(batch), utc_now())
+
+        # The bulk import API never creates destination namespaces for
+        # project entities - make sure each group chain exists first.
+        ready = []
+        for p in batch:
+            namespace = p["path_with_namespace"].rpartition("/")[0]
+            if ensure_namespace(dst, cfg["destination"]["url"], namespace,
+                                ns_cache, log):
+                ready.append(p)
+            else:
+                failures.add(PHASE, p["path_with_namespace"],
+                             f"destination namespace '{namespace}' missing and "
+                             f"could not be created (see transfer.log)")
+                state[p["path_with_namespace"]] = {"status": "failed",
+                                                   "updated_at": utc_now()}
+        if not ready:
+            save_state(cfg["state_file"], state)
+            continue
+        batch = ready
+
+        bulk_id = submit_batch(dst, cfg["destination"]["url"],
+                               cfg["source"]["url"], cfg["source"]["token"],
+                               batch, log)
+        if bulk_id is None:
+            for p in batch:
+                failures.add(PHASE, p["path_with_namespace"],
+                             "bulk import submission failed (see transfer.log)")
+                state[p["path_with_namespace"]] = {"status": "failed",
+                                                   "updated_at": utc_now()}
+            save_state(cfg["state_file"], state)
+            time.sleep(cfg["sleep_between_batches_seconds"])
+            continue
+
+        results = wait_for_batch(dst, cfg["destination"]["url"], bulk_id,
+                                 cfg["poll_interval_seconds"],
+                                 cfg["batch_timeout_seconds"], log)
+
+        for p in batch:
+            path = p["path_with_namespace"]
+            res = results.get(path, {"status": "timeout", "failures": []})
+            state[path] = {"status": res["status"], "bulk_import_id": bulk_id,
+                           "updated_at": utc_now()}
+            if res["status"] == "finished":
+                log.info("  OK  %s", path)
+            else:
+                reason = res["status"]
+                if res["failures"]:
+                    f0 = res["failures"][0]
+                    reason += f" | {f0.get('pipeline_class', '')}: " \
+                              f"{f0.get('exception_message', '')[:200]}"
+                log.error("  FAIL %s -> %s", path, reason)
+                failures.add(PHASE, path, reason)
+        save_state(cfg["state_file"], state)
+
+        if i < len(batches):
+            log.info("Sleeping %ss before next batch ...",
+                     cfg["sleep_between_batches_seconds"])
+            time.sleep(cfg["sleep_between_batches_seconds"])
+
+    done = sum(1 for v in state.values() if v.get("status") == "finished")
+    log.info("Transfer pass complete: %d/%d finished. Failures (if any) in %s",
+             done, len(projects), failures.path)
+    failures.close()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit("\nInterrupted - state saved after last completed batch; "
+                 "re-run to resume.")
