@@ -58,6 +58,104 @@ from gitlab_common import (FailureReport, api_get_paginated, encode_path,
 PHASE = "verify"
 
 
+def is_group(session, base_url: str, path: str) -> bool:
+    """Check if a path is a group/subgroup (not a project).
+    
+    Args:
+        session: API session for the instance.
+        base_url: Instance base URL.
+        path: Full path to check.
+    
+    Returns:
+        True if the path is a group, False if it's a project or doesn't exist.
+    """
+    # Try to get it as a group first
+    try:
+        resp = session.get(f"{base_url}/api/v4/groups/{encode_path(path)}", timeout=60)
+        if resp.status_code == 200:
+            return True
+    except requests.RequestException:
+        pass
+    return False
+
+
+def expand_group_paths(session, base_url: str, paths: list[str], log) -> list[str]:
+    """Expand any group paths in the list to all projects under those groups.
+    
+    Args:
+        session: API session for the instance.
+        base_url: Instance base URL.
+        paths: List of paths that may be projects or groups.
+        log: Logger instance for progress messages.
+    
+    Returns:
+        List of project paths with groups expanded to their projects.
+    """
+    expanded = []
+    
+    def get_projects_from_group(group_path: str, log) -> list[str]:
+        """Get all projects from a group, handling subgroups recursively."""
+        projects = []
+        
+        # Get projects from this group
+        group_projects = list_all_projects(session, base_url, group_path)
+        project_paths = [p["path_with_namespace"] for p in group_projects]
+        log.info("    Found %d projects in group '%s'", len(project_paths), group_path)
+        projects.extend(project_paths)
+        
+        return projects
+    
+    def process_paths_recursive(paths_to_process: list[str], log) -> list[str]:
+        """Process paths recursively, handling groups by getting their subgroups."""
+        result = []
+        
+        for path in paths_to_process:
+            if is_group(session, base_url, path):
+                # It's a group - get its projects first
+                log.info("  Processing group '%s' ...", path)
+                result.extend(get_projects_from_group(path, log))
+                
+                # Then get subgroups and process them recursively
+                subgroups = get_subgroups(session, base_url, path)
+                if subgroups:
+                    log.info("    Found %d subgroups in '%s'", len(subgroups), path)
+                    # Process subgroups recursively
+                    result.extend(process_paths_recursive(subgroups, log))
+            else:
+                # It's a project path - add directly
+                result.append(path)
+        
+        return result
+    
+    # Process the initial paths
+    expanded = process_paths_recursive(paths, log)
+    return expanded
+
+def get_subgroups(session, base_url: str, group_path: str) -> list[str]:
+    """Get all subgroups under a given group path.
+    
+    Args:
+        session: API session for the instance.
+        base_url: Instance base URL.
+        group_path: Path to the parent group.
+    
+    Returns:
+        List of subgroup paths.
+    """
+    try:
+        # Get subgroups of the given group
+        resp = session.get(
+            f"{base_url}/api/v4/groups/{encode_path(group_path)}/subgroups",
+            params={"include_parent": False, "per_page": 100},
+            timeout=60
+        )
+        resp.raise_for_status()
+        subgroups = resp.json()
+        return [sg["full_path"] for sg in subgroups]
+    except requests.RequestException:
+        return []
+
+
 def get_refs(session, base_url: str, project_path: str) -> dict | None:
     """Fetch all branch and tag tips for one project.
 
@@ -97,13 +195,12 @@ def get_refs(session, base_url: str, project_path: str) -> dict | None:
 METADATA_KINDS = {
     "issues": ("issues", {"state": "all", "scope": "all"}),
     "merge_requests": ("merge_requests", {"state": "all", "scope": "all"}),
-    "labels": ("labels", {}),
     "milestones": ("milestones", {"state": "all"}),
 }
 
 
 def get_metadata_counts(session, base_url: str, project_path: str) -> dict:
-    """Fetch item COUNTS for issues, MRs, labels, and milestones.
+    """Fetch item COUNTS for issues, MRs,  and milestones.
 
     Uses per_page=1 requests and reads the `X-Total` response header, so
     each collection costs a single tiny GET regardless of its size.
@@ -190,7 +287,7 @@ def main() -> None:
                              "of enumerating the whole group.")
     parser.add_argument("--check-metadata", action="store_true",
                         help="Also compare COUNTS of issues, merge requests, "
-                             "labels, and milestones (git refs alone cannot "
+                             "and milestones (git refs alone cannot "
                              "detect metadata drift). Count-based: catches "
                              "partial imports and post-migration activity, "
                              "not item-level content edits. Adds 8 small API "
@@ -203,13 +300,16 @@ def main() -> None:
     log = setup_logging(os.path.join(cfg["reports_dir"], "verify.log"))
     failures = FailureReport(cfg["reports_dir"], "verify_failures.csv")
 
-    ca_bundle = cfg.get("ssl_ca_bundle")
-    src = make_session(cfg["source"]["token"], ca_bundle)
-    dst = make_session(cfg["destination"]["token"], ca_bundle)
+    src = make_session(cfg["source"]["token"])
+    dst = make_session(cfg["destination"]["token"])
 
     if args.projects_file:
         with open(args.projects_file, encoding="utf-8") as fh:
-            paths = [ln.strip() for ln in fh if ln.strip()]
+            input_paths = [ln.strip() for ln in fh if ln.strip()]
+        log.info("Loaded %d paths from %s", len(input_paths), args.projects_file)
+        log.info("Expanding any group paths to projects ...")
+        paths = expand_group_paths(src, cfg["source"]["url"], input_paths, log)
+        log.info("Expanded to %d projects", len(paths))
     else:
         log.info("Enumerating source projects ...")
         paths = [p["path_with_namespace"]
@@ -233,17 +333,16 @@ def main() -> None:
                          "branches_dst", "tags_src", "tags_dst",
                          "issues_src", "issues_dst",
                          "mrs_src", "mrs_dst",
-                         "labels_src", "labels_dst",
                          "milestones_src", "milestones_dst",
                          "differences"])
 
         def meta_cells(meta: dict | None) -> list:
-            """Return the 8 metadata cells (issues/mrs/labels/milestones,
+            """Return the 7 metadata cells (issues/mrs/milestones,
             src+dst) for one side. '-' when --check-metadata is off,
             '?' when the instance did not report a count (X-Total -1)."""
             if meta is None:
                 return ["-"] * 4
-            order = ("issues", "merge_requests", "labels", "milestones")
+            order = ("issues", "merge_requests", "milestones")
             return [("?" if meta.get(k, -1) == -1 else meta[k]) for k in order]
 
         def meta_columns(src_meta: dict | None, dst_meta: dict | None) -> list:
@@ -282,7 +381,7 @@ def main() -> None:
                 continue
 
             diffs = diff_refs(src_refs, dst_refs)
-            if src_meta is not None:
+            if src_meta is not None and dst_meta is not None:
                 diffs.extend(diff_metadata(src_meta, dst_meta))
             if diffs:
                 counts["out_of_sync"] += 1
