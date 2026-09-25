@@ -1,0 +1,12 @@
+# Java 17+ --add-opens flags required by OpenLiberty's Yoko ORB for IIOP/Remote EJB.
+# The Yoko ORB uses reflection to access internal JDK classes for CORBA serialization
+# and RMI-IIOP stub/tie generation.
+--add-opens=java.base/java.lang=ALL-UNNAMED
+--add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+--add-opens=java.base/java.io=ALL-UNNAMED
+--add-opens=java.base/java.security=ALL-UNNAMED
+--add-opens=java.base/java.util=ALL-UNNAMED
+--add-opens=java.base/java.net=ALL-UNNAMED
+--add-opens=java.base/sun.security.ssl=ALL-UNNAMED
+--add-opens=java.naming/javax.naming.spi=ALL-UNNAMED
+--add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED

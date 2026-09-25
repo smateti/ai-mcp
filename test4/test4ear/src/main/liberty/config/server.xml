@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="test4 - Stateless EJB with H2 JDBC and REST API">
+
+    <featureManager>
+        <feature>ejbRemote-3.2</feature>
+        <feature>jaxrs-2.1</feature>
+        <feature>jsonp-1.1</feature>
+        <feature>jndi-1.0</feature>
+        <feature>jdbc-4.2</feature>
+    </featureManager>
+
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9083"
+                  httpsPort="9446"
+                  host="*"/>
+
+    <!-- IIOP endpoint for remote EJB access -->
+    <iiopEndpoint id="defaultIiopEndpoint"
+                  iiopPort="2809"
+                  host="localhost"/>
+
+    <applicationManager autoExpand="true"/>
+
+    <!-- H2 JDBC Driver as a shared library -->
+    <library id="h2Lib">
+        <fileset dir="${server.config.dir}/jdbc" includes="h2-*.jar"/>
+    </library>
+
+    <!-- H2 file-based DataSource -->
+    <dataSource id="h2DS" jndiName="jdbc/h2DB" type="javax.sql.DataSource">
+        <jdbcDriver libraryRef="h2Lib"/>
+        <properties URL="jdbc:h2:${server.output.dir}/h2data/test4db;AUTO_SERVER=TRUE"/>
+    </dataSource>
+
+    <!-- Deploy the EJB EAR -->
+    <enterpriseApplication id="test4ear"
+                           location="test4ear.ear"
+                           name="test4ear"/>
+
+    <logging consoleLogLevel="INFO"
+             traceSpecification="com.example.test4.*=fine"/>
+
+</server>

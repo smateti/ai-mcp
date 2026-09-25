@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>test4</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>test4ejb</artifactId>
+    <packaging>ejb</packaging>
+    <name>test4ejb - Stateless Remote EJB with H2 JDBC</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>javax</groupId>
+            <artifactId>javaee-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-ejb-plugin</artifactId>
+                <configuration>
+                    <ejbVersion>3.2</ejbVersion>
+                    <generateClient>true</generateClient>
+                    <clientIncludes>
+                        <clientInclude>com/example/test4/ejb/EmployeeRemote.class</clientInclude>
+                        <clientInclude>com/example/test4/ejb/Employee.class</clientInclude>
+                    </clientIncludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

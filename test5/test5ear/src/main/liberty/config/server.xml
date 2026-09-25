@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="test5 - Web Frontend calling test4 via Remote EJB/IIOP">
+
+    <featureManager>
+        <feature>servlet-4.0</feature>
+        <feature>ejbRemote-3.2</feature>
+        <feature>jndi-1.0</feature>
+    </featureManager>
+
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="9082"
+                  httpsPort="9445"
+                  host="*"/>
+
+    <!-- IIOP endpoint for this server's ORB (must use a different port than test4's 2809) -->
+    <iiopEndpoint id="defaultIiopEndpoint"
+                  iiopPort="2810"
+                  host="localhost"/>
+
+    <!-- ORB configuration: points to test4's IIOP CosNaming service -->
+    <orb nameService="corbaname::localhost:2809"/>
+
+    <applicationManager autoExpand="true"/>
+
+    <enterpriseApplication id="test5ear"
+                           location="test5ear.ear"
+                           name="test5ear"/>
+
+    <logging consoleLogLevel="INFO"
+             traceSpecification="com.example.test5.*=fine"/>
+
+</server>
